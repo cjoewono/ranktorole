@@ -32,15 +32,17 @@
 
 ### Database Models
 - [ ] User model (UUID PK, extend AbstractUser)
-- [ ] Resume model (UUID PK, user FK, military_text, job_description, output JSON, created_at)
+- [ ] Resume model (UUID PK, user FK, military_text, job_description, session_anchor, approved_bullets, rejected_bullets, output JSON, created_at)
 - [ ] Run and verify migrations
 
 ### Translation Service
 - [ ] Create translate_app Django app
+- [ ] Write context.py — DecisionsLog, RollingChatWindow
+- [ ] Write compress_session_anchor() and build_messages() in services.py
 - [ ] Build MilitaryTranslation Pydantic schema
-- [ ] Build translation_service.py (Claude API call)
-- [ ] Build POST /api/v1/translate/ view
-- [ ] Write pytest tests for translation_service.py
+- [ ] Build translation_service.py (Claude API call via build_messages)
+- [ ] Build POST /api/v1/translations/ view
+- [ ] Write pytest tests for context.py and services.py
 
 ### Frontend
 - [ ] Build layout + navigation (React Router DOM)
@@ -65,8 +67,17 @@
 - [ ] Deploy via docker compose up --build -d
 - [ ] Smoke test all endpoints on live URL
 
+### Phase 3 — Subagent Orchestration
+- [ ] Install VoltAgent subagents: django-developer, react-specialist, docker-expert, postgres-pro
+- [ ] Commit AGENTS.md and .claude/orchestrate.md
+- [ ] Run: claude "Read CLAUDE.md, TASKS.md, and .claude/orchestrate.md. Execute Phase 3 full stack build per orchestrate.md. Run all agents to completion. Deliver summary report when done."
+- [ ] Review summary report — verify all agents passed
+- [ ] Smoke test: docker compose up --build
+
 ## Blocked
 None
 
 ## Completed
-None
+- [x] Project scaffolding — CLAUDE.md, ARCHITECTURE.md, SECURITY.md, DATA_CONTRACT.md, .env.example, .gitignore, .claudeignore, .claude/skills/
+- [x] Context window management — ARCHITECTURE.md § Context Window, CLAUDE.md updated, Resume model fields defined
+- [x] Subagent skill files — shared.md, translate.md, models.md, auth.md, deploy.md rewritten with scope isolation

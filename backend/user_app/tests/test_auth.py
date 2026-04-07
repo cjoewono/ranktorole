@@ -5,6 +5,14 @@ from rest_framework.test import APIClient
 User = get_user_model()
 
 
+@pytest.fixture(autouse=True)
+def disable_throttling(monkeypatch):
+    from django.core.cache import cache
+    from user_app.views import LoginRateThrottle
+    cache.clear()
+    monkeypatch.setattr(LoginRateThrottle, "allow_request", lambda self, request, view: True)
+
+
 @pytest.fixture
 def client():
     return APIClient()

@@ -198,7 +198,7 @@ dispatch({
 
 - Props: `draft`, `phase`, `dispatch`, `resumeId`
 - REVIEWING: read-only `civilian_title`, `summary`, bullet list. No internal state. "Approve & Finalize" button dispatches `FINALIZE_STARTED`
-- FINALIZING: component initializes local state (`editTitle`, `editSummary`, `editBullets`) from `draft` props on mount/phase change. Each field becomes editable (`<input>`, `<textarea>`, per-bullet `<textarea>`). "Confirm Final" calls `finalizeResume(resumeId, { civilian_title: editTitle, summary: editSummary, bullets: editBullets })`, then dispatches `DONE`
+- FINALIZING: `DraftPane` conditionally renders a separate `FinalizingPane` sub-component (or inline block keyed to phase) so that it mounts fresh when phase becomes `"FINALIZING"`. This guarantees `useState(draft.civilian_title)` etc. initialize from the current (post-chat) draft props rather than stale values. Do NOT use a `useEffect` to sync local state — fresh mount is the correct pattern. Each field becomes editable (`<input>`, `<textarea>`, per-bullet `<textarea>`). "Confirm Final" calls `finalizeResume(resumeId, { civilian_title: editTitle, summary: editSummary, bullets: editBullets })`, then dispatches `DONE`
 
 ### `ChatPane.jsx`
 

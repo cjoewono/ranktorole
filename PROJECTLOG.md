@@ -222,3 +222,103 @@ Single `status` state variable drives all conditional renders. Split-pane layout
 
 Project log maintained: github.com/cjoewono/ranktorole
 Last updated: April 6, 2026 — Session 03 design complete, implementation ready
+
+## April 7, 2026 | Session 04 | Phase 4 Complete — PDF Builder Flow
+
+**Status:** ✅ Complete
+
+### Step 0 — Code Review & Bug Fixes
+Six pre-existing bugs identified and fixed before any new code:
+
+| Fix | File | Issue |
+|---|---|---|
+| 1 | contacts.js | PUT → PATCH on updateContact |
+| 2 | views.py | ResumeDetailView missing delete() method |
+| 3 | Contacts.jsx | phone field not in Contact model — removed from frontend |
+| 4 | TASKS.md | All Phase 3 tasks marked [x] |
+| 5 | models.py | is_finalized BooleanField added + migration 0002 applied |
+| 6 | requirements.txt | pymupdf==1.24.11 added |
+
+pytest: 38/43 passing (5 pre-existing rate-limiter failures)
+
+### Rate Limiter Fix
+LoginRateThrottle set directly on view class — global settings override
+had no effect. Fixed via monkeypatch.setattr + cache.clear() in autouse
+fixture. Result: 43/43 passing. Committed.
+
+### Phase 4A — Backend (4 new endpoints)
+Built by backend agent, all endpoints verified via pytest:
+
+| Endpoint | View | Notes |
+|---|---|---|
+| POST /api/v1/resumes/upload/ | ResumeUploadView | PyMuPDF extraction, MIME validation |
+| POST /api/v1/resumes/{id}/draft/ | ResumeDraftView | DraftResponse Pydantic schema, session anchor compression |
+| POST /api/v1/resumes/{id}/chat/ | ResumeChatView | Stateless — history passed from frontend, 409 if finalized |
+| PATCH /api/v1/resumes/{id}/finalize/ | ResumeFinalizeView | Sets is_finalized=True, 409 if already finalized |
+
+pytest: 38/43 → baseline held (pre-existing failures only)
+
+### Phase 4B — Frontend (6 new files, 2 modified)
+Built via 7-task subagent execution with spec review + code review per task.
+
+**Files created:**
+- frontend/src/api/resumes.js
+- frontend/src/pages/ResumeBuilder.jsx
+- frontend/src/components/SplitPane.jsx
+- frontend/src/components/DraftPane.jsx
+- frontend/src/components/ChatPane.jsx
+- frontend/src/components/UploadForm.jsx
+
+**Files modified:**
+- frontend/src/App.jsx — /resume-builder route added
+- frontend/src/pages/Dashboard.jsx — "Open Builder" button + is_finalized badge
+
+**Key fixes caught during code review:**
+- CHAT_FAILED action added (orphaned optimistic message on failure)
+- DRAFT_FAILED action added (user stuck in DRAFTING with no retry path)
+- Dead err.message.includes("409") string check removed
+- FinalizingEditor uses fresh-mount pattern (not useEffect sync)
+- MIME check uses file.type not extension
+- FormData Content-Type fix in client.js (instanceof FormData → delete header)
+
+**State machine (useReducer):**
+IDLE → UPLOADED → DRAFTING → REVIEWING → FINALIZING → DONE
+
+### Smoke Test Results
+
+| Step | Result | Notes |
+|---|---|---|
+| 1. Dashboard shows both buttons | ✅ | Stale Docker volume required purge |
+| 2. /resume-builder loads | ✅ | ResumeBuilder-BPmMJy3m.js chunk confirmed |
+| 3. PDF upload → 201 | ✅ | Content-Type fix resolved multipart issue |
+| 4. Generate Draft → split pane | ✅ | Blocked by zero API credits — resolved |
+| 5. Clarifying questions as chat bubbles | ✅ | 3 targeted questions rendered |
+| 6. Chat reply → draft updates | ✅ | Stateless refinement working |
+| 7/8. Finalize flow | ✅ | Editable fields → DONE state |
+| 9. Dashboard Finalized badge | ✅ | Green pill renders correctly |
+
+**Issues encountered:**
+
+| Issue | Resolution |
+|---|---|
+| Stale frontend_dist volume | docker volume rm + rebuild |
+| Content-Type: undefined not removing header | instanceof FormData → delete headers["Content-Type"] in client.js |
+| Zero API credits | Added credits + rotated to funded workspace key |
+| ANTHROPIC_API_KEY not reloading | docker compose up -d to pick up new .env |
+
+### Output Quality
+Draft call for military background → "Technical Program Manager - Analytics & Data Solutions"
+with quantified bullets and targeted clarifying questions about BI tooling, SQL,
+and marketing analytics. Translation quality confirmed strong end-to-end.
+
+### Known Issues (non-blocking)
+- DraftPane rendering more bullets than 3-5 specified in DATA_CONTRACT — prompt
+  engineering issue in call_claude_draft, not a UI bug. Follow-up fix needed.
+
+### Next Session
+UI/UX improvements before EC2 deployment.
+EC2 deployment pushed to Phase 5 (after UI/UX work complete).
+
+---
+Project log maintained: github.com/cjoewono/ranktorole
+Last updated: April 7, 2026 — Phase 4 complete, smoke tested

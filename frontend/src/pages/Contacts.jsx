@@ -7,7 +7,7 @@ import {
   deleteContact,
 } from "../api/contacts";
 
-const EMPTY_FORM = { name: "", email: "", phone: "", notes: "" };
+const EMPTY_FORM = { name: "", email: "", notes: "" };
 
 export default function Contacts() {
   const [contacts, setContacts] = useState([]);
@@ -30,7 +30,6 @@ export default function Contacts() {
     setForm({
       name: contact.name,
       email: contact.email || "",
-      phone: contact.phone || "",
       notes: contact.notes || "",
     });
     setShowForm(true);
@@ -130,19 +129,6 @@ export default function Contacts() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={form.phone}
-                    onChange={(e) =>
-                      setForm({ ...form, phone: e.target.value })
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Notes
                   </label>
                   <input
@@ -198,9 +184,6 @@ export default function Contacts() {
                   <p className="font-semibold text-gray-900">{c.name}</p>
                   {c.email && (
                     <p className="text-sm text-gray-500 truncate">{c.email}</p>
-                  )}
-                  {c.phone && (
-                    <p className="text-sm text-gray-400">{c.phone}</p>
                   )}
                   {c.notes && (
                     <p className="text-xs text-gray-400 mt-1 italic">

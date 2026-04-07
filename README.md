@@ -38,6 +38,10 @@ Built as a full-stack MVP with a focus on security, clean architecture, and prod
 - O*NET integration for MOS code to civilian job title mapping
 - Lazy-loaded React components
 - RESTful API with UUIDv4 primary keys throughout
+- PDF upload → AI draft → chat refinement → finalize flow
+- Split-pane builder UI (draft left, chat right)
+- 6-phase state machine (IDLE → UPLOADED → DRAFTING → REVIEWING → FINALIZING → DONE)
+- Finalized resume badge on dashboard
  
 ---
  
@@ -45,32 +49,83 @@ Built as a full-stack MVP with a focus on security, clean architecture, and prod
  
 ```
 ranktorole/
-  frontend/          # React 18 + Vite + Tailwind
-    src/
-      api/           # fetch wrapper, auth, translations, contacts
-      components/    # NavBar, TranslateForm, ResumeOutput, ProtectedRoute
-      context/       # AuthContext (hybrid JWT — memory + httpOnly cookie)
-      pages/         # Login, Register, Dashboard, Translator, Contacts
-  backend/           # Django REST Framework
-    config/          # settings, urls, wsgi, asgi
-    user_app/        # Custom user model + JWT auth + Google OAuth
-    translate_app/   # Claude API integration + context window management
-      context.py     # DecisionsLog, RollingChatWindow
-      services.py    # compress_session_anchor, build_messages, call_claude
-    contact_app/     # Networking contacts CRUD
-    onet_app/        # O*NET server-side proxy
-  nginx/             # Reverse proxy config
-  .claude/           # Claude Code configuration (local only)
+├── frontend/                 # React 18 + Vite + Tailwind CSS
+│   ├── src/
+│   │   ├── api/              # API Client & Service Modules
+│   │   │   ├── client.js     # Axios wrapper with silent token refresh
+│   │   │   ├── auth.js       # JWT & OAuth login/register logic
+│   │   │   ├── translations.js# Legacy single-shot translator endpoints
+│   │   │   ├── contacts.js   # Networking CRM CRUD operations
+│   │   │   └── resumes.js    # Multi-phase builder (upload, chat, draft)
+│   │   ├── components/       # Reusable UI Components
+│   │   │   ├── NavBar.jsx
+│   │   │   ├── ProtectedRoute.jsx
+│   │   │   ├── SplitPane.jsx    # Builder layout (Draft vs Chat)
+│   │   │   ├── DraftPane.jsx    # Live Markdown preview + Editor
+│   │   │   ├── ChatPane.jsx     # AI Clarifying questions & refinement
+│   │   │   ├── UploadForm.jsx   # PDF parser & Job Desc input
+│   │   │   ├── TranslateForm.jsx# Legacy text-paste input
+│   │   │   └── ResumeOutput.jsx # Legacy display component
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx  # Hybrid JWT (Memory + httpOnly Cookie)
+│   │   └── pages/            # View Routing
+│   │       ├── Dashboard.jsx    # History & Entry points
+│   │       ├── ResumeBuilder.jsx# 6-phase PDF builder state machine
+│   │       ├── Translator.jsx   # Legacy single-shot flow
+│   │       ├── Contacts.jsx     # Networking contact list
+│   │       ├── Login.jsx
+│   │       └── Register.jsx
+│
+├── backend/                  # Django REST Framework (DRF)
+│   ├── config/               # Settings, URLs, WSGI/ASGI
+│   ├── user_app/             # Custom User model & Google OAuth 2.0
+│   ├── translate_app/        # Core AI Engine (Claude Integration)
+│   │   ├── context.py        # DecisionsLog & RollingChatWindow logic
+│   │   ├── services.py       # Session compression & Claude API calls
+│   │   └── views.py          # Resume (Upload/Draft/Chat/Finalize) & Translation views
+│   ├── contact_app/          # Professional networking CRUD
+│   └── onet_app/             # O*NET API server-side proxy
+│
+├── nginx/                    # Reverse proxy & SSL configuration
+└── .claude/                  # Claude Code configuration (local dev)
 ```
  
 ### Service Map
- 
+
 | Service | Dev | Production |
 |---|---|---|
 | Frontend | localhost:5173 (Vite on host) | Nginx :80 |
 | Backend | localhost:8000 (Docker) | Nginx :80/api/ |
 | Database | localhost:5432 (Docker) | Internal only |
 | Nginx | — | :80 |
+
+### Dev vs Production
+
+**Development:**
+- Frontend runs on host via `npm run dev` (HMR enabled)
+- Backend + DB run in Docker
+- Vite proxies `/api/` to localhost:8000
+- No Nginx needed in dev
+
+**Production:**
+- `npm run build` → dist/
+- `docker compose up --build`
+- Nginx serves dist/ and proxies `/api/` → backend
+
+### Resume Builder Flow
+| Phase | Action | Endpoint |
+|---|---|---|
+| IDLE | User selects PDF | — |
+| UPLOADED | PDF extracted, Resume record created | POST /api/v1/resumes/upload/ |
+| DRAFTING | JD submitted, Claude called once | POST /api/v1/resumes/{id}/draft/ |
+| REVIEWING | Split-pane: draft left, chat right | POST /api/v1/resumes/{id}/chat/ |
+| FINALIZING | Bullets editable inline | — |
+| DONE | Resume saved, is_finalized=True | PATCH /api/v1/resumes/{id}/finalize/ |
+
+**Context window strategy:** Claude never sees the raw PDF or JD after the
+first call. All refinement turns use a compressed session anchor (~350 tokens)
+stored in the database plus chat history passed from the frontend on each
+request. Target: ≤ 5,000 tokens per API call.
  
 ### Dev vs Production
  

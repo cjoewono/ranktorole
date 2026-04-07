@@ -18,6 +18,7 @@ class Resume(models.Model):
     civilian_title = models.CharField(max_length=255)
     summary = models.TextField()
     bullets = models.JSONField(default=list)
+    is_finalized = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

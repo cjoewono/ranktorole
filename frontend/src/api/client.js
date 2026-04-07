@@ -24,6 +24,7 @@ async function refreshTokens() {
 
 export async function apiFetch(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...options.headers };
+  if (options.body instanceof FormData) delete headers["Content-Type"];
   if (_accessToken) headers["Authorization"] = `Bearer ${_accessToken}`;
 
   let res = await fetch(`${BASE}${path}`, { ...options, headers });

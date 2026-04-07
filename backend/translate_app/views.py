@@ -6,8 +6,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Resume
-from .serializers import ResumeSerializer, TranslationInputSerializer
-from .services import compress_session_anchor
+from .serializers import FinalizeInputSerializer, ResumeSerializer, TranslationInputSerializer
+from .services import (
+    call_claude_chat,
+    call_claude_draft,
+    compress_session_anchor,
+    extract_pdf_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,3 +85,211 @@ class ResumeDetailView(APIView):
         except Resume.DoesNotExist:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(ResumeSerializer(resume).data)
+
+    def delete(self, request, pk):
+        try:
+            resume = Resume.objects.get(pk=pk, user=request.user)
+        except Resume.DoesNotExist:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        resume.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ResumeUploadView(APIView):
+    """POST /api/v1/resumes/upload/ — extract PDF text and create a Resume record."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response(
+                {"error": "No file provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if uploaded_file.content_type != "application/pdf":
+            return Response(
+                {"error": "Only PDF files are accepted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        file_bytes = uploaded_file.read()
+
+        try:
+            military_text = extract_pdf_text(file_bytes)
+        except Exception:
+            logger.error("PDF extraction failed")
+            return Response(
+                {"error": "Failed to extract text from PDF."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if not military_text.strip():
+            return Response(
+                {"error": "PDF yielded no extractable text."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        resume = Resume.objects.create(
+            user=request.user,
+            military_text=military_text,
+            job_description="",
+            civilian_title="",
+            summary="",
+            is_finalized=False,
+        )
+
+        return Response(
+            {"id": str(resume.id), "created_at": resume.created_at},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ResumeDraftView(APIView):
+    """POST /api/v1/resumes/{id}/draft/ — generate draft + clarifying questions via Claude."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            resume = Resume.objects.get(pk=pk, user=request.user)
+        except Resume.DoesNotExist:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        job_description = request.data.get("job_description", "").strip()
+        if not job_description:
+            return Response(
+                {"error": "job_description is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            draft = call_claude_draft(resume.military_text, job_description)
+        except ValueError:
+            return Response(
+                {"error": "Invalid response from AI service."},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        except Exception:
+            logger.error("Claude API failure during draft generation")
+            return Response(
+                {"error": "Translation service unavailable."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        anchor = {
+            "civilian_title": draft.civilian_title,
+            "summary": draft.summary,
+            "bullets": draft.bullets,
+            "job_description_snippet": job_description[:300],
+        }
+
+        resume.job_description = job_description
+        resume.civilian_title = draft.civilian_title
+        resume.summary = draft.summary
+        resume.bullets = draft.bullets
+        resume.session_anchor = anchor
+        resume.save()
+
+        return Response(
+            {
+                "civilian_title": draft.civilian_title,
+                "summary": draft.summary,
+                "bullets": draft.bullets,
+                "clarifying_questions": draft.clarifying_questions,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ResumeChatView(APIView):
+    """POST /api/v1/resumes/{id}/chat/ — stateless refinement turn via Claude."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            resume = Resume.objects.get(pk=pk, user=request.user)
+        except Resume.DoesNotExist:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if resume.is_finalized:
+            return Response(
+                {"error": "Resume is already finalized."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        message = request.data.get("message", "").strip()
+        if not message:
+            return Response(
+                {"error": "message is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        anchor = resume.session_anchor
+        if not anchor:
+            return Response(
+                {"error": "Draft not yet generated. Call /draft/ first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        history = request.data.get("history", [])
+
+        try:
+            chat_result = call_claude_chat(anchor, history, message)
+        except ValueError:
+            return Response(
+                {"error": "Invalid response from AI service."},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        except Exception:
+            logger.error("Claude API failure during chat refinement")
+            return Response(
+                {"error": "Translation service unavailable."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        resume.civilian_title = chat_result.civilian_title
+        resume.summary = chat_result.summary
+        resume.bullets = chat_result.bullets
+        resume.save()
+
+        return Response(
+            {
+                "civilian_title": chat_result.civilian_title,
+                "summary": chat_result.summary,
+                "bullets": chat_result.bullets,
+                "assistant_reply": chat_result.assistant_reply,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ResumeFinalizeView(APIView):
+    """PATCH /api/v1/resumes/{id}/finalize/ — save final edits and set is_finalized=True."""
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            resume = Resume.objects.get(pk=pk, user=request.user)
+        except Resume.DoesNotExist:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if resume.is_finalized:
+            return Response(
+                {"error": "Resume is already finalized."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        ser = FinalizeInputSerializer(data=request.data)
+        if not ser.is_valid():
+            return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        for field, value in ser.validated_data.items():
+            setattr(resume, field, value)
+        resume.is_finalized = True
+        resume.save()
+
+        return Response(ResumeSerializer(resume).data, status=status.HTTP_200_OK)

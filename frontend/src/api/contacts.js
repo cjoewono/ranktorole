@@ -19,7 +19,7 @@ export async function createContact(payload) {
 
 export async function updateContact(id, payload) {
   const res = await apiFetch(`/api/v1/contacts/${id}/`, {
-    method: "PUT",
+    method: "PATCH",
     body: JSON.stringify(payload),
   });
   const data = await res.json();

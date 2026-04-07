@@ -10,8 +10,13 @@ export async function uploadResume(file) {
     headers: { "Content-Type": undefined },
     body: formData,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Upload failed");
+  let data = {};
+  try {
+    data = await res.json();
+  } catch (_) {
+    /* non-JSON body */
+  }
+  if (!res.ok) throw new Error(data.error || data.detail || "Upload failed");
   return data; // { id, created_at }
 }
 
@@ -20,8 +25,14 @@ export async function generateDraft(resumeId, jobDescription) {
     method: "POST",
     body: JSON.stringify({ job_description: jobDescription }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Draft generation failed");
+  let data = {};
+  try {
+    data = await res.json();
+  } catch (_) {
+    /* non-JSON body */
+  }
+  if (!res.ok)
+    throw new Error(data.error || data.detail || "Draft generation failed");
   return data; // { civilian_title, summary, bullets, clarifying_questions }
 }
 
@@ -30,8 +41,14 @@ export async function sendChatMessage(resumeId, message, history) {
     method: "POST",
     body: JSON.stringify({ message, history }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Chat request failed");
+  let data = {};
+  try {
+    data = await res.json();
+  } catch (_) {
+    /* non-JSON body */
+  }
+  if (!res.ok)
+    throw new Error(data.error || data.detail || "Chat request failed");
   return data; // { civilian_title, summary, bullets, assistant_reply }
 }
 
@@ -43,7 +60,21 @@ export async function finalizeResume(
     method: "PATCH",
     body: JSON.stringify({ civilian_title, summary, bullets }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Finalize failed");
+  let data = {};
+  try {
+    data = await res.json();
+  } catch (_) {
+    /* non-JSON body */
+  }
+  if (!res.ok) {
+    throw new Error(
+      data.error ||
+        data.detail ||
+        data.civilian_title?.[0] ||
+        data.summary?.[0] ||
+        data.bullets?.[0] ||
+        "Finalize failed",
+    );
+  }
   return data; // full Resume object
 }

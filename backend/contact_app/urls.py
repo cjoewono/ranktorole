@@ -1,3 +1,8 @@
 from django.urls import path
 
-urlpatterns = []
+from .views import ContactDetailView, ContactListView
+
+urlpatterns = [
+    path('', ContactListView.as_view()),
+    path('<uuid:pk>/', ContactDetailView.as_view()),
+]

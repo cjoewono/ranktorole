@@ -20,6 +20,13 @@
 - Never store raw military text longer than needed for translation
 - No PII logging
 - Resume data scoped to authenticated user only (filter by request.user)
+- Raw PDF bytes never stored — extracted text only
+- chat_history never persisted to DB — stateless by design
+
+## File Uploads
+- Validate PDF MIME type server-side before passing to PyMuPDF — never trust file extension alone
+- Max upload size: 10MB enforced by Nginx client_max_body_size
+- Reject any file that does not extract to a non-empty string
 
 ## Docker
 - Never expose DB port externally in docker-compose.yml

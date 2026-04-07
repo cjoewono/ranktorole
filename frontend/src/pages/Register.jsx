@@ -5,6 +5,7 @@ import { registerRequest } from "../api/auth";
 export default function Register() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -14,7 +15,7 @@ export default function Register() {
     setError(null);
     setLoading(true);
     try {
-      await registerRequest(email, password);
+      await registerRequest(email, username, password);
       navigate("/login");
     } catch (err) {
       setError(err.message);
@@ -48,6 +49,19 @@ export default function Register() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Username
+            </label>
+            <input
+              type="text"
+              required
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

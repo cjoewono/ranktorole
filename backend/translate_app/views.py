@@ -13,9 +13,16 @@ logger = logging.getLogger(__name__)
 
 
 class TranslationView(APIView):
-    """POST /api/v1/translations/ — translate military text into a civilian resume."""
+    """
+    GET  /api/v1/translations/ — list resumes for authenticated user.
+    POST /api/v1/translations/ — translate military text into a civilian resume.
+    """
 
     permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        resumes = Resume.objects.filter(user=request.user)
+        return Response(ResumeSerializer(resumes, many=True).data)
 
     def post(self, request):
         input_ser = TranslationInputSerializer(data=request.data)

@@ -11,3 +11,4 @@ dist/
 *.log
 *.sqlite3
 postgres_data/
+repomix-output.xml

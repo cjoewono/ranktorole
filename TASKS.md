@@ -6,60 +6,152 @@
 - [x] Done
 - [!] Blocked
 
-## Current Sprint (Due April 24)
+---
+
+## Completed — Phases 1–3 (Session 01–02)
 
 ### Infrastructure
-- [ ] Initialize Django project + app structure
-- [ ] Initialize React + Vite + Tailwind
-- [ ] Write docker-compose.yml (frontend, backend, db, nginx)
-- [ ] Write Nginx config
-- [ ] Configure .env and .env.example
-- [ ] Verify full stack boots via docker compose up --build
+- [x] Initialize Django project + app structure
+- [x] Initialize React + Vite + Tailwind
+- [x] Write docker-compose.yml (frontend, backend, db, nginx)
+- [x] Write Nginx config
+- [x] Configure .env and .env.example
+- [x] Verify full stack boots via docker compose up --build
 
 ### Authentication
-- [ ] Install and configure djangorestframework-simplejwt
-- [ ] Build /api/v1/auth/register/ endpoint
-- [ ] Build /api/v1/auth/login/ endpoint (returns access + refresh tokens)
-- [ ] Build /api/v1/auth/refresh/ endpoint
-- [ ] Apply JWT middleware to all non-auth endpoints
-- [ ] Build frontend login/register forms
-- [ ] Store JWT in httpOnly cookie on frontend
-- [ ] Protect all frontend routes (redirect to login if no token)
-- [ ] Install social-auth-app-django
-- [ ] Configure Google OAuth credentials in .env
-- [ ] Build /api/v1/auth/google/ endpoint
-- [ ] Frontend Google login button
+- [x] Install and configure djangorestframework-simplejwt
+- [x] Build /api/v1/auth/register/ endpoint
+- [x] Build /api/v1/auth/login/ endpoint (returns access + refresh tokens)
+- [x] Build /api/v1/auth/refresh/ endpoint
+- [x] Build /api/v1/auth/logout/ endpoint
+- [x] Apply JWT middleware to all non-auth endpoints
+- [x] Build frontend login/register forms
+- [x] Hybrid JWT: access token in memory, refresh token in httpOnly cookie
+- [x] Protect all frontend routes (redirect to login if no token)
+- [x] Install social-auth-app-django
+- [x] Configure Google OAuth credentials in .env
+- [x] Build /api/v1/auth/google/ endpoint
+- [x] Frontend Google login button
 
 ### Database Models
-- [ ] User model (UUID PK, extend AbstractUser)
-- [ ] Resume model (UUID PK, user FK, military_text, job_description, session_anchor, approved_bullets, rejected_bullets, output JSON, created_at)
-- [ ] Run and verify migrations
+- [x] User model (UUID PK, extend AbstractUser)
+- [x] Resume model (UUID PK, user FK, military_text, job_description, session_anchor, approved_bullets, rejected_bullets, output JSON, created_at)
+- [x] Contact model (UUID PK, user FK, name, email, company, role, notes)
+- [x] Run and verify migrations
 
-### Translation Service
-- [ ] Create translate_app Django app
-- [ ] Write context.py — DecisionsLog, RollingChatWindow
-- [ ] Write compress_session_anchor() and build_messages() in services.py
-- [ ] Build MilitaryTranslation Pydantic schema
-- [ ] Build translation_service.py (Claude API call via build_messages)
-- [ ] Build POST /api/v1/translations/ view
-- [ ] Write pytest tests for context.py and services.py
+### Translation Service (original single-shot — superseded by Phase 4)
+- [x] Create translate_app Django app
+- [x] Write context.py — DecisionsLog, RollingChatWindow
+- [x] Write compress_session_anchor() and build_messages() in services.py
+- [x] Build MilitaryTranslation Pydantic schema
+- [x] Build POST /api/v1/translations/ view
+- [x] Write pytest tests for context.py and services.py
 
-### Frontend
-- [ ] Build layout + navigation (React Router DOM)
-- [ ] Build TranslateForm component (military_text + job_description inputs)
-- [ ] Build ResumeOutput component (displays civilian_title, summary, bullets)
-- [ ] Build resume history page (list saved resumes)
-- [ ] Lazy load ResumeOutput component
-- [ ] Connect all forms to backend API via relative paths
+### Frontend (original)
+- [x] Build layout + navigation (React Router DOM)
+- [x] Build TranslateForm component (military_text + job_description inputs)
+- [x] Build ResumeOutput component (displays civilian_title, summary, bullets)
+- [x] Build resume history page (list saved resumes)
+- [x] Lazy load components
+- [x] Connect all forms to backend API via relative paths
 
-### Public API (O*NET)
-- [ ] Create onet_app Django app
-- [ ] Build server-side proxy view
-- [ ] Build GET /api/v1/onet/search/ endpoint
-- [ ] Connect to frontend MOS code input field
+### Contacts CRUD
+- [x] Build contact_app views (list, create, update, delete)
+- [x] Connect frontend Contacts page to API
 
-### Deployment
-- [ ] Provision EC2 instance
+---
+
+## Current Sprint — Phase 4: PDF Flow + Intelligent Refinement (Due April 24)
+
+### Step 0 — Code Review & Smoke Test (do this first, before any new code)
+- [ ] docker compose up --build — verify all 4 services start clean
+- [ ] Run pytest — verify all 18 tests pass
+- [ ] Verify GET /api/v1/resumes/ returns 200 (not 405)
+- [ ] Verify POST /api/v1/translations/ works end-to-end
+- [ ] Verify GET /api/v1/contacts/ returns 200 (not HTML stub)
+- [ ] Code review: translate_app/services.py, context.py, views.py
+- [ ] Code review: user_app/views.py (JWT hybrid pattern)
+- [ ] Code review: frontend AuthContext.jsx + client.js
+- [ ] Fix any issues found before starting Step 1
+
+### Step 1 — Migration & Dependencies
+- [ ] Add `is_finalized = BooleanField(default=False)` to Resume model
+- [ ] Add `blank=True` to `job_description`, `civilian_title`, `summary` on Resume model
+- [ ] Run makemigrations + migrate
+- [ ] Add `pymupdf==1.24.11` to requirements.txt
+- [ ] Rebuild Docker image (docker compose up --build)
+
+### Step 2 — PDF Upload Endpoint
+- [ ] Build `POST /api/v1/resumes/upload/` view
+  - Accepts multipart/form-data with resume_file
+  - Validates PDF MIME type server-side
+  - Extracts text via PyMuPDF (fitz)
+  - Creates Resume record (military_text, user)
+  - Returns {id, military_text_preview}
+- [ ] Register URL in resume_urls.py
+- [ ] Update ResumeSerializer to handle partial state (blank fields)
+- [ ] Smoke test with Calvin's PDF
+
+### Step 3 — Draft Endpoint
+- [ ] Expand MilitaryTranslation Pydantic schema:
+  - Add `clarifying_questions: list[str]`
+  - Add `assistant_reply: str`
+- [ ] Update system prompt to instruct Claude to generate 2-3 clarifying questions
+- [ ] Build `POST /api/v1/resumes/{id}/draft/` view
+  - Accepts {job_description}
+  - Loads Resume by id + user
+  - Calls compress_session_anchor(military_text, job_description)
+  - Saves job_description, session_anchor, civilian_title, summary, bullets
+  - Returns full MilitaryTranslation
+- [ ] Register URL in resume_urls.py
+- [ ] Update existing tests to cover new schema fields
+
+### Step 4 — Chat Endpoint
+- [ ] Build `POST /api/v1/resumes/{id}/chat/` view
+  - Accepts {message, history[]}
+  - Loads Resume.session_anchor from DB
+  - Builds messages: system_prompt + anchor + history + message
+  - Calls Claude API
+  - Updates Resume: civilian_title, summary, bullets
+  - Returns updated MilitaryTranslation (clarifying_questions=[], assistant_reply populated)
+- [ ] Register URL in resume_urls.py
+- [ ] Handle 409 if is_finalized=True
+- [ ] Write pytest tests for chat endpoint
+
+### Step 5 — Finalize Endpoint
+- [ ] Build `PATCH /api/v1/resumes/{id}/finalize/` view
+  - Accepts optional {civilian_title, summary, bullets}
+  - Saves provided fields + sets is_finalized=True
+  - Returns finalized Resume
+- [ ] Register URL in resume_urls.py
+- [ ] Write pytest test for finalize endpoint
+
+### Step 6 — Frontend: Split-Pane Translator
+- [ ] Replace TranslateForm textarea with PDF dropzone (file input, PDF only)
+- [ ] Implement frontend status state machine:
+  - IDLE → UPLOADED → DRAFTING → REVIEWING → FINALIZING → DONE
+- [ ] Build split-pane layout (draft left, chat right)
+- [ ] Left pane: render civilian_title, summary, bullets (editable in FINALIZING state)
+- [ ] Right pane: render chat messages (clarifying_questions as assistant messages)
+- [ ] Wire "Generate Draft" button → POST /{id}/draft/
+- [ ] Wire chat input → POST /{id}/chat/ with history payload
+- [ ] Wire "Approve & Finalize" button → FINALIZING state
+- [ ] Wire "Confirm Final" button → PATCH /{id}/finalize/
+- [ ] Update api/translations.js with new endpoint functions
+- [ ] Update Dashboard to show is_finalized badge
+
+### Step 7 — End-to-End Smoke Test
+- [ ] Upload Calvin's PDF
+- [ ] Paste a real job description
+- [ ] Verify draft + 2-3 questions returned
+- [ ] Answer questions in chat, verify draft updates
+- [ ] Inline-edit a bullet
+- [ ] Finalize and verify is_finalized=True on dashboard
+
+---
+
+## Phase 5 — EC2 Deployment (after Phase 4 complete)
+- [ ] Provision EC2 instance (Ubuntu 22.04)
 - [ ] Install Docker + Docker Compose on EC2
 - [ ] Configure production .env on EC2
 - [ ] Set up IAM instance role (no hardcoded credentials)
@@ -67,17 +159,12 @@
 - [ ] Deploy via docker compose up --build -d
 - [ ] Smoke test all endpoints on live URL
 
-### Phase 3 — Subagent Orchestration
-- [ ] Install VoltAgent subagents: django-developer, react-specialist, docker-expert, postgres-pro
-- [ ] Commit AGENTS.md and .claude/orchestrate.md
-- [ ] Run: claude "Read CLAUDE.md, TASKS.md, and .claude/orchestrate.md. Execute Phase 3 full stack build per orchestrate.md. Run all agents to completion. Deliver summary report when done."
-- [ ] Review summary report — verify all agents passed
-- [ ] Smoke test: docker compose up --build
+---
 
 ## Blocked
 None
 
-## Completed
-- [x] Project scaffolding — CLAUDE.md, ARCHITECTURE.md, SECURITY.md, DATA_CONTRACT.md, .env.example, .gitignore, .claudeignore, .claude/skills/
-- [x] Context window management — ARCHITECTURE.md § Context Window, CLAUDE.md updated, Resume model fields defined
-- [x] Subagent skill files — shared.md, translate.md, models.md, auth.md, deploy.md rewritten with scope isolation
+---
+
+## Start Next Session With
+> "Let's continue RankToRole — code review and smoke test before Phase 4. Work through TASKS.md Step 0 first, fix anything broken, then we start the migration."

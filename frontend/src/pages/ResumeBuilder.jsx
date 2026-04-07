@@ -31,6 +31,8 @@ function reducer(state, action) {
         draft: action.draft,
         chatHistory: action.initialMessages,
       };
+    case "DRAFT_FAILED":
+      return { ...state, phase: "UPLOADED", error: action.message };
     case "CHAT_SENT":
       return {
         ...state,
@@ -82,7 +84,7 @@ export default function ResumeBuilder() {
         })),
       });
     } catch (err) {
-      dispatch({ type: "ERROR", message: err.message });
+      dispatch({ type: "DRAFT_FAILED", message: err.message });
     }
   }
 

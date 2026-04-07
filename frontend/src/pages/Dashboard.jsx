@@ -32,12 +32,20 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-gray-900">
             Your Translations
           </h1>
-          <Link
-            to="/translator"
-            className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            New Translation
-          </Link>
+          <div className="flex gap-3">
+            <Link
+              to="/resume-builder"
+              className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              Open Builder
+            </Link>
+            <Link
+              to="/translator"
+              className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              New Translation
+            </Link>
+          </div>
         </div>
 
         {error && (
@@ -69,9 +77,16 @@ export default function Dashboard() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <h2 className="font-semibold text-gray-900 truncate">
-                      {t.civilian_title}
-                    </h2>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="font-semibold text-gray-900 truncate">
+                        {t.civilian_title}
+                      </h2>
+                      {t.is_finalized && (
+                        <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                          Finalized
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500 mt-1 line-clamp-2">
                       {t.summary}
                     </p>

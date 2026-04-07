@@ -8,6 +8,7 @@ const Register = lazy(() => import("./pages/Register"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Translator = lazy(() => import("./pages/Translator"));
 const Contacts = lazy(() => import("./pages/Contacts"));
+const ResumeBuilder = lazy(() => import("./pages/ResumeBuilder"));
 
 function Spinner() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/translator" element={<Translator />} />
               <Route path="/contacts" element={<Contacts />} />
+              <Route path="/resume-builder" element={<ResumeBuilder />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

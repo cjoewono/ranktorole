@@ -60,6 +60,7 @@ function FinalizingEditor({ draft, resumeId, dispatch }) {
           Bullets
         </label>
         <div className="space-y-2">
+          {/* key={i} is safe here because bullets are edit-in-place only (no add/remove/reorder). */}
           {editBullets.map((bullet, i) => (
             <textarea
               key={i}
@@ -76,11 +77,17 @@ function FinalizingEditor({ draft, resumeId, dispatch }) {
         </div>
       </div>
 
+      {editBullets.length === 0 && (
+        <p className="text-sm text-amber-600">
+          No bullets to display. Draft may be incomplete.
+        </p>
+      )}
+
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       <button
         onClick={handleConfirm}
-        disabled={saving}
+        disabled={saving || editBullets.length === 0}
         className="bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
       >
         {saving ? "Saving..." : "Confirm Final"}

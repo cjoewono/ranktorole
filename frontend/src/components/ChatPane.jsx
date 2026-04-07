@@ -37,13 +37,11 @@ export default function ChatPane({ chatHistory, resumeId, phase, dispatch }) {
         reply: response.assistant_reply,
       });
     } catch (err) {
-      if (
-        err.message.includes("409") ||
-        err.message.toLowerCase().includes("finalized")
-      ) {
+      if (err.message.toLowerCase().includes("finalized")) {
         setLockedMsg("Resume is finalized. No further changes.");
       } else {
-        dispatch({ type: "ERROR", message: err.message });
+        // CHAT_FAILED lets the reducer pop the optimistic message that CHAT_SENT appended
+        dispatch({ type: "CHAT_FAILED", message: err.message });
       }
     } finally {
       setSending(false);

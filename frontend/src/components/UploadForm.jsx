@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { uploadResume } from "../api/resumes";
 
-export default function UploadForm({ state, dispatch, onGenerateDraft }) {
+export default function UploadForm({
+  state,
+  dispatch,
+  onGenerateDraft = () => {},
+}) {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
 
@@ -9,7 +13,7 @@ export default function UploadForm({ state, dispatch, onGenerateDraft }) {
 
   async function handleUpload() {
     if (!file) return;
-    if (!file.name.endsWith(".pdf")) {
+    if (file.type !== "application/pdf") {
       dispatch({ type: "ERROR", message: "Only PDF files are accepted." });
       return;
     }
@@ -75,7 +79,7 @@ export default function UploadForm({ state, dispatch, onGenerateDraft }) {
           </span>
           <button
             onClick={onGenerateDraft}
-            disabled={!state.jobDescription.trim()}
+            disabled={!(state.jobDescription ?? "").trim()}
             className="bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
           >
             Generate Draft

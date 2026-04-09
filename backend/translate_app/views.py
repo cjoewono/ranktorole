@@ -3,10 +3,27 @@ import logging
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
+
+class TranslateThrottle(UserRateThrottle):
+    scope = "user_translate"
+
+
+class UploadThrottle(UserRateThrottle):
+    scope = "user_upload"
+
+
+class DraftThrottle(UserRateThrottle):
+    scope = "user_draft"
+
+
+class ChatThrottle(UserRateThrottle):
+    scope = "user_chat"
+
 from .models import Resume
-from .serializers import FinalizeInputSerializer, ResumeSerializer, TranslationInputSerializer
+from .serializers import DraftInputSerializer, FinalizeInputSerializer, ResumeSerializer, TranslationInputSerializer
 from .services import (
     call_claude_chat,
     call_claude_draft,
@@ -24,6 +41,7 @@ class TranslationView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [TranslateThrottle]
 
     def get(self, request):
         resumes = Resume.objects.filter(user=request.user)
@@ -58,7 +76,7 @@ class TranslationView(APIView):
             session_anchor=anchor,
             civilian_title=anchor["civilian_title"],
             summary=anchor["summary"],
-            bullets=anchor["bullets"],
+            roles=anchor.get("roles", []),
         )
 
         return Response(ResumeSerializer(resume).data, status=status.HTTP_201_CREATED)
@@ -99,6 +117,7 @@ class ResumeUploadView(APIView):
     """POST /api/v1/resumes/upload/ — extract PDF text and create a Resume record."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UploadThrottle]
 
     def post(self, request):
         uploaded_file = request.FILES.get("file")
@@ -150,6 +169,7 @@ class ResumeDraftView(APIView):
     """POST /api/v1/resumes/{id}/draft/ — generate draft + clarifying questions via Claude."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [DraftThrottle]
 
     def post(self, request, pk):
         try:
@@ -157,15 +177,13 @@ class ResumeDraftView(APIView):
         except Resume.DoesNotExist:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        job_description = request.data.get("job_description", "").strip()
-        if not job_description:
-            return Response(
-                {"error": "job_description is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        input_ser = DraftInputSerializer(data=request.data)
+        if not input_ser.is_valid():
+            return Response(input_ser.errors, status=status.HTTP_400_BAD_REQUEST)
+        job_description = input_ser.validated_data.get("job_description", "")
 
         try:
-            draft = call_claude_draft(resume.military_text, job_description)
+            translation = call_claude_draft(resume.military_text, job_description)
         except ValueError:
             return Response(
                 {"error": "Invalid response from AI service."},
@@ -178,35 +196,41 @@ class ResumeDraftView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
+        roles_data = [r.model_dump() for r in translation.roles]
+
         anchor = {
-            "civilian_title": draft.civilian_title,
-            "summary": draft.summary,
-            "bullets": draft.bullets,
+            "civilian_title": translation.civilian_title,
+            "summary": translation.summary,
+            "roles": roles_data,
             "job_description_snippet": job_description[:300],
         }
 
         resume.job_description = job_description
-        resume.civilian_title = draft.civilian_title
-        resume.summary = draft.summary
-        resume.bullets = draft.bullets
+        resume.civilian_title = translation.civilian_title
+        resume.summary = translation.summary
+        resume.roles = roles_data
+        resume.ai_initial_draft = roles_data  # frozen snapshot — never updated after this
         resume.session_anchor = anchor
+        resume.chat_history = []  # start fresh
         resume.save()
 
         return Response(
             {
-                "civilian_title": draft.civilian_title,
-                "summary": draft.summary,
-                "bullets": draft.bullets,
-                "clarifying_questions": draft.clarifying_questions,
+                "civilian_title": translation.civilian_title,
+                "summary": translation.summary,
+                "roles": roles_data,
+                "clarifying_question": translation.clarifying_question,
+                "assistant_reply": translation.assistant_reply,
             },
             status=status.HTTP_200_OK,
         )
 
 
 class ResumeChatView(APIView):
-    """POST /api/v1/resumes/{id}/chat/ — stateless refinement turn via Claude."""
+    """POST /api/v1/resumes/{id}/chat/ — stateful refinement turn via Claude (history from DB)."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ChatThrottle]
 
     def post(self, request, pk):
         try:
@@ -234,10 +258,14 @@ class ResumeChatView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        history = request.data.get("history", [])
+        # Load chat_history from DB — do not accept it from frontend
+        chat_history: list[dict] = list(resume.chat_history or [])
+
+        # Append new user message before calling Claude
+        chat_history.append({"role": "user", "content": message})
 
         try:
-            chat_result = call_claude_chat(anchor, history, message)
+            translation = call_claude_chat(anchor, chat_history, message)
         except ValueError:
             return Response(
                 {"error": "Invalid response from AI service."},
@@ -250,17 +278,23 @@ class ResumeChatView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        resume.civilian_title = chat_result.civilian_title
-        resume.summary = chat_result.summary
-        resume.bullets = chat_result.bullets
+        roles_data = [r.model_dump() for r in translation.roles]
+
+        # Append assistant reply to history
+        chat_history.append({"role": "assistant", "content": translation.assistant_reply})
+
+        resume.chat_history = chat_history
+        resume.roles = roles_data
+        resume.civilian_title = translation.civilian_title
+        resume.summary = translation.summary
         resume.save()
 
         return Response(
             {
-                "civilian_title": chat_result.civilian_title,
-                "summary": chat_result.summary,
-                "bullets": chat_result.bullets,
-                "assistant_reply": chat_result.assistant_reply,
+                "roles": roles_data,
+                "assistant_reply": translation.assistant_reply,
+                "civilian_title": translation.civilian_title,
+                "summary": translation.summary,
             },
             status=status.HTTP_200_OK,
         )
@@ -287,8 +321,17 @@ class ResumeFinalizeView(APIView):
         if not ser.is_valid():
             return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        for field, value in ser.validated_data.items():
-            setattr(resume, field, value)
+        validated = ser.validated_data
+
+        # Save scalar fields via setattr
+        for field in ("civilian_title", "summary"):
+            if field in validated:
+                setattr(resume, field, validated[field])
+
+        # Save roles if provided (client's final edited version)
+        if "roles" in validated:
+            resume.roles = validated["roles"]
+
         resume.is_finalized = True
         resume.save()
 

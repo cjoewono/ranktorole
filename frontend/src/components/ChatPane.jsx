@@ -1,14 +1,23 @@
 import { useState, useRef, useEffect } from "react";
-import { sendChatMessage } from "../api/resumes";
 
-export default function ChatPane({ chatHistory, resumeId, phase, dispatch }) {
+export default function ChatPane({
+  chatHistory = [],
+  resumeId,
+  phase,
+  dispatch,
+  onSend,
+}) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [lockedMsg, setLockedMsg] = useState(null);
   const bottomRef = useRef(null);
 
-  const isLocked =
-    phase === "FINALIZING" || phase === "DONE" || lockedMsg !== null;
+  useEffect(() => {
+    if (phase === "REVIEWING" || phase === "FINALIZING") setLockedMsg(null);
+  }, [phase]);
+
+  // Chat is only locked when DONE or a server error says finalized
+  const isLocked = phase === "DONE" || lockedMsg !== null;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -21,28 +30,13 @@ export default function ChatPane({ chatHistory, resumeId, phase, dispatch }) {
     setInput("");
     setSending(true);
 
-    // Snapshot history BEFORE dispatch so backend receives history without current message
-    const historyBeforeSend = [...chatHistory];
-    dispatch({ type: "CHAT_SENT", message });
-
     try {
-      const response = await sendChatMessage(
-        resumeId,
-        message,
-        historyBeforeSend,
-      );
-      dispatch({
-        type: "CHAT_RECEIVED",
-        draft: response,
-        reply: response.assistant_reply,
-      });
+      await onSend(message);
     } catch (err) {
       if (err.message.toLowerCase().includes("finalized")) {
         setLockedMsg("Resume is finalized. No further changes.");
-      } else {
-        // CHAT_FAILED lets the reducer pop the optimistic message that CHAT_SENT appended
-        dispatch({ type: "CHAT_FAILED", message: err.message });
       }
+      // CHAT_FAILED is dispatched inside onSend (handleChatSend in ResumeBuilder)
     } finally {
       setSending(false);
     }
@@ -56,14 +50,20 @@ export default function ChatPane({ chatHistory, resumeId, phase, dispatch }) {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-[400px] bg-white rounded-xl border border-gray-200 shadow-sm">
+    <div className="flex flex-col h-full bg-white">
+      {/* Message list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {chatHistory.length === 0 && (
           <p className="text-gray-400 text-sm text-center pt-8">
             Clarifying questions will appear here after the draft is generated.
           </p>
         )}
-        {chatHistory.map((msg, i) => (
+        {phase === "FINALIZING" && (
+          <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 text-center">
+            You can still chat to get AI suggestions while editing.
+          </p>
+        )}
+        {(chatHistory || []).map((msg, i) => (
           <div
             key={i}
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -82,13 +82,14 @@ export default function ChatPane({ chatHistory, resumeId, phase, dispatch }) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Input area */}
       {lockedMsg ? (
         <div className="border-t border-gray-200 px-4 py-3 text-sm text-gray-500 italic">
           {lockedMsg}
         </div>
       ) : isLocked ? (
         <div className="border-t border-gray-200 px-4 py-3 text-sm text-gray-400 italic">
-          Chat locked — resume is being finalized.
+          Chat locked — resume is finalized.
         </div>
       ) : (
         <div className="border-t border-gray-200 px-4 py-3 flex gap-2">
@@ -97,7 +98,11 @@ export default function ChatPane({ chatHistory, resumeId, phase, dispatch }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Reply or ask a follow-up..."
+            placeholder={
+              phase === "FINALIZING"
+                ? "Ask for suggestions while editing…"
+                : "Reply or ask a follow-up..."
+            }
             className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
           <button

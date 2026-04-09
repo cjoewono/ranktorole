@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RankToRole — Translator Redesign Mockup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+        background: #f8fafc;
+        color: #1e293b;
+        min-height: 100vh;
+      }
+
+      /* ── DESIGN TOKEN LEGEND ── */
+      .token-bar {
+        background: #0f172a;
+        color: #f8fafc;
+        padding: 10px 24px;
+        font-size: 11px;
+        display: flex;
+        gap: 24px;
+        align-items: center;
+        flex-wrap: wrap;
+        letter-spacing: 0.03em;
+      }
+      .token-bar strong {
+        color: #f59e0b;
+        margin-right: 4px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .swatch {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        vertical-align: middle;
+        margin-right: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+      }
+
+      /* ── NAV ── */
+      nav {
+        background: #0f172a;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        padding: 0 28px;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .nav-logo {
+        color: #fff;
+        font-weight: 700;
+        font-size: 18px;
+        letter-spacing: -0.01em;
+      }
+      .nav-links {
+        display: flex;
+        gap: 28px;
+        align-items: center;
+      }
+      .nav-link {
+        color: #94a3b8;
+        font-size: 13px;
+        text-decoration: none;
+        transition: color 0.15s;
+        cursor: pointer;
+      }
+      .nav-link.active {
+        color: #fff;
+        font-weight: 600;
+        border-bottom: 2px solid #fff;
+        padding-bottom: 2px;
+      }
+      .nav-link:hover {
+        color: #fff;
+      }
+      .nav-signout {
+        color: #94a3b8;
+        font-size: 13px;
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+
+      /* ── PAGE ── */
+      .page {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 32px 24px 48px;
+      }
+      .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 28px;
+      }
+      .page-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.02em;
+      }
+      .page-subtitle {
+        font-size: 14px;
+        color: #64748b;
+        margin-top: 4px;
+      }
+      .back-link {
+        font-size: 13px;
+        color: #1d4ed8;
+        text-decoration: none;
+      }
+
+      /* ── STATUS BADGE ── */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 10px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .badge-reviewing {
+        background: #fef3c7;
+        color: #b45309;
+      }
+      .badge-idle {
+        background: #f1f5f9;
+        color: #64748b;
+      }
+
+      /* ── SPLIT PANE ── */
+      .split-pane {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        align-items: start;
+      }
+
+      /* ── LEFT PANE — INPUT ── */
+      .pane-input {
+        background: #fff;
+        border: 1.5px solid #1d4ed8;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      }
+      .pane-input-header {
+        background: #0f172a;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .pane-input-header .icon {
+        color: #f59e0b;
+        font-size: 16px;
+      }
+      .pane-input-header h2 {
+        color: #f8fafc;
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .pane-input-body {
+        padding: 20px;
+      }
+
+      .field {
+        margin-bottom: 18px;
+      }
+      .field label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .field textarea {
+        width: 100%;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 13px;
+        color: #334155;
+        resize: none;
+        font-family: inherit;
+        line-height: 1.5;
+        outline: none;
+      }
+      .field textarea:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+      }
+      .field textarea.mono {
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 12px;
+      }
+      .char-count {
+        font-size: 11px;
+        color: #94a3b8;
+        text-align: right;
+        margin-top: 4px;
+      }
+
+      .btn-primary {
+        width: 100%;
+        background: #1d4ed8;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 11px 20px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        transition: background 0.15s;
+        font-family: inherit;
+      }
+      .btn-primary:hover {
+        background: #1e40af;
+      }
+
+      /* ── RIGHT PANE — OUTPUT ── */
+      .pane-output {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow:
+          0 4px 20px rgba(0, 0, 0, 0.08),
+          0 1px 3px rgba(0, 0, 0, 0.04);
+      }
+      .pane-output-header {
+        padding: 14px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .pane-output-header-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .pane-output-header h2 {
+        font-size: 13px;
+        font-weight: 600;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .redline-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #64748b;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 5px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .redline-toggle.active {
+        background: #fff7ed;
+        border-color: #fde68a;
+        color: #b45309;
+      }
+      .toggle-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #cbd5e1;
+      }
+      .toggle-dot.on {
+        background: #f59e0b;
+      }
+
+      .pane-output-body {
+        padding: 20px;
+      }
+
+      .output-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 4px;
+        letter-spacing: -0.015em;
+      }
+      .output-date {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-bottom: 20px;
+      }
+
+      .output-section {
+        margin-bottom: 20px;
+      }
+      .output-section-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: #3b82f6;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 8px;
+      }
+      .output-summary {
+        font-size: 14px;
+        color: #475569;
+        line-height: 1.65;
+      }
+
+      .bullet-list {
+        list-style: none;
+      }
+      .bullet-item {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 8px 10px;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #334155;
+        line-height: 1.5;
+        margin-bottom: 4px;
+        cursor: text;
+        transition: background 0.12s;
+      }
+      .bullet-item:hover {
+        background: #f8fafc;
+      }
+      .bullet-item.editing {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+      }
+      .bullet-dot {
+        color: #3b82f6;
+        margin-top: 3px;
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+
+      .bullet-input {
+        width: 100%;
+        background: transparent;
+        border: none;
+        outline: none;
+        font-size: 14px;
+        font-family: inherit;
+        color: #0f172a;
+        line-height: 1.5;
+        resize: none;
+      }
+
+      /* ── FINALIZE BUTTON ── */
+      .btn-finalize {
+        width: 100%;
+        background: #1d4ed8;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 11px 20px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+        margin-top: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .btn-finalize:hover {
+        background: #1e40af;
+      }
+      .btn-finalize .amber-star {
+        color: #f59e0b;
+      }
+
+      /* ── REDLINE SECTION ── */
+      .redline-section {
+        margin-top: 32px;
+        border-top: 1px dashed #e2e8f0;
+        padding-top: 24px;
+      }
+      .redline-heading {
+        font-size: 13px;
+        font-weight: 600;
+        color: #92400e;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .redline-badge {
+        background: #fef3c7;
+        color: #92400e;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 2px 8px;
+        border-radius: 99px;
+      }
+      .redline-legend {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #64748b;
+      }
+      .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+      }
+      .legend-dot.del {
+        background: #fecaca;
+      }
+      .legend-dot.add {
+        background: #fef3c7;
+      }
+      .legend-dot.unchanged {
+        background: #e2e8f0;
+      }
+
+      .redline-bullet {
+        padding: 8px 12px;
+        border-radius: 8px;
+        margin-bottom: 6px;
+        font-size: 14px;
+        line-height: 1.65;
+        background: #fff;
+        border: 1px solid #f1f5f9;
+      }
+      .del {
+        background: #fee2e2;
+        color: #b91c1c;
+        text-decoration: line-through;
+        border-radius: 3px;
+        padding: 0 3px;
+        font-size: 13px;
+      }
+      .add {
+        background: #fef3c7;
+        color: #92400e;
+        font-weight: 600;
+        border-radius: 3px;
+        padding: 0 3px;
+        font-size: 13px;
+      }
+      .unch {
+        color: #334155;
+      }
+
+      /* ── PALETTE STRIP ── */
+      .palette-strip {
+        display: flex;
+        gap: 0;
+        margin-bottom: 28px;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+      }
+      .palette-chip {
+        flex: 1;
+        padding: 20px 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .palette-chip .chip-name {
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .palette-chip .chip-hex {
+        font-size: 10px;
+        opacity: 0.7;
+        font-family: monospace;
+      }
+      .palette-chip .chip-role {
+        font-size: 10px;
+        opacity: 0.6;
+      }
+
+      /* ── SECTION LABELS ── */
+      .section-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 12px;
+        margin-top: 32px;
+      }
+      .section-label:first-child {
+        margin-top: 0;
+      }
+
+      /* ── LOADING SKELETON ── */
+      .skeleton {
+        background: linear-gradient(
+          90deg,
+          #f1f5f9 25%,
+          #e2e8f0 50%,
+          #f1f5f9 75%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+        border-radius: 6px;
+      }
+      @keyframes shimmer {
+        0% {
+          background-position: -200% 0;
+        }
+        100% {
+          background-position: 200% 0;
+        }
+      }
+      .sk-line {
+        height: 14px;
+        margin-bottom: 8px;
+      }
+      .sk-line.w-3\/4 {
+        width: 75%;
+      }
+      .sk-line.w-1\/2 {
+        width: 50%;
+      }
+      .sk-line.w-full {
+        width: 100%;
+      }
+      .sk-title {
+        height: 24px;
+        width: 55%;
+        margin-bottom: 12px;
+      }
+
+      hr.divider {
+        border: none;
+        border-top: 1px solid #f1f5f9;
+        margin: 24px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- DESIGN TOKEN BAR -->
+    <div class="token-bar">
+      <strong>Design Tokens</strong>
+      <span
+        ><span class="swatch" style="background: #0f172a"></span>Command Navy
+        #0f172a</span
+      >
+      <span
+        ><span class="swatch" style="background: #1d4ed8"></span>Trust Blue
+        #1d4ed8</span
+      >
+      <span
+        ><span class="swatch" style="background: #3b82f6"></span>Sky Accent
+        #3b82f6</span
+      >
+      <span
+        ><span
+          class="swatch"
+          style="background: #f59e0b; border-color: rgba(0, 0, 0, 0.2)"
+        ></span
+        >Transition Amber #f59e0b</span
+      >
+      <span
+        ><span
+          class="swatch"
+          style="background: #f8fafc; border-color: rgba(255, 255, 255, 0.3)"
+        ></span
+        >Interface White #f8fafc</span
+      >
+      <span
+        ><span class="swatch" style="background: #ef4444"></span>Alert Red
+        #ef4444</span
+      >
+    </div>
+
+    <!-- NAV -->
+    <nav>
+      <div class="nav-logo">RankToRole</div>
+      <div class="nav-links">
+        <a class="nav-link" href="#">Dashboard</a>
+        <a class="nav-link active" href="#">Translator</a>
+        <a class="nav-link" href="#">Contacts</a>
+        <button class="nav-signout">Sign out</button>
+      </div>
+    </nav>
+
+    <!-- PAGE -->
+    <div class="page">
+      <!-- PALETTE STRIP -->
+      <div class="section-label">Design System Palette</div>
+      <div class="palette-strip">
+        <div class="palette-chip" style="background: #0f172a; color: #f8fafc">
+          <div class="chip-name">Command Navy</div>
+          <div class="chip-hex">#0f172a</div>
+          <div class="chip-role">Nav · Hero BG</div>
+        </div>
+        <div class="palette-chip" style="background: #1d4ed8; color: #fff">
+          <div class="chip-name">Trust Blue</div>
+          <div class="chip-hex">#1d4ed8</div>
+          <div class="chip-role">Primary CTAs</div>
+        </div>
+        <div class="palette-chip" style="background: #3b82f6; color: #fff">
+          <div class="chip-name">Sky Accent</div>
+          <div class="chip-hex">#3b82f6</div>
+          <div class="chip-role">Focus · Hover</div>
+        </div>
+        <div class="palette-chip" style="background: #f59e0b; color: #0f172a">
+          <div class="chip-name">Transition Amber</div>
+          <div class="chip-hex">#f59e0b</div>
+          <div class="chip-role">Redline Add · Achievement</div>
+        </div>
+        <div class="palette-chip" style="background: #10b981; color: #fff">
+          <div class="chip-name">Success Green</div>
+          <div class="chip-hex">#10b981</div>
+          <div class="chip-role">Finalized</div>
+        </div>
+        <div class="palette-chip" style="background: #fecaca; color: #7f1d1d">
+          <div class="chip-name">Redline Delete</div>
+          <div class="chip-hex">red-200 bg</div>
+          <div class="chip-role">Removed words</div>
+        </div>
+        <div
+          class="palette-chip"
+          style="
+            background: #f8fafc;
+            color: #334155;
+            border-left: 1px solid #e2e8f0;
+          "
+        >
+          <div class="chip-name">Interface White</div>
+          <div class="chip-hex">#f8fafc</div>
+          <div class="chip-role">Page BG · Cards</div>
+        </div>
+      </div>
+
+      <!-- PAGE HEADER -->
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Military-to-Civilian Translator</h1>
+          <p class="page-subtitle">
+            Paste your experience and a target job — get a professional draft
+            instantly.
+          </p>
+        </div>
+        <span class="badge badge-reviewing">● Reviewing</span>
+      </div>
+
+      <!-- ══════════════════════════════════════ -->
+      <!-- SPLIT PANE (REVIEWING STATE SHOWN)    -->
+      <!-- ══════════════════════════════════════ -->
+      <div class="section-label">Split-Pane Layout · Reviewing State</div>
+      <div class="split-pane">
+        <!-- LEFT: INPUT -->
+        <div class="pane-input">
+          <div class="pane-input-header">
+            <span class="icon">✦</span>
+            <h2>Military Context</h2>
+          </div>
+          <div class="pane-input-body">
+            <div class="field">
+              <label>Military Experience</label>
+              <textarea class="mono" rows="7" readonly>
+SGT, 11B Infantryman, US Army (2017–2023). Led 12-person squad during OIF rotations. Managed logistics for $2.4M equipment inventory. Trained 40+ soldiers on weapons maintenance SOPs. Coordinated with battalion S-4 on supply chain operations.</textarea
+              >
+              <div class="char-count">312 / 5000</div>
+            </div>
+            <div class="field">
+              <label>Target Job Description</label>
+              <textarea rows="5" readonly>
+We are looking for an Operations Manager to lead cross-functional teams, manage supply chains, and drive process improvement initiatives. 3+ years leadership required. PMP certification a plus.</textarea
+              >
+              <div class="char-count">198 / 5000</div>
+            </div>
+            <button class="btn-primary" style="opacity: 0.6; cursor: default">
+              ↻ Translate Again
+            </button>
+          </div>
+        </div>
+
+        <!-- RIGHT: OUTPUT -->
+        <div class="pane-output">
+          <div class="pane-output-header">
+            <div class="pane-output-header-left">
+              <h2>Professional Preview</h2>
+              <span class="badge badge-reviewing" style="margin-left: 8px"
+                >Reviewing</span
+              >
+            </div>
+            <!-- Redline toggle (ACTIVE STATE) -->
+            <button class="redline-toggle active">
+              <span class="toggle-dot on"></span>
+              Redline On
+            </button>
+          </div>
+          <div class="pane-output-body">
+            <div class="output-title">Operations &amp; Logistics Manager</div>
+            <div class="output-date">Generated Apr 9, 2026</div>
+
+            <div class="output-section">
+              <div class="output-section-label">Summary</div>
+              <p class="output-summary">
+                Results-driven operations professional with 6 years of U.S. Army
+                leadership, overseeing cross-functional teams and managing
+                multi-million dollar asset inventories. Proven track record in
+                process standardization and supply chain coordination.
+              </p>
+            </div>
+
+            <div class="output-section">
+              <div class="output-section-label">
+                Resume Bullets
+                <span
+                  style="
+                    color: #94a3b8;
+                    font-weight: 400;
+                    font-size: 10px;
+                    text-transform: none;
+                    letter-spacing: 0;
+                  "
+                  >(click to edit)</span
+                >
+              </div>
+              <ul class="bullet-list">
+                <li class="bullet-item">
+                  <span class="bullet-dot">•</span>
+                  <span
+                    >Led a 12-person infantry squad through 3 OIF rotations,
+                    achieving zero safety incidents across 18 months of
+                    operations.</span
+                  >
+                </li>
+                <li class="bullet-item editing">
+                  <span class="bullet-dot">•</span>
+                  <textarea class="bullet-input" rows="2">
+Managed and maintained accountability for a $2.4M equipment portfolio, coordinating with battalion supply officers to ensure 99.8% readiness rate.</textarea
+                  >
+                </li>
+                <li class="bullet-item">
+                  <span class="bullet-dot">•</span>
+                  <span
+                    >Designed and delivered standardized training programs for
+                    40+ personnel, reducing equipment failure incidents by
+                    35%.</span
+                  >
+                </li>
+                <li class="bullet-item">
+                  <span class="bullet-dot">•</span>
+                  <span
+                    >Coordinated logistics and supply chain operations with
+                    battalion S-4, streamlining procurement cycles by 20%.</span
+                  >
+                </li>
+              </ul>
+            </div>
+
+            <!-- REDLINE DIFF SECTION -->
+            <div class="redline-section">
+              <div class="redline-heading">
+                <span>🔴 Redline Diff</span>
+                <span class="redline-badge">vs. Original AI Draft</span>
+              </div>
+              <div class="redline-legend">
+                <div class="legend-item">
+                  <div class="legend-dot del"></div>
+                  Removed (AI original)
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot add"></div>
+                  Added (your edit)
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot unchanged"></div>
+                  Unchanged
+                </div>
+              </div>
+
+              <!-- Bullet 2 has a diff (the editing bullet) -->
+              <div class="redline-bullet">
+                <span class="unch"
+                  >Managed and maintained accountability for a </span
+                ><span class="del">$2.1M</span><span class="add">$2.4M</span
+                ><span class="unch"> equipment </span
+                ><span class="del">inventory</span
+                ><span class="add">portfolio</span
+                ><span class="unch"
+                  >, coordinating with battalion supply officers to ensure </span
+                ><span class="del">high</span><span class="add">99.8%</span
+                ><span class="unch"> readiness rate.</span>
+              </div>
+              <div style="font-size: 12px; color: #94a3b8; margin-top: 8px">
+                Bullets 1, 3, 4 — unchanged from AI draft
+              </div>
+            </div>
+
+            <button class="btn-finalize">
+              <span class="amber-star">★</span>
+              Approve &amp; Finalize
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- /split-pane -->
+
+      <hr class="divider" />
+
+      <!-- LOADING STATE SKELETON -->
+      <div class="section-label">
+        Loading State — Skeleton Pulse (while AI generates)
+      </div>
+      <div class="split-pane">
+        <div class="pane-input" style="opacity: 0.55">
+          <div class="pane-input-header">
+            <span class="icon">✦</span>
+            <h2>Military Context</h2>
+          </div>
+          <div class="pane-input-body">
+            <div class="field">
+              <label>Military Experience</label>
+              <div class="skeleton sk-line w-full" style="height: 80px"></div>
+            </div>
+            <div class="field">
+              <label>Target Job Description</label>
+              <div class="skeleton sk-line w-full" style="height: 60px"></div>
+            </div>
+            <button class="btn-primary" style="opacity: 0.4; cursor: default">
+              Translating…
+            </button>
+          </div>
+        </div>
+        <div class="pane-output">
+          <div class="pane-output-header">
+            <div class="pane-output-header-left">
+              <h2>Professional Preview</h2>
+              <span class="badge badge-idle" style="margin-left: 8px"
+                >Generating…</span
+              >
+            </div>
+          </div>
+          <div class="pane-output-body">
+            <div class="skeleton sk-title"></div>
+            <div class="skeleton sk-line w-full"></div>
+            <div class="skeleton sk-line w-3/4"></div>
+            <div class="skeleton sk-line w-1/2"></div>
+            <div class="skeleton sk-line w-full" style="margin-top: 16px"></div>
+            <div class="skeleton sk-line w-3/4"></div>
+            <div class="skeleton sk-line w-full"></div>
+            <div class="skeleton sk-line w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- /page -->
+  </body>
+</html>

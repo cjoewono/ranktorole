@@ -18,9 +18,6 @@ export default function NavBar() {
         <NavLink to="/dashboard" className={linkClass}>
           Dashboard
         </NavLink>
-        <NavLink to="/translator" className={linkClass}>
-          Translator
-        </NavLink>
         <NavLink to="/contacts" className={linkClass}>
           Contacts
         </NavLink>

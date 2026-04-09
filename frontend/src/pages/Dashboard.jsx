@@ -1,16 +1,62 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import NavBar from "../components/NavBar";
 import { listTranslations, deleteTranslation } from "../api/translations";
 
+/*
+ * ResumeBuilder re-entry contract (for Agent 1 to implement):
+ *
+ * Dashboard navigates to /resume-builder with these URL params:
+ *   ?id={uuid}&mode=continue  → load resume from GET /api/v1/resumes/{id}/
+ *                                restore draft.roles, chatHistory display from resume.chat_history
+ *                                set phase = "REVIEWING"
+ *   ?id={uuid}&mode=edit      → load resume from GET /api/v1/resumes/{id}/
+ *                                restore draft.roles, aiInitialDraft from resume.ai_initial_draft
+ *                                set phase = "FINALIZING"
+ *   (no params)               → fresh session, phase = "IDLE"
+ *
+ * ResumeBuilder should call getResume(id) on mount when id param is present.
+ */
+
+function StatusBadge({ resume }) {
+  if (resume.is_finalized) {
+    return (
+      <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+        Finalized
+      </span>
+    );
+  }
+  if (resume.roles?.length > 0) {
+    return (
+      <span className="bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+        In Progress
+      </span>
+    );
+  }
+  return (
+    <span className="bg-gray-100 text-gray-500 text-xs font-semibold px-2 py-0.5 rounded-full">
+      Not Started
+    </span>
+  );
+}
+
+function formatDate(isoString) {
+  return new Date(isoString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function Dashboard() {
-  const [translations, setTranslations] = useState([]);
+  const [resumes, setResumes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     listTranslations()
-      .then(setTranslations)
+      .then(setResumes)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -18,7 +64,7 @@ export default function Dashboard() {
   async function handleDelete(id) {
     try {
       await deleteTranslation(id);
-      setTranslations((prev) => prev.filter((t) => t.id !== id));
+      setResumes((prev) => prev.filter((r) => r.id !== id));
     } catch (err) {
       setError(err.message);
     }
@@ -29,23 +75,13 @@ export default function Dashboard() {
       <NavBar />
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Your Translations
-          </h1>
-          <div className="flex gap-3">
-            <Link
-              to="/resume-builder"
-              className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-            >
-              Open Builder
-            </Link>
-            <Link
-              to="/translator"
-              className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-            >
-              New Translation
-            </Link>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900">Your Resumes</h1>
+          <Link
+            to="/resume-builder"
+            className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            New Resume
+          </Link>
         </div>
 
         {error && (
@@ -58,48 +94,82 @@ export default function Dashboard() {
           <div className="text-center text-gray-400 py-16 text-sm">
             Loading...
           </div>
-        ) : translations.length === 0 ? (
+        ) : resumes.length === 0 ? (
           <div className="text-center py-16 space-y-3">
-            <p className="text-gray-400 text-sm">No translations yet.</p>
+            <p className="text-gray-400 text-sm">No resumes yet.</p>
             <Link
-              to="/translator"
+              to="/resume-builder"
               className="text-blue-600 text-sm hover:underline"
             >
-              Translate your first resume
+              Build your first resume
             </Link>
           </div>
         ) : (
           <ul className="space-y-4">
-            {translations.map((t) => (
+            {resumes.map((resume) => (
               <li
-                key={t.id}
+                key={resume.id}
                 className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
+                    {/* Title + status badge */}
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="font-semibold text-gray-900 truncate">
-                        {t.civilian_title}
-                      </h2>
-                      {t.is_finalized && (
-                        <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">
-                          Finalized
-                        </span>
+                      {resume.civilian_title ? (
+                        <h2 className="font-bold text-gray-900 truncate">
+                          {resume.civilian_title}
+                        </h2>
+                      ) : (
+                        <h2 className="font-bold text-gray-400 italic truncate">
+                          Untitled Resume
+                        </h2>
                       )}
+                      <StatusBadge resume={resume} />
                     </div>
-                    <p className="text-sm text-gray-500 mt-1 line-clamp-2">
-                      {t.summary}
-                    </p>
+
+                    {/* Summary — one line, truncated */}
+                    {resume.summary && (
+                      <p className="text-sm text-gray-500 mt-1 truncate">
+                        {resume.summary}
+                      </p>
+                    )}
+
+                    {/* Created date */}
                     <p className="text-xs text-gray-400 mt-2">
-                      {new Date(t.created_at).toLocaleDateString()}
+                      {formatDate(resume.created_at)}
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleDelete(t.id)}
-                    className="text-red-400 hover:text-red-600 text-sm shrink-0 transition-colors"
-                  >
-                    Delete
-                  </button>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {resume.is_finalized ? (
+                      <button
+                        onClick={() =>
+                          navigate(`/resume-builder?id=${resume.id}&mode=edit`)
+                        }
+                        className="border border-blue-600 text-blue-600 hover:bg-blue-50 text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Edit &amp; Export
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/resume-builder?id=${resume.id}&mode=continue`,
+                          )
+                        }
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Continue
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDelete(resume.id)}
+                      className="text-red-400 hover:text-red-600 text-sm transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </li>
             ))}

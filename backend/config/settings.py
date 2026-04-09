@@ -24,7 +24,16 @@ SECRET_KEY = os.environ.get(
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 _allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
-ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()] or ['*']
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',')
+                 if h.strip()] or ['localhost', '127.0.0.1']
+
+if not DEBUG and ALLOWED_HOSTS == ['localhost', '127.0.0.1']:
+    import warnings
+    warnings.warn(
+        "ALLOWED_HOSTS is not set. Defaulting to localhost only. "
+        "Set ALLOWED_HOSTS in your production .env.",
+        stacklevel=2,
+    )
 
 # ---------------------------------------------------------------------------
 # Application definition
@@ -134,7 +143,20 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
         'login': '5/min',
+        'user_translate': '20/day',
+        'user_draft': '20/day',
+        'user_chat': '50/day',
+        'user_upload': '20/day',
     },
+}
+
+# Switch to RedisCache in production for cross-worker throttle
+# consistency across Gunicorn workers.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "ranktorole-cache",
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -162,6 +184,15 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+if not DEBUG and not _cors_origins_env.strip():
+    import warnings
+    warnings.warn(
+        "CORS_ALLOWED_ORIGINS is not set. All browser requests will "
+        "be blocked in production. Set CORS_ALLOWED_ORIGINS in your "
+        ".env to your EC2 public URL.",
+        stacklevel=2,
+    )
 
 # ---------------------------------------------------------------------------
 # Social Auth (Google OAuth 2.0)
@@ -208,3 +239,28 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # External API keys
 # ---------------------------------------------------------------------------
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+
+# ---------------------------------------------------------------------------
+# Security headers — all gated on not DEBUG, inert in local dev
+# ---------------------------------------------------------------------------
+
+# Required for Nginx + EC2: tells Django that X-Forwarded-Proto: https
+# means the original request was HTTPS (Nginx terminates SSL internally)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Redirect HTTP → HTTPS at Django level as a backstop behind Nginx
+SECURE_SSL_REDIRECT = not DEBUG
+
+# Flip cookies to Secure=True in production
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+# HSTS — set to 0 in dev; activate to 31536000 ONLY after SSL cert is
+# confirmed working on EC2, or browsers will be locked out for 1 year
+SECURE_HSTS_SECONDS = 0 if DEBUG else 0  # manually flip on deploy
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+
+# These two are safe in dev — just add response headers, no redirects
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'

@@ -22,7 +22,7 @@ export default function TranslateForm({ onResult, onError }) {
 
   const charCount = (val) => (
     <span className="text-xs text-gray-400 text-right block mt-1">
-      {val.length} / 5000
+      {val.length} / 15000
     </span>
   );
 
@@ -37,7 +37,7 @@ export default function TranslateForm({ onResult, onError }) {
           placeholder="Paste your military job description, duties, or resume text here..."
           value={militaryText}
           onChange={(e) => setMilitaryText(e.target.value)}
-          maxLength={5000}
+          maxLength={15000}
           required
           minLength={10}
         />
@@ -53,7 +53,7 @@ export default function TranslateForm({ onResult, onError }) {
           placeholder="Paste the civilian job posting you are targeting..."
           value={jobDescription}
           onChange={(e) => setJobDescription(e.target.value)}
-          maxLength={5000}
+          maxLength={15000}
           required
           minLength={10}
         />

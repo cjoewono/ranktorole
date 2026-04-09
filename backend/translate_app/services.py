@@ -14,14 +14,27 @@ logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = (
     "You are a professional resume writer specializing in "
-    "military-to-civilian career transitions."
+    "military-to-civilian career transitions. "
+    "Your task is to translate military resume experience into compelling civilian language. "
+    "Preserve every role exactly as it appears (title, org, dates). "
+    "Rewrite only the bullet points using strong civilian language with a past-tense action verb first. "
+    "Return ONLY valid JSON — no markdown fences, no commentary."
 )
+
+
+class RoleEntry(BaseModel):
+    title: str
+    org: str
+    dates: str
+    bullets: list[str]
 
 
 class MilitaryTranslation(BaseModel):
     civilian_title: str
     summary: str
-    bullets: list[str]
+    roles: list[RoleEntry]
+    clarifying_question: str  # single high-impact question on draft call, "" on refinement turns
+    assistant_reply: str      # "" on draft call, populated on chat turns
 
 
 def compress_session_anchor(military_text: str, job_description: str) -> dict:
@@ -37,7 +50,7 @@ def compress_session_anchor(military_text: str, job_description: str) -> dict:
     return {
         "civilian_title": translation.civilian_title,
         "summary": translation.summary,
-        "bullets": translation.bullets,
+        "roles": [r.model_dump() for r in translation.roles],
     }
 
 
@@ -56,11 +69,19 @@ def build_messages(
       4. New user message with schema appended
     """
     # Layer 1
+    roles_summary = ""
+    for role in anchor.get("roles", []):
+        if isinstance(role, dict):
+            roles_summary += (
+                f"\n  - {role.get('title', '')} at {role.get('org', '')} "
+                f"({role.get('dates', '')})"
+            )
+
     anchor_block = (
         "Session context (compressed):\n"
         f"Title: {anchor.get('civilian_title', '')}\n"
         f"Summary: {anchor.get('summary', '')}\n"
-        f"Initial bullets: {'; '.join(anchor.get('bullets', []))}"
+        f"Roles:{roles_summary}"
     )
 
     # Layer 2
@@ -85,20 +106,6 @@ def build_messages(
     return messages
 
 
-class DraftResponse(BaseModel):
-    civilian_title: str
-    summary: str
-    bullets: list[str]
-    clarifying_questions: list[str]
-
-
-class ChatResponse(BaseModel):
-    civilian_title: str
-    summary: str
-    bullets: list[str]
-    assistant_reply: str
-
-
 def extract_pdf_text(file_bytes: bytes) -> str:
     """Extract text from PDF bytes using PyMuPDF. Returns concatenated page text."""
     import fitz  # noqa: PLC0415 — import inside function avoids load-time failure if not installed
@@ -119,7 +126,7 @@ def _call_claude_typed(messages: list[dict], model_class):
     try:
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=1024,
+            max_tokens=2048,
             system=_SYSTEM_PROMPT,
             messages=messages,
         )
@@ -144,32 +151,65 @@ def _call_claude_typed(messages: list[dict], model_class):
         raise ValueError("Invalid response from Claude API") from exc
 
 
-def call_claude_draft(military_text: str, job_description: str) -> DraftResponse:
-    """Single Claude call for the draft endpoint. Returns DraftResponse with clarifying questions."""
-    schema = DraftResponse.model_json_schema()
+def call_claude_draft(military_text: str, job_description: str) -> MilitaryTranslation:
+    """Single Claude call for the draft endpoint. Returns MilitaryTranslation with clarifying questions."""
+    schema = MilitaryTranslation.model_json_schema()
     user_message = (
-        "Translate this military experience into a civilian resume draft.\n"
-        "Also generate 2-3 targeted clarifying questions to better tailor the resume "
-        "to the specific role (ground them in gaps between the resume and the job description).\n\n"
+        "Translate this military resume into a structured civilian resume draft.\n\n"
+        "Instructions:\n"
+        "- Extract EVERY role from the experience section of the PDF text.\n"
+        "- For each role, preserve the title, org/location, and date range EXACTLY as written.\n"
+        "- Rewrite ONLY the bullets for each role using strong civilian language "
+        "(past-tense action verb first).\n"
+        "- Do NOT add or remove roles — preserve the same number of roles as the original.\n"
+        "- Do NOT cap the number of bullets per role — preserve the same count as the original.\n"
+        "- Return a 2-3 sentence civilian-facing professional summary in the summary field.\n"
+        "- Identify the SINGLE most important gap between the resume and the job description.\n"
+        "- Return exactly ONE high-impact clarifying question in the clarifying_question field "
+        "(a string, not a list) — make it specific to this JD, not generic.\n"
+        "- If the resume already covers the JD well, ask about a quantifiable achievement "
+        "or specific tool/methodology mentioned in the JD that is missing from the resume.\n"
+        "- Set assistant_reply to an empty string \"\".\n\n"
         f"Military background:\n{military_text}\n\n"
         f"Target job description:\n{job_description}\n\n"
         f"Return ONLY valid JSON matching this schema: {json.dumps(schema)}"
     )
-    return _call_claude_typed([{"role": "user", "content": user_message}], DraftResponse)
+    return _call_claude_typed([{"role": "user", "content": user_message}], MilitaryTranslation)
 
 
-def call_claude_chat(anchor: dict, history: list[dict], message: str) -> ChatResponse:
+def call_claude_chat(anchor: dict, history: list[dict], message: str) -> MilitaryTranslation:
     """Stateless refinement call. Builds anchor-pair + history + new message context."""
-    schema = ChatResponse.model_json_schema()
-    bullets_str = "\n".join(f"- {b}" for b in anchor.get("bullets", []))
+    schema = MilitaryTranslation.model_json_schema()
+
+    roles_lines = []
+    for role in anchor.get("roles", []):
+        if isinstance(role, dict):
+            roles_lines.append(
+                f"  Role: {role.get('title', '')} | Org: {role.get('org', '')} "
+                f"| Dates: {role.get('dates', '')}"
+            )
+            for b in role.get("bullets", []):
+                roles_lines.append(f"    - {b}")
+
+    roles_str = "\n".join(roles_lines) if roles_lines else "(no roles)"
+
     anchor_text = (
         "Current resume draft (session context):\n"
         f"Civilian title: {anchor.get('civilian_title', '')}\n"
         f"Summary: {anchor.get('summary', '')}\n"
-        f"Bullets:\n{bullets_str}\n"
+        f"Roles:\n{roles_str}\n"
         f"Role context: {anchor.get('job_description_snippet', '')}"
     )
-    schema_instruction = f"\nReturn ONLY valid JSON matching this schema: {json.dumps(schema)}"
+
+    schema_instruction = (
+        "\n\nInstructions for this refinement turn:\n"
+        "- Update the roles array based on user feedback.\n"
+        "- Preserve role title, org, and dates EXACTLY — only rewrite bullets.\n"
+        "- Do NOT add or remove roles.\n"
+        "- Set clarifying_question to \"\".\n"
+        "- Populate assistant_reply with a brief explanation of changes made.\n"
+        f"\nReturn ONLY valid JSON matching this schema: {json.dumps(schema)}"
+    )
 
     if not history:
         messages: list[dict] = [
@@ -181,7 +221,7 @@ def call_claude_chat(anchor: dict, history: list[dict], message: str) -> ChatRes
         messages.extend(history)
         messages.append({"role": "user", "content": message + schema_instruction})
 
-    return _call_claude_typed(messages, ChatResponse)
+    return _call_claude_typed(messages, MilitaryTranslation)
 
 
 def call_claude(messages: list[dict]) -> MilitaryTranslation:
@@ -196,7 +236,7 @@ def call_claude(messages: list[dict]) -> MilitaryTranslation:
     try:
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=1024,
+            max_tokens=2048,
             system=_SYSTEM_PROMPT,
             messages=messages,
         )

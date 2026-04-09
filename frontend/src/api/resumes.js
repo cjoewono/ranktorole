@@ -33,13 +33,13 @@ export async function generateDraft(resumeId, jobDescription) {
   }
   if (!res.ok)
     throw new Error(data.error || data.detail || "Draft generation failed");
-  return data; // { civilian_title, summary, bullets, clarifying_questions }
+  return data; // { civilian_title, summary, roles[], clarifying_questions }
 }
 
-export async function sendChatMessage(resumeId, message, history) {
+export async function sendChatMessage(resumeId, message) {
   const res = await apiFetch(`/api/v1/resumes/${resumeId}/chat/`, {
     method: "POST",
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message }),
   });
   let data = {};
   try {
@@ -49,16 +49,16 @@ export async function sendChatMessage(resumeId, message, history) {
   }
   if (!res.ok)
     throw new Error(data.error || data.detail || "Chat request failed");
-  return data; // { civilian_title, summary, bullets, assistant_reply }
+  return data; // { civilian_title, summary, roles[], assistant_reply }
 }
 
 export async function finalizeResume(
   resumeId,
-  { civilian_title, summary, bullets },
+  { civilian_title, summary, roles },
 ) {
   const res = await apiFetch(`/api/v1/resumes/${resumeId}/finalize/`, {
     method: "PATCH",
-    body: JSON.stringify({ civilian_title, summary, bullets }),
+    body: JSON.stringify({ civilian_title, summary, roles }),
   });
   let data = {};
   try {
@@ -72,9 +72,24 @@ export async function finalizeResume(
         data.detail ||
         data.civilian_title?.[0] ||
         data.summary?.[0] ||
-        data.bullets?.[0] ||
+        data.roles?.[0] ||
         "Finalize failed",
     );
   }
   return data; // full Resume object
+}
+
+export async function getResume(resumeId) {
+  const res = await apiFetch(`/api/v1/resumes/${resumeId}/`, {
+    method: "GET",
+  });
+  let data = {};
+  try {
+    data = await res.json();
+  } catch (_) {
+    /* non-JSON body */
+  }
+  if (!res.ok)
+    throw new Error(data.error || data.detail || "Failed to load resume");
+  return data; // full resume object including roles[], chat_history[], ai_initial_draft
 }

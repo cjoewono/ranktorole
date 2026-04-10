@@ -22,6 +22,7 @@ class DraftThrottle(UserRateThrottle):
 class ChatThrottle(UserRateThrottle):
     scope = "user_chat"
 
+
 from .models import Resume
 from .serializers import DraftInputSerializer, FinalizeInputSerializer, ResumeSerializer, TranslationInputSerializer
 from .services import (
@@ -127,21 +128,18 @@ class ResumeUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 1. Size check (max 10MB)
         if uploaded_file.size > 10 * 1024 * 1024:
             return Response(
                 {"error": "File too large. Maximum size is 10MB."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 2. MIME type check
         if uploaded_file.content_type != "application/pdf":
             return Response(
                 {"error": "Only PDF files are accepted."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 3. Magic bytes check
         magic_bytes = uploaded_file.read(5)
         if not magic_bytes.startswith(b"%PDF-"):
             return Response(
@@ -151,6 +149,7 @@ class ResumeUploadView(APIView):
         uploaded_file.seek(0)
 
         file_bytes = uploaded_file.read()
+
         try:
             military_text = extract_pdf_text(file_bytes)
         except Exception:
@@ -225,9 +224,9 @@ class ResumeDraftView(APIView):
         resume.civilian_title = translation.civilian_title
         resume.summary = translation.summary
         resume.roles = roles_data
-        resume.ai_initial_draft = roles_data  # frozen snapshot — never updated after this
+        resume.ai_initial_draft = roles_data
         resume.session_anchor = anchor
-        resume.chat_history = []  # start fresh
+        resume.chat_history = []
         resume.save()
 
         return Response(
@@ -274,7 +273,6 @@ class ResumeChatView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Load chat_history from DB — do not accept it from frontend
         chat_history: list[dict] = list(resume.chat_history or [])
 
         try:
@@ -293,7 +291,6 @@ class ResumeChatView(APIView):
 
         roles_data = [r.model_dump() for r in translation.roles]
 
-        # Append user message then assistant reply — both only on success
         chat_history.append({"role": "user", "content": message})
         chat_history.append({"role": "assistant", "content": translation.assistant_reply})
 
@@ -337,12 +334,10 @@ class ResumeFinalizeView(APIView):
 
         validated = ser.validated_data
 
-        # Save scalar fields via setattr
         for field in ("civilian_title", "summary"):
             if field in validated:
                 setattr(resume, field, validated[field])
 
-        # Save roles if provided (client's final edited version)
         if "roles" in validated:
             resume.roles = validated["roles"]
 

@@ -33,8 +33,8 @@ class MilitaryTranslation(BaseModel):
     civilian_title: str
     summary: str
     roles: list[RoleEntry]
-    clarifying_question: str  # single high-impact question on draft call, "" on refinement turns
-    assistant_reply: str      # "" on draft call, populated on chat turns
+    clarifying_question: str
+    assistant_reply: str
 
 
 def compress_session_anchor(military_text: str, job_description: str) -> dict:
@@ -60,15 +60,7 @@ def build_messages(
     chat_window: RollingChatWindow,
     new_user_message: str,
 ) -> list[dict]:
-    """Assemble 4-layer context for every subsequent multi-turn call.
-
-    Layer order:
-      1. Anchor summary (compressed session context)
-      2. Decisions log
-      3. Prior chat turns (from RollingChatWindow)
-      4. New user message with schema appended
-    """
-    # Layer 1
+    """Assemble 4-layer context for every subsequent multi-turn call."""
     roles_summary = ""
     for role in anchor.get("roles", []):
         if isinstance(role, dict):
@@ -84,17 +76,13 @@ def build_messages(
         f"Roles:{roles_summary}"
     )
 
-    # Layer 2
     decisions_block = decisions.to_prompt_block()
-
     system_context = anchor_block
     if decisions_block:
         system_context += f"\n\n{decisions_block}"
 
-    # Layer 3 — prior turns from chat window
     messages: list[dict] = list(chat_window.to_messages())
 
-    # Layer 4 — new user message with system context prepended
     schema = MilitaryTranslation.model_json_schema()
     full_user_message = (
         f"{system_context}\n\n"
@@ -108,19 +96,14 @@ def build_messages(
 
 def extract_pdf_text(file_bytes: bytes) -> str:
     """Extract text from PDF bytes using PyMuPDF. Returns concatenated page text."""
-    import fitz  # noqa: PLC0415 — import inside function avoids load-time failure if not installed
+    import fitz
 
     with fitz.open(stream=file_bytes, filetype="pdf") as doc:
         return "\n".join(page.get_text() for page in doc)
 
 
 def _call_claude_typed(messages: list[dict], model_class):
-    """Call Claude API and validate the text response against any Pydantic model class.
-
-    Raises:
-        anthropic.APIError: on network/API failure
-        ValueError: if response cannot be parsed or validated
-    """
+    """Call Claude API and validate the text response against any Pydantic model class."""
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
 
     try:
@@ -130,9 +113,12 @@ def _call_claude_typed(messages: list[dict], model_class):
             system=_SYSTEM_PROMPT,
             messages=messages,
         )
-    except anthropic.APIError:
-        logger.error("Claude API error")
+    except anthropic.APIError as e:
+        logger.error("Claude API error: %s", str(e))
         raise
+    except Exception as e:
+        logger.error("Unexpected error calling Claude: %s", str(e))
+        raise ValueError(f"Claude API call failed: {str(e)}") from e
 
     raw = ""
     for block in response.content:
@@ -152,7 +138,7 @@ def _call_claude_typed(messages: list[dict], model_class):
 
 
 def call_claude_draft(military_text: str, job_description: str) -> MilitaryTranslation:
-    """Single Claude call for the draft endpoint. Returns MilitaryTranslation with clarifying questions."""
+    """Single Claude call for the draft endpoint."""
     schema = MilitaryTranslation.model_json_schema()
     user_message = (
         "Translate this military resume into a structured civilian resume draft.\n\n"
@@ -178,7 +164,7 @@ def call_claude_draft(military_text: str, job_description: str) -> MilitaryTrans
 
 
 def call_claude_chat(anchor: dict, history: list[dict], message: str) -> MilitaryTranslation:
-    """Stateful refinement call. Builds anchor-pair + history + new message context."""
+    """Stateful refinement call. Builds anchor + history + new message context."""
     schema = MilitaryTranslation.model_json_schema()
 
     roles_lines = []
@@ -217,24 +203,21 @@ def call_claude_chat(anchor: dict, history: list[dict], message: str) -> Militar
         ]
     else:
         if history[0]["role"] == "user":
-            # DB history always starts with a user turn. Fold anchor into that first
-            # turn to prevent consecutive user messages, which the Anthropic API rejects.
-            combined = {"role": "user", "content": anchor_text + "\n\n" + history[0]["content"]}
+            combined = {
+                "role": "user",
+                "content": anchor_text + "\n\n" + history[0]["content"],
+            }
             messages = [combined] + list(history[1:])
         else:
-            # History starts with assistant — original anchor-first design still works.
             messages = [{"role": "user", "content": anchor_text}]
             messages.extend(history)
         messages.append({"role": "user", "content": message + schema_instruction})
 
+    return _call_claude_typed(messages, MilitaryTranslation)
+
 
 def call_claude(messages: list[dict]) -> MilitaryTranslation:
-    """Call Claude API and return Pydantic-validated MilitaryTranslation.
-
-    Raises:
-        anthropic.APIError: on network/API failure
-        ValueError: if response cannot be parsed or validated
-    """
+    """Call Claude API and return Pydantic-validated MilitaryTranslation."""
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
 
     try:
@@ -248,14 +231,12 @@ def call_claude(messages: list[dict]) -> MilitaryTranslation:
         logger.error("Claude API error during translation call")
         raise
 
-    # Parse from text block only — never tool_use block
     raw = ""
     for block in response.content:
         if block.type == "text":
             raw = block.text
             break
 
-    # Strip markdown fences
     raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
     raw = re.sub(r"\s*```$", "", raw)
 

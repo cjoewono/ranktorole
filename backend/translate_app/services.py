@@ -178,7 +178,7 @@ def call_claude_draft(military_text: str, job_description: str) -> MilitaryTrans
 
 
 def call_claude_chat(anchor: dict, history: list[dict], message: str) -> MilitaryTranslation:
-    """Stateless refinement call. Builds anchor-pair + history + new message context."""
+    """Stateful refinement call. Builds anchor-pair + history + new message context."""
     schema = MilitaryTranslation.model_json_schema()
 
     roles_lines = []
@@ -216,12 +216,16 @@ def call_claude_chat(anchor: dict, history: list[dict], message: str) -> Militar
             {"role": "user", "content": anchor_text + "\n\n" + message + schema_instruction}
         ]
     else:
-        # Anchor as first user turn so history (starting with assistant) alternates correctly
-        messages = [{"role": "user", "content": anchor_text}]
-        messages.extend(history)
+        if history[0]["role"] == "user":
+            # DB history always starts with a user turn. Fold anchor into that first
+            # turn to prevent consecutive user messages, which the Anthropic API rejects.
+            combined = {"role": "user", "content": anchor_text + "\n\n" + history[0]["content"]}
+            messages = [combined] + list(history[1:])
+        else:
+            # History starts with assistant — original anchor-first design still works.
+            messages = [{"role": "user", "content": anchor_text}]
+            messages.extend(history)
         messages.append({"role": "user", "content": message + schema_instruction})
-
-    return _call_claude_typed(messages, MilitaryTranslation)
 
 
 def call_claude(messages: list[dict]) -> MilitaryTranslation:

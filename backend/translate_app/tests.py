@@ -466,6 +466,37 @@ class TestResumeUploadView:
         response = client.post("/api/v1/resumes/upload/", {}, format="multipart")
         assert response.status_code == 401
 
+    def test_file_too_large_returns_400(self, auth_client, db):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        
+        # Create an actual 11MB file in memory so the multipart encoder sends 11MB
+        large_file = SimpleUploadedFile(
+            "large.pdf", 
+            b"%PDF-1.4 " + b"0" * (11 * 1024 * 1024), 
+            content_type="application/pdf"
+        )
+        
+        response = auth_client.post(
+            "/api/v1/resumes/upload/",
+            {"file": large_file},
+            format="multipart",
+        )
+        
+        assert response.status_code == 400
+        assert "large" in response.data["error"].lower()
+
+    def test_spoofed_mime_type_returns_400(self, auth_client, db):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        # application/pdf MIME but content is not a PDF (no %PDF- header)
+        fake = SimpleUploadedFile(
+            "resume.pdf", b"PK\x03\x04fake zip content", content_type="application/pdf"
+        )
+        response = auth_client.post(
+            "/api/v1/resumes/upload/",
+            {"file": fake},
+            format="multipart",
+        )
+        assert response.status_code == 400
 
 # ---------------------------------------------------------------------------
 # views.py — POST /api/v1/resumes/{id}/draft/
@@ -614,7 +645,8 @@ class TestResumeChatView:
             },
             format="json",
         )
-        # call_claude_chat should have been called with history from DB (empty list + new message)
+        # call_claude_chat should have been called with history from DB (empty list —
+        # new message is not pre-appended; it is passed separately as the message arg)
         call_args = mock_chat.call_args
         passed_history = call_args[0][1]  # positional: anchor, history, message
         # The history passed to Claude should NOT contain the injected client history

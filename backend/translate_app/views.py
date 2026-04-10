@@ -127,14 +127,30 @@ class ResumeUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # 1. Size check (max 10MB)
+        if uploaded_file.size > 10 * 1024 * 1024:
+            return Response(
+                {"error": "File too large. Maximum size is 10MB."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 2. MIME type check
         if uploaded_file.content_type != "application/pdf":
             return Response(
                 {"error": "Only PDF files are accepted."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        file_bytes = uploaded_file.read()
+        # 3. Magic bytes check
+        magic_bytes = uploaded_file.read(5)
+        if not magic_bytes.startswith(b"%PDF-"):
+            return Response(
+                {"error": "Invalid file signature. File is not a true PDF."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        uploaded_file.seek(0)
 
+        file_bytes = uploaded_file.read()
         try:
             military_text = extract_pdf_text(file_bytes)
         except Exception:
@@ -261,9 +277,6 @@ class ResumeChatView(APIView):
         # Load chat_history from DB — do not accept it from frontend
         chat_history: list[dict] = list(resume.chat_history or [])
 
-        # Append new user message before calling Claude
-        chat_history.append({"role": "user", "content": message})
-
         try:
             translation = call_claude_chat(anchor, chat_history, message)
         except ValueError:
@@ -280,7 +293,8 @@ class ResumeChatView(APIView):
 
         roles_data = [r.model_dump() for r in translation.roles]
 
-        # Append assistant reply to history
+        # Append user message then assistant reply — both only on success
+        chat_history.append({"role": "user", "content": message})
         chat_history.append({"role": "assistant", "content": translation.assistant_reply})
 
         resume.chat_history = chat_history

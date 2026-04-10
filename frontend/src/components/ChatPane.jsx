@@ -54,7 +54,7 @@ export default function ChatPane({
       {/* Message list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {chatHistory.length === 0 && (
-          <p className="text-gray-400 text-sm text-center pt-8">
+          <p className="text-slate-400 text-sm text-center pt-8">
             Clarifying questions will appear here after the draft is generated.
           </p>
         )}
@@ -69,10 +69,10 @@ export default function ChatPane({
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed ${
+              className={`max-w-[80%] px-4 py-2 text-sm leading-relaxed ${
                 msg.role === "user"
-                  ? "bg-blue-700 text-white"
-                  : "bg-gray-100 text-gray-800"
+                  ? "bg-blue-700 text-white rounded-2xl rounded-br-sm"
+                  : "bg-slate-100 text-slate-800 rounded-2xl rounded-bl-sm"
               }`}
             >
               {msg.content}
@@ -84,15 +84,15 @@ export default function ChatPane({
 
       {/* Input area */}
       {lockedMsg ? (
-        <div className="border-t border-gray-200 px-4 py-3 text-sm text-gray-500 italic">
+        <div className="border-t border-slate-200 px-4 py-3 text-sm text-slate-500 italic">
           {lockedMsg}
         </div>
       ) : isLocked ? (
-        <div className="border-t border-gray-200 px-4 py-3 text-sm text-gray-400 italic">
+        <div className="border-t border-slate-200 px-4 py-3 text-sm text-slate-400 italic">
           Chat locked — resume is finalized.
         </div>
       ) : (
-        <div className="border-t border-gray-200 px-4 py-3 flex gap-2">
+        <div className="border-t border-slate-200 px-4 py-3 flex gap-2">
           <textarea
             rows={2}
             value={input}
@@ -103,7 +103,7 @@ export default function ChatPane({
                 ? "Ask for suggestions while editing…"
                 : "Reply or ask a follow-up..."
             }
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
           />
           <button
             onClick={handleSend}

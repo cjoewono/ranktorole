@@ -29,13 +29,13 @@ export default function UploadForm({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
       <h2 className="font-semibold text-gray-800 text-lg">
         Upload Your Resume
       </h2>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
           Resume PDF
         </label>
         <input
@@ -43,12 +43,12 @@ export default function UploadForm({
           accept=".pdf"
           disabled={isUploaded}
           onChange={(e) => setFile(e.target.files[0] || null)}
-          className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+          className="block w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
           Job Description
         </label>
         <textarea
@@ -58,7 +58,7 @@ export default function UploadForm({
             dispatch({ type: "JD_CHANGED", value: e.target.value })
           }
           placeholder="Paste the job description here..."
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
         />
         {(state.jobDescription ?? "").trim().length > 0 &&
           (state.jobDescription ?? "").trim().length < 10 && (

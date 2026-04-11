@@ -33,6 +33,15 @@ function AppShell() {
 
   const path = location.pathname;
 
+  // Redirect unknown paths to dashboard
+  if (
+    path !== "/dashboard" &&
+    path !== "/contacts" &&
+    path !== "/resume-builder"
+  ) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return (
     <div
       className={`min-h-screen bg-background${fullscreen ? " overflow-hidden" : ""}`}

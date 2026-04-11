@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import NavBar from "../components/NavBar";
+import PageHeader from "../components/PageHeader";
 import {
   listContacts,
   createContact,
@@ -74,48 +74,50 @@ export default function Contacts() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <NavBar />
-      <main className="max-w-3xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Contacts</h1>
-          {!showForm && (
+    <>
+      <PageHeader
+        label="INTEL DATABASE / ACTIVE"
+        title="OPERATOR INTEL"
+        action={
+          !showForm && (
             <button
               onClick={() => setShowForm(true)}
-              className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+              className="mission-gradient font-label text-xs tracking-widest uppercase text-on-primary px-4 py-2.5 rounded-md hover:opacity-90 transition-opacity"
             >
-              Add Contact
+              + ADD CONTACT
             </button>
-          )}
-        </div>
+          )
+        }
+      />
 
+      <main className="max-w-4xl mx-auto px-4 py-6 space-y-4">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-6">
+          <div className="bg-error-container text-on-error-container font-body text-sm px-4 py-3">
             {error}
           </div>
         )}
 
         {showForm && (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-6">
-            <h2 className="font-semibold text-slate-800 mb-4">
-              {editingId ? "Edit Contact" : "New Contact"}
+          <div className="bg-surface-container-low p-6">
+            <h2 className="font-headline font-semibold text-on-surface uppercase text-sm tracking-wide mb-5">
+              {editingId ? "EDIT CONTACT" : "NEW CONTACT"}
             </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Name <span className="text-red-400">*</span>
+                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
+                    Name <span className="text-error">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="tactical-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
                     Email
                   </label>
                   <input
@@ -124,11 +126,11 @@ export default function Contacts() {
                     onChange={(e) =>
                       setForm({ ...form, email: e.target.value })
                     }
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="tactical-input"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                <div className="sm:col-span-2">
+                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
                     Notes
                   </label>
                   <input
@@ -137,28 +139,28 @@ export default function Contacts() {
                     onChange={(e) =>
                       setForm({ ...form, notes: e.target.value })
                     }
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="tactical-input"
                   />
                 </div>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-4 pt-2">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+                  className="mission-gradient font-label text-xs tracking-widest uppercase text-on-primary px-6 py-2.5 rounded-md disabled:opacity-50 transition-opacity"
                 >
                   {saving
-                    ? "Saving..."
+                    ? "SAVING..."
                     : editingId
-                      ? "Save Changes"
-                      : "Add Contact"}
+                      ? "SAVE CHANGES"
+                      : "ADD CONTACT"}
                 </button>
                 <button
                   type="button"
                   onClick={cancelForm}
-                  className="text-slate-500 hover:text-slate-700 text-sm px-4 py-2 rounded-lg border border-slate-300 transition-colors"
+                  className="font-label text-xs tracking-widest uppercase text-on-surface-variant hover:text-on-surface transition-colors px-4 py-2.5"
                 >
-                  Cancel
+                  CANCEL
                 </button>
               </div>
             </form>
@@ -166,11 +168,11 @@ export default function Contacts() {
         )}
 
         {loading ? (
-          <div className="text-center text-slate-400 py-16 text-sm">
-            Loading...
+          <div className="text-center text-on-surface-variant py-16 font-label text-xs tracking-widest uppercase">
+            LOADING INTEL...
           </div>
         ) : contacts.length === 0 ? (
-          <div className="text-center py-16 text-slate-400 text-sm">
+          <div className="text-center py-16 font-label text-xs tracking-widest uppercase text-on-surface-variant">
             No contacts yet. Add one above.
           </div>
         ) : (
@@ -178,29 +180,33 @@ export default function Contacts() {
             {contacts.map((c) => (
               <li
                 key={c.id}
-                className="bg-white rounded-xl border border-gray-200 px-5 py-4 shadow-sm flex items-start justify-between gap-4"
+                className="bg-surface-container px-5 py-4 flex items-start justify-between gap-4"
               >
                 <div className="min-w-0">
-                  <p className="font-semibold text-slate-900">{c.name}</p>
+                  <p className="font-headline font-semibold text-on-surface">
+                    {c.name}
+                  </p>
                   {c.email && (
-                    <p className="text-sm text-slate-500 truncate">{c.email}</p>
+                    <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant mt-0.5 truncate">
+                      {c.email}
+                    </p>
                   )}
                   {c.notes && (
-                    <p className="text-xs text-slate-400 mt-1 italic">
+                    <p className="font-body text-xs text-outline mt-1 italic">
                       {c.notes}
                     </p>
                   )}
                 </div>
-                <div className="flex gap-3 shrink-0">
+                <div className="flex gap-4 shrink-0">
                   <button
                     onClick={() => startEdit(c)}
-                    className="text-blue-500 hover:text-blue-700 text-sm transition-colors"
+                    className="font-label text-xs tracking-widest uppercase text-tertiary hover:text-tertiary-fixed transition-colors"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleDelete(c.id)}
-                    className="text-red-400 hover:text-red-600 text-sm transition-colors"
+                    className="font-label text-xs tracking-widest uppercase text-error hover:opacity-80 transition-opacity"
                   >
                     Delete
                   </button>
@@ -210,6 +216,6 @@ export default function Contacts() {
           </ul>
         )}
       </main>
-    </div>
+    </>
   );
 }

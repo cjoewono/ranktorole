@@ -35,7 +35,7 @@ export default function DraftPane({
               exportPDF({
                 civilian_title: draft.civilian_title,
                 summary: draft.summary,
-                roles: draft.roles,
+                roles: draft.roles ?? [],
               })
             }
             className="mission-gradient w-full text-on-primary font-label font-semibold tracking-widest uppercase text-sm py-3 rounded-md hover:opacity-90 transition-opacity"

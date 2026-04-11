@@ -74,7 +74,11 @@ function reducer(state, action) {
     case "RETURN_TO_CHAT":
       return { ...state, phase: "REVIEWING", aiSuggestions: null };
     case "DONE":
-      return { ...state, phase: "DONE" };
+      return {
+        ...state,
+        phase: "DONE",
+        ...(action.draft ? { draft: action.draft } : {}),
+      };
     case "ERROR":
       return { ...state, error: action.message };
     case "LOADING":

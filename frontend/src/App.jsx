@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   BrowserRouter,
   Navigate,
@@ -25,13 +25,17 @@ function Spinner() {
 }
 
 function AppShell() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, hydrating } = useAuth();
   const location = useLocation();
   const [fullscreen, setFullscreen] = useState(false);
-
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-
   const path = location.pathname;
+
+  useEffect(() => {
+    if (path !== "/resume-builder") setFullscreen(false);
+  }, [path]);
+
+  if (hydrating) return <Spinner />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   // Redirect unknown paths to dashboard
   if (

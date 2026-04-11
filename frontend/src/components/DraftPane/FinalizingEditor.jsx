@@ -77,7 +77,14 @@ export default function FinalizingEditor({
         summary: editSummary,
         roles: editRoles,
       });
-      dispatch({ type: "DONE" });
+      dispatch({
+        type: "DONE",
+        draft: {
+          civilian_title: editTitle,
+          summary: editSummary,
+          roles: editRoles,
+        },
+      });
     } catch (err) {
       setError(
         err.data?.civilian_title?.[0] ||

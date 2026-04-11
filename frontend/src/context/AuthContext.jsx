@@ -13,6 +13,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
+  const [hydrating, setHydrating] = useState(true);
   const navigate = useNavigate();
 
   const logout = useCallback(() => {
@@ -44,6 +45,9 @@ export function AuthProvider({ children }) {
       })
       .catch(() => {
         // No valid session — stay logged out
+      })
+      .finally(() => {
+        setHydrating(false);
       });
   }, []);
 
@@ -54,7 +58,9 @@ export function AuthProvider({ children }) {
   }, [logout]);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated: !!token, login, logout }}>
+    <AuthContext.Provider
+      value={{ isAuthenticated: !!token, hydrating, login, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

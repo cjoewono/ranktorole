@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
 import { deleteTranslation } from "../api/translations";
 import { useResumes } from "../context/ResumeContext";
+import { exportPDF } from "../utils/pdfExport";
 
 function formatDate(isoString) {
   return new Date(isoString).toLocaleDateString("en-US", {
@@ -170,13 +171,27 @@ export default function Dashboard() {
                       }
                       className="font-label text-xs tracking-widest uppercase text-tertiary hover:text-tertiary-fixed transition-colors"
                     >
-                      {resume.is_finalized ? "EDIT & EXPORT" : "CONTINUE"}
+                      {resume.is_finalized ? "EDIT" : "CONTINUE"}
                     </button>
+                    {resume.is_finalized && (
+                      <button
+                        onClick={() =>
+                          exportPDF({
+                            civilian_title: resume.civilian_title,
+                            summary: resume.summary,
+                            roles: resume.roles ?? [],
+                          })
+                        }
+                        className="font-label text-xs tracking-widest uppercase text-secondary hover:opacity-80 transition-opacity"
+                      >
+                        EXPORT PDF
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDelete(resume.id)}
                       className="font-label text-xs tracking-widest uppercase text-error hover:opacity-80 transition-opacity"
                     >
-                      ✕
+                      DELETE
                     </button>
                   </div>
                 </div>

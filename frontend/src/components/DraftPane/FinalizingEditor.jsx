@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { finalizeResume } from "../../api/resumes";
 import BulletEditor from "./BulletEditor";
 
@@ -21,6 +22,7 @@ export default function FinalizingEditor({
   const [expandedKey, setExpandedKey] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   // Auto-apply AI chat suggestions to the editable state when they arrive
   useEffect(() => {
@@ -56,14 +58,7 @@ export default function FinalizingEditor({
         summary: editSummary,
         roles: editRoles,
       });
-      dispatch({
-        type: "DONE",
-        draft: {
-          civilian_title: editTitle,
-          summary: editSummary,
-          roles: editRoles,
-        },
-      });
+      navigate("/dashboard");
     } catch (err) {
       setError(
         err.data?.civilian_title?.[0] ||
@@ -80,19 +75,10 @@ export default function FinalizingEditor({
     <div className="flex flex-col h-full">
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
-        {/* Header row */}
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => dispatch({ type: "RETURN_TO_CHAT" })}
-            className="font-label text-xs tracking-widest uppercase text-tertiary hover:text-tertiary-fixed transition-colors"
-          >
-            ← Return to Chat
-          </button>
-          <h2 className="font-headline font-bold text-xl uppercase text-on-surface tracking-wide">
-            Edit &amp; Finalize
-          </h2>
-        </div>
+        {/* Header */}
+        <h2 className="font-headline font-bold text-xl uppercase text-on-surface tracking-wide">
+          Edit &amp; Finalize
+        </h2>
 
         {/* Title */}
         <div>

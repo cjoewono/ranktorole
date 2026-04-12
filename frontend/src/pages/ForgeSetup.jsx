@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
-import NavBar from "../components/NavBar";
 import PageHeader from "../components/PageHeader";
 
 const BRANCHES = [
@@ -27,11 +26,14 @@ const SECTORS = [
 ];
 
 async function fetchOnetSkills(keyword) {
-  const res = await apiFetch(
-    `/api/v1/onet/search/?keyword=${encodeURIComponent(keyword)}`,
-  );
-  const data = await res.json();
-  return data.skills || [];
+  try {
+    const data = await apiFetch(
+      `/api/v1/onet/search/?keyword=${encodeURIComponent(keyword)}`,
+    );
+    return data.skills || [];
+  } catch {
+    return [];
+  }
 }
 
 function FieldLabel({ children }) {
@@ -80,15 +82,10 @@ export default function ForgeSetup() {
     if (!mos.trim()) return;
     setLoadingSkills(true);
     setOnetFetched(false);
-    try {
-      const skills = await fetchOnetSkills(mos.trim());
-      setOnetSkills(skills);
-    } catch {
-      setOnetSkills([]);
-    } finally {
-      setLoadingSkills(false);
-      setOnetFetched(true);
-    }
+    const skills = await fetchOnetSkills(mos.trim());
+    setOnetSkills(skills);
+    setLoadingSkills(false);
+    setOnetFetched(true);
   }
 
   function toggleSkill(skill) {
@@ -150,13 +147,29 @@ export default function ForgeSetup() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <NavBar />
-
+    <>
       <PageHeader
         label={isEditing ? "OPERATOR / PROFILE_UPDATE" : "FORGE / ONBOARDING"}
         title={isEditing ? "EDIT PROFILE" : "FORGE SETUP"}
       />
+
+      {/* Context quality explanation */}
+      <div className="bg-surface-container px-4 py-3 border-b border-outline-variant/15">
+        <div className="max-w-xl mx-auto flex items-start gap-3">
+          <span className="text-primary text-lg mt-0.5">◆</span>
+          <div>
+            <p className="font-label text-xs tracking-widest uppercase text-primary mb-1">
+              Why this matters
+            </p>
+            <p className="font-body text-sm text-on-surface-variant leading-relaxed">
+              Your profile feeds directly into the AI translation engine. The
+              more precise your branch, MOS, target sector, and skills — the
+              more accurately your military experience maps to civilian language
+              that hiring managers recognize.
+            </p>
+          </div>
+        </div>
+      </div>
 
       <main className="max-w-xl mx-auto px-4 py-8 pb-28 md:pb-8">
         {error && (
@@ -189,6 +202,9 @@ export default function ForgeSetup() {
                 </option>
               ))}
             </TacticalSelect>
+            <p className="font-label text-xs tracking-widest text-outline mt-1">
+              Determines service-specific terminology mapping
+            </p>
           </div>
 
           {/* MOS */}
@@ -224,6 +240,9 @@ export default function ForgeSetup() {
                 </option>
               ))}
             </TacticalSelect>
+            <p className="font-label text-xs tracking-widest text-outline mt-1">
+              Tunes vocabulary and job title suggestions to your target industry
+            </p>
           </div>
 
           {/* Skills */}
@@ -324,10 +343,56 @@ export default function ForgeSetup() {
                 </button>
               </div>
             </div>
+            <p className="font-label text-xs tracking-widest text-outline mt-1">
+              Selected skills are prioritized in your translated resume bullets
+            </p>
           </div>
 
           {/* Submit */}
           <div className="space-y-4 pt-2">
+            {/* Profile completeness */}
+            {(() => {
+              const filled =
+                [branch, mos, targetSector].filter(Boolean).length +
+                (selectedSkills.length > 0 ? 1 : 0);
+              const total = 4;
+              const pct = Math.round((filled / total) * 100);
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
+                      Profile signal strength
+                    </span>
+                    <span
+                      className={`font-label text-xs tracking-widest uppercase ${
+                        pct === 100
+                          ? "text-secondary"
+                          : pct >= 50
+                            ? "text-primary"
+                            : "text-outline"
+                      }`}
+                    >
+                      {pct}%
+                    </span>
+                  </div>
+                  <div className="h-1 bg-surface-container-highest overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${
+                        pct === 100 ? "bg-secondary" : "bg-primary"
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  {pct < 100 && (
+                    <p className="font-label text-xs tracking-widest text-outline">
+                      {pct < 50
+                        ? "Add more details for better translation accuracy"
+                        : "Almost there — complete all fields for best results"}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             <button
               type="submit"
               disabled={saving}
@@ -353,6 +418,6 @@ export default function ForgeSetup() {
           </div>
         </form>
       </main>
-    </div>
+    </>
   );
 }

@@ -262,10 +262,10 @@ All queries filtered by request.user — no cross-user access
 
 ## O\*NET Proxy (unchanged)
 
-GET /api/v1/onet/search/?code={mos_code}
+GET /api/v1/onet/search/?keyword={mos_code}
 Auth: JWT required
-Server-side proxy only — never call from frontend
-Returns: {title, description, related_civilian_titles[]}
+Server-side proxy — proxies to O\*NET Web Services
+Returns: {occupations: [{code, title}], skills: [string]}
 
 ---
 

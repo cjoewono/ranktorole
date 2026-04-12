@@ -68,6 +68,21 @@
 
 ---
 
+## Current — Session 08 (Code Review Fixes)
+
+- [ ] Fix fetchOnetSkills crash (apiFetch returns parsed data)
+- [ ] Remove ProtectedRoute.jsx, consolidate auth into AppShell
+- [ ] Profile gate in AppShell (require profile_context)
+- [ ] Delete dead call_claude() function
+- [ ] Extract \_build_profile_block helper (DRY)
+- [ ] Anthropic client singleton
+- [ ] Add throttle to ResumeFinalizeView and OnetSearchView
+- [ ] Add ErrorBoundary component
+- [ ] Remove legacy TranslationView, translations.js, context.py dead code
+- [ ] Doc sync (CLAUDE.md, DATA_CONTRACT.md, ARCHITECTURE.md, TASKS.md)
+
+---
+
 ## Current Sprint — Phase 4: PDF Flow + Intelligent Refinement (Due April 24)
 
 ### Step 0 — Code Review & Smoke Test (do this first, before any new code)
@@ -152,12 +167,60 @@
 
 ### Step 7 — End-to-End Smoke Test
 
-- [ ] Upload Calvin's PDF
-- [ ] Paste a real job description
-- [ ] Verify draft + 2-3 questions returned
-- [ ] Answer questions in chat, verify draft updates
-- [ ] Inline-edit a bullet
-- [ ] Finalize and verify is_finalized=True on dashboard
+- [x] Upload Calvin's PDF
+- [x] Paste a real job description
+- [x] Verify draft + single clarifying question returned
+- [x] Answer questions in chat, verify draft updates
+- [x] Inline-edit a bullet
+- [x] Finalize and verify is_finalized=True on dashboard
+
+---
+
+## Completed — Session 06 (April 10)
+
+### API Layer Refactor (Frontend)
+
+- [x] Add APIError class + handleResponse helper to client.js
+- [x] Refactor apiFetch to return parsed data, throw APIError
+- [x] Eliminate manual error handling from resumes.js, auth.js, contacts.js, translations.js
+- [x] Extract exportPDF to frontend/src/utils/pdfExport.js
+
+### Backend Service Layer
+
+- [x] Add ChatResult dataclass to services.py
+- [x] Migrate chat history management into call_claude_chat
+- [x] Update ResumeChatView to consume ChatResult
+- [x] Update 4 ResumeChatView tests to mock ChatResult return type
+- [x] Verify 77/77 tests pass
+
+---
+
+## Completed — Session 07 (April 11)
+
+### SPA Shell Refactor
+
+- [x] Implement AppShell pattern (always-mounted NavBar, pages shown/hidden via CSS)
+- [x] Add ResumeContext (frontend/src/context/ResumeContext.jsx)
+- [x] Extract PageHeader shared component (frontend/src/components/PageHeader.jsx)
+- [x] Refactor Dashboard to use PageHeader, remove NavBar import
+- [x] Refactor Contacts to use PageHeader, remove NavBar import
+- [x] Refactor ResumeBuilder to accept setFullscreen prop, handle DONE phase
+- [x] Delete ProtectedRoute.jsx (dead code)
+- [x] Add catch-all redirect to /dashboard for unknown paths
+- [x] Verify frontend build passes, 77 backend tests pass
+
+### Frontend Component Decomposition
+
+- [x] Extract state machine into frontend/src/hooks/useResumeMachine.js
+- [x] Reduce ResumeBuilder.jsx to JSX-only (1 hook call, no logic)
+- [x] Split DraftPane.jsx into DraftPane/ directory:
+  - [x] DraftPane/DiffView.jsx
+  - [x] DraftPane/BulletEditor.jsx
+  - [x] DraftPane/FinalizingEditor.jsx
+  - [x] DraftPane/index.jsx
+- [x] Delete flat DraftPane.jsx
+- [x] Verify Vite builds 441 modules with 0 import errors
+- [x] Verify 77/77 backend tests pass
 
 ---
 
@@ -181,4 +244,4 @@ None
 
 ## Start Next Session With
 
-> "Let's continue RankToRole — code review and smoke test before Phase 4. Work through TASKS.md Step 0 first, fix anything broken, then we start the migration."
+> "Let's continue RankToRole — pick up from TASKS.md Phase 5: EC2 deployment. Run pytest first to confirm 77/77, then start provisioning."

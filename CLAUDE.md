@@ -40,7 +40,7 @@ See ARCHITECTURE.md for system design patterns and Docker lessons.
 
 1. User uploads PDF resume → backend extracts text, creates Resume record, returns resume_id
 2. User pastes job description → single LLM call returns draft + 2-3 clarifying questions
-3. User answers questions in chat → stateless refinement turns (history passed from frontend)
+3. User answers questions in chat → stateful refinement turns (history persisted to DB, loaded server-side)
 4. User approves → inline bullet editing → "Approve & Finalize" → is_finalized = True
 
 ## LLM Integration
@@ -48,7 +48,7 @@ See ARCHITECTURE.md for system design patterns and Docker lessons.
 - Provider: Claude API (claude-sonnet-4-20250514)
 - Location: backend/translate_app/services.py
 - Input call 1: {military_text (string), job_description (string)}
-- Input call 2+: {session_anchor (dict), history (list), message (string)}
+- Input call 2+: {session_anchor (dict from DB), chat_history (list from DB), message (string)}
 - Output every call: JSON matching MilitaryTranslation schema (see below)
 - Env var: ANTHROPIC_API_KEY
 - SDK: anthropic (pip install anthropic)
@@ -75,7 +75,7 @@ class MilitaryTranslation(BaseModel):
 ```
 POST   /api/v1/resumes/upload/          PDF → military_text, returns resume_id
 POST   /api/v1/resumes/{id}/draft/      JD → draft + questions, sets session_anchor
-POST   /api/v1/resumes/{id}/chat/       message+history → updated draft + reply
+POST   /api/v1/resumes/{id}/chat/       message → updated draft + reply (history loaded from DB)
 PATCH  /api/v1/resumes/{id}/finalize/   final edits → is_finalized=True
 GET    /api/v1/resumes/                 list resumes for authenticated user
 GET    /api/v1/resumes/{id}/            retrieve single resume
@@ -84,13 +84,13 @@ DELETE /api/v1/resumes/{id}/            delete resume
 
 ## Context Window Budget (per call)
 
-| Layer                 | Tokens     | Policy                                 |
-| --------------------- | ---------- | -------------------------------------- |
-| System prompt         | ~400       | Static — never changes                 |
-| Session anchor        | ~350       | Set once on draft call, always kept    |
-| Frontend chat history | ≤ 500      | Passed from frontend, capped by client |
-| New user message      | ~100       | Current turn only                      |
-| **Total input**       | **~1,350** | Well under 5,000 token budget          |
+| Layer            | Tokens     | Policy                               |
+| ---------------- | ---------- | ------------------------------------ |
+| System prompt    | ~400       | Static — never changes               |
+| Session anchor   | ~350       | Set once on draft call, always kept  |
+| DB chat history  | ≤ 500      | Loaded from DB, appended server-side |
+| New user message | ~100       | Current turn only                    |
+| **Total input**  | **~1,350** | Well under 5,000 token budget        |
 
 Raw military_text and job_description are NEVER passed after call 1.
 
@@ -129,7 +129,7 @@ Raw military_text and job_description are NEVER passed after call 1.
 - O\*NET Web Services: https://services.onetcenter.org/ws/
 - Purpose: map military occupation codes to civilian job titles
 - Server-side proxy only, never call from frontend
-- Endpoint: GET /api/v1/onet/search/?code={mos_code}
+- Endpoint: GET /api/v1/onet/search/?keyword={mos_code}
 
 ## OAuth
 

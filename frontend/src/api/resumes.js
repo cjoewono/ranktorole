@@ -1,95 +1,51 @@
 import { apiFetch } from "./client";
 
+export async function listResumes() {
+  return await apiFetch("/api/v1/resumes/");
+}
+
 export async function uploadResume(file) {
   const formData = new FormData();
   formData.append("file", file);
   // Pass Content-Type: undefined so apiFetch's default "application/json" is
   // overridden — browser then sets multipart/form-data with correct boundary.
-  const res = await apiFetch("/api/v1/resumes/upload/", {
+  return await apiFetch("/api/v1/resumes/upload/", {
     method: "POST",
     headers: { "Content-Type": undefined },
     body: formData,
-  });
-  let data = {};
-  try {
-    data = await res.json();
-  } catch (_) {
-    /* non-JSON body */
-  }
-  if (!res.ok) throw new Error(data.error || data.detail || "Upload failed");
-  return data; // { id, created_at }
+  }); // { id, created_at }
 }
 
 export async function generateDraft(resumeId, jobDescription) {
-  const res = await apiFetch(`/api/v1/resumes/${resumeId}/draft/`, {
+  return await apiFetch(`/api/v1/resumes/${resumeId}/draft/`, {
     method: "POST",
     body: JSON.stringify({ job_description: jobDescription }),
-  });
-  let data = {};
-  try {
-    data = await res.json();
-  } catch (_) {
-    /* non-JSON body */
-  }
-  if (!res.ok)
-    throw new Error(data.error || data.detail || "Draft generation failed");
-  return data; // { civilian_title, summary, roles[], clarifying_questions }
+  }); // { civilian_title, summary, roles[], clarifying_questions }
 }
 
 export async function sendChatMessage(resumeId, message) {
-  const res = await apiFetch(`/api/v1/resumes/${resumeId}/chat/`, {
+  return await apiFetch(`/api/v1/resumes/${resumeId}/chat/`, {
     method: "POST",
     body: JSON.stringify({ message }),
-  });
-  let data = {};
-  try {
-    data = await res.json();
-  } catch (_) {
-    /* non-JSON body */
-  }
-  if (!res.ok)
-    throw new Error(data.error || data.detail || "Chat request failed");
-  return data; // { civilian_title, summary, roles[], assistant_reply }
+  }); // { civilian_title, summary, roles[], assistant_reply }
 }
 
 export async function finalizeResume(
   resumeId,
   { civilian_title, summary, roles },
 ) {
-  const res = await apiFetch(`/api/v1/resumes/${resumeId}/finalize/`, {
+  return await apiFetch(`/api/v1/resumes/${resumeId}/finalize/`, {
     method: "PATCH",
     body: JSON.stringify({ civilian_title, summary, roles }),
-  });
-  let data = {};
-  try {
-    data = await res.json();
-  } catch (_) {
-    /* non-JSON body */
-  }
-  if (!res.ok) {
-    throw new Error(
-      data.error ||
-        data.detail ||
-        data.civilian_title?.[0] ||
-        data.summary?.[0] ||
-        data.roles?.[0] ||
-        "Finalize failed",
-    );
-  }
-  return data; // full Resume object
+  }); // full Resume object
 }
 
 export async function getResume(resumeId) {
-  const res = await apiFetch(`/api/v1/resumes/${resumeId}/`, {
+  return await apiFetch(`/api/v1/resumes/${resumeId}/`, {
     method: "GET",
-  });
-  let data = {};
-  try {
-    data = await res.json();
-  } catch (_) {
-    /* non-JSON body */
-  }
-  if (!res.ok)
-    throw new Error(data.error || data.detail || "Failed to load resume");
-  return data; // full resume object including roles[], chat_history[], ai_initial_draft
+  }); // full resume object including roles[], chat_history[], ai_initial_draft
+}
+
+export async function deleteResume(id) {
+  return await apiFetch(`/api/v1/resumes/${id}/`, { method: "DELETE" });
 }

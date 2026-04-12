@@ -7,10 +7,6 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 
-class TranslateThrottle(UserRateThrottle):
-    scope = "user_translate"
-
-
 class UploadThrottle(UserRateThrottle):
     scope = "user_upload"
 
@@ -23,8 +19,12 @@ class ChatThrottle(UserRateThrottle):
     scope = "user_chat"
 
 
+class FinalizeThrottle(UserRateThrottle):
+    scope = "user_draft"  # reuse the draft rate bucket — 20/day is reasonable
+
+
 from .models import Resume
-from .serializers import DraftInputSerializer, FinalizeInputSerializer, ResumeSerializer, TranslationInputSerializer
+from .serializers import DraftInputSerializer, FinalizeInputSerializer, ResumeSerializer
 from .services import (
     call_claude_chat,
     call_claude_draft,
@@ -33,54 +33,6 @@ from .services import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class TranslationView(APIView):
-    """
-    GET  /api/v1/translations/ — list resumes for authenticated user.
-    POST /api/v1/translations/ — translate military text into a civilian resume.
-    """
-
-    permission_classes = [IsAuthenticated]
-    throttle_classes = [TranslateThrottle]
-
-    def get(self, request):
-        resumes = Resume.objects.filter(user=request.user)
-        return Response(ResumeSerializer(resumes, many=True).data)
-
-    def post(self, request):
-        input_ser = TranslationInputSerializer(data=request.data)
-        if not input_ser.is_valid():
-            return Response(input_ser.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        military_text = input_ser.validated_data["military_text"]
-        job_description = input_ser.validated_data["job_description"]
-
-        try:
-            anchor = compress_session_anchor(military_text, job_description, request.user.profile_context)
-        except ValueError:
-            return Response(
-                {"error": "Translation failed: invalid response from AI service."},
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            )
-        except Exception:
-            logger.error("Unexpected error during translation")
-            return Response(
-                {"error": "Translation service unavailable."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-        resume = Resume.objects.create(
-            user=request.user,
-            military_text=military_text,
-            job_description=job_description,
-            session_anchor=anchor,
-            civilian_title=anchor["civilian_title"],
-            summary=anchor["summary"],
-            roles=anchor.get("roles", []),
-        )
-
-        return Response(ResumeSerializer(resume).data, status=status.HTTP_201_CREATED)
 
 
 class ResumeListView(APIView):
@@ -198,7 +150,11 @@ class ResumeDraftView(APIView):
         job_description = input_ser.validated_data.get("job_description", "")
 
         try:
-            translation = call_claude_draft(resume.military_text, job_description)
+            translation = call_claude_draft(
+                resume.military_text,
+                job_description,
+                request.user.profile_context,
+            )
         except ValueError:
             return Response(
                 {"error": "Invalid response from AI service."},
@@ -218,6 +174,7 @@ class ResumeDraftView(APIView):
             "summary": translation.summary,
             "roles": roles_data,
             "job_description_snippet": job_description[:300],
+            "profile_context": request.user.profile_context,
         }
 
         resume.job_description = job_description
@@ -306,6 +263,7 @@ class ResumeFinalizeView(APIView):
     """PATCH /api/v1/resumes/{id}/finalize/ — save final edits and set is_finalized=True."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [FinalizeThrottle]
 
     def patch(self, request, pk):
         try:

@@ -15,11 +15,6 @@ class ResumeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'session_anchor', 'ai_initial_draft']
 
 
-class TranslationInputSerializer(serializers.Serializer):
-    military_text = serializers.CharField(min_length=10, max_length=5000)
-    job_description = serializers.CharField(min_length=10, max_length=15000)
-
-
 class TranslationOutputSerializer(serializers.Serializer):
     civilian_title = serializers.CharField()
     summary = serializers.CharField()

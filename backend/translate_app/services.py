@@ -9,9 +9,19 @@ from dataclasses import dataclass
 import anthropic
 from pydantic import BaseModel, ValidationError
 
-from .context import DecisionsLog, RollingChatWindow
-
 logger = logging.getLogger(__name__)
+
+_anthropic_client = None
+
+
+def _get_client() -> anthropic.Anthropic:
+    global _anthropic_client
+    if _anthropic_client is None:
+        _anthropic_client = anthropic.Anthropic(
+            api_key=os.environ.get("ANTHROPIC_API_KEY", "")
+        )
+    return _anthropic_client
+
 
 _SYSTEM_PROMPT = (
     "You are a professional resume writer specializing in "
@@ -44,24 +54,34 @@ class ChatResult:
     updated_history: list[dict]
 
 
+def _build_profile_block(profile_context: dict | None) -> str:
+    """Build the OPERATOR PROFILE prompt block from user profile_context."""
+    if not profile_context:
+        return ""
+    parts = []
+    if profile_context.get("branch"):
+        parts.append(f"Military Branch: {profile_context['branch']}")
+    if profile_context.get("mos"):
+        parts.append(f"MOS/Rating: {profile_context['mos']}")
+    if profile_context.get("target_sector"):
+        parts.append(f"Target Civilian Sector: {profile_context['target_sector']}")
+    if profile_context.get("skills"):
+        skills = (
+            ", ".join(profile_context["skills"])
+            if isinstance(profile_context["skills"], list)
+            else profile_context["skills"]
+        )
+        parts.append(f"Key Transferable Skills: {skills}")
+    if not parts:
+        return ""
+    return "OPERATOR PROFILE:\n" + "\n".join(parts) + "\n\n"
+
+
 def compress_session_anchor(military_text: str, job_description: str, profile_context: dict | None = None) -> dict:
     """Run ONCE at session start. Returns compressed anchor dict stored to Resume.session_anchor."""
     schema = MilitaryTranslation.model_json_schema()
 
-    profile_block = ""
-    if profile_context:
-        parts = []
-        if profile_context.get("branch"):
-            parts.append(f"Military Branch: {profile_context['branch']}")
-        if profile_context.get("mos"):
-            parts.append(f"MOS/Rating: {profile_context['mos']}")
-        if profile_context.get("target_sector"):
-            parts.append(f"Target Civilian Sector: {profile_context['target_sector']}")
-        if profile_context.get("skills"):
-            skills = ", ".join(profile_context["skills"]) if isinstance(profile_context["skills"], list) else profile_context["skills"]
-            parts.append(f"Key Transferable Skills: {skills}")
-        if parts:
-            profile_block = "OPERATOR PROFILE:\n" + "\n".join(parts) + "\n\n"
+    profile_block = _build_profile_block(profile_context)
 
     user_message = (
         f"{profile_block}"
@@ -70,52 +90,12 @@ def compress_session_anchor(military_text: str, job_description: str, profile_co
         f"Target job description: {job_description}\n"
         f"Return ONLY valid JSON matching this schema: {json.dumps(schema)}"
     )
-    translation = call_claude([{"role": "user", "content": user_message}])
+    translation = _call_claude_typed([{"role": "user", "content": user_message}], MilitaryTranslation)
     return {
         "civilian_title": translation.civilian_title,
         "summary": translation.summary,
         "roles": [r.model_dump() for r in translation.roles],
     }
-
-
-def build_messages(
-    anchor: dict,
-    decisions: DecisionsLog,
-    chat_window: RollingChatWindow,
-    new_user_message: str,
-) -> list[dict]:
-    """Assemble 4-layer context for every subsequent multi-turn call."""
-    roles_summary = ""
-    for role in anchor.get("roles", []):
-        if isinstance(role, dict):
-            roles_summary += (
-                f"\n  - {role.get('title', '')} at {role.get('org', '')} "
-                f"({role.get('dates', '')})"
-            )
-
-    anchor_block = (
-        "Session context (compressed):\n"
-        f"Title: {anchor.get('civilian_title', '')}\n"
-        f"Summary: {anchor.get('summary', '')}\n"
-        f"Roles:{roles_summary}"
-    )
-
-    decisions_block = decisions.to_prompt_block()
-    system_context = anchor_block
-    if decisions_block:
-        system_context += f"\n\n{decisions_block}"
-
-    messages: list[dict] = list(chat_window.to_messages())
-
-    schema = MilitaryTranslation.model_json_schema()
-    full_user_message = (
-        f"{system_context}\n\n"
-        f"{new_user_message}\n"
-        f"Return ONLY valid JSON matching this schema: {json.dumps(schema)}"
-    )
-    messages.append({"role": "user", "content": full_user_message})
-
-    return messages
 
 
 def extract_pdf_text(file_bytes: bytes) -> str:
@@ -128,7 +108,7 @@ def extract_pdf_text(file_bytes: bytes) -> str:
 
 def _call_claude_typed(messages: list[dict], model_class):
     """Call Claude API and validate the text response against any Pydantic model class."""
-    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
+    client = _get_client()
 
     try:
         response = client.messages.create(
@@ -161,10 +141,18 @@ def _call_claude_typed(messages: list[dict], model_class):
         raise ValueError("Invalid response from Claude API") from exc
 
 
-def call_claude_draft(military_text: str, job_description: str) -> MilitaryTranslation:
+def call_claude_draft(
+    military_text: str,
+    job_description: str,
+    profile_context: dict | None = None,
+) -> MilitaryTranslation:
     """Single Claude call for the draft endpoint."""
     schema = MilitaryTranslation.model_json_schema()
+
+    profile_block = _build_profile_block(profile_context)
+
     user_message = (
+        f"{profile_block}"
         "Translate this military resume into a structured civilian resume draft.\n\n"
         "Instructions:\n"
         "- Extract EVERY role from the experience section of the PDF text.\n"
@@ -203,7 +191,10 @@ def call_claude_chat(anchor: dict, history: list[dict], message: str) -> ChatRes
 
     roles_str = "\n".join(roles_lines) if roles_lines else "(no roles)"
 
+    profile_block = _build_profile_block(anchor.get("profile_context"))
+
     anchor_text = (
+        f"{profile_block}"
         "Current resume draft (session context):\n"
         f"Civilian title: {anchor.get('civilian_title', '')}\n"
         f"Summary: {anchor.get('summary', '')}\n"
@@ -246,33 +237,3 @@ def call_claude_chat(anchor: dict, history: list[dict], message: str) -> ChatRes
     return ChatResult(translation=translation, updated_history=updated_history)
 
 
-def call_claude(messages: list[dict]) -> MilitaryTranslation:
-    """Call Claude API and return Pydantic-validated MilitaryTranslation."""
-    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
-
-    try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=2048,
-            system=_SYSTEM_PROMPT,
-            messages=messages,
-        )
-    except anthropic.APIError:
-        logger.error("Claude API error during translation call")
-        raise
-
-    raw = ""
-    for block in response.content:
-        if block.type == "text":
-            raw = block.text
-            break
-
-    raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
-    raw = re.sub(r"\s*```$", "", raw)
-
-    try:
-        data = json.loads(raw)
-        return MilitaryTranslation(**data)
-    except (json.JSONDecodeError, ValidationError) as exc:
-        logger.error("Claude response parsing failed: %s", type(exc).__name__)
-        raise ValueError("Invalid response from Claude API") from exc

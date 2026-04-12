@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
-import { deleteTranslation } from "../api/translations";
+import { deleteResume } from "../api/resumes";
 import { useResumes } from "../context/ResumeContext";
 import { exportPDF } from "../utils/pdfExport";
 
@@ -42,7 +42,7 @@ export default function Dashboard() {
 
   async function handleDelete(id) {
     try {
-      await deleteTranslation(id);
+      await deleteResume(id);
       await refreshResumes();
     } catch (err) {
       setError(err.message);

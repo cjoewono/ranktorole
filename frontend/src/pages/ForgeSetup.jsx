@@ -25,6 +25,14 @@ const SECTORS = [
   "Other",
 ];
 
+async function fetchOnetSkills(keyword) {
+  const res = await apiFetch(
+    `/api/v1/onet/search/?keyword=${encodeURIComponent(keyword)}`,
+  );
+  const data = await res.json();
+  return data.skills || [];
+}
+
 export default function ForgeSetup() {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
@@ -34,12 +42,51 @@ export default function ForgeSetup() {
   const [targetSector, setTargetSector] = useState(
     user?.profile_context?.target_sector || "",
   );
-  const [skills, setSkills] = useState(
-    user?.profile_context?.skills?.join(", ") || "",
+  const [selectedSkills, setSelectedSkills] = useState(
+    user?.profile_context?.skills || [],
   );
+  const [onetSkills, setOnetSkills] = useState([]);
+  const [loadingSkills, setLoadingSkills] = useState(false);
+  const [customSkill, setCustomSkill] = useState("");
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  async function handleMosBlur() {
+    if (!mos.trim()) return;
+    setLoadingSkills(true);
+    try {
+      const skills = await fetchOnetSkills(mos.trim());
+      setOnetSkills(skills);
+    } catch {
+      setOnetSkills([]);
+    } finally {
+      setLoadingSkills(false);
+    }
+  }
+
+  function toggleSkill(skill) {
+    setSelectedSkills((prev) =>
+      prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill],
+    );
+  }
+
+  function addCustomSkill() {
+    const trimmed = customSkill.trim();
+    if (!trimmed || selectedSkills.includes(trimmed)) {
+      setCustomSkill("");
+      return;
+    }
+    setSelectedSkills((prev) => [...prev, trimmed]);
+    setCustomSkill("");
+  }
+
+  function handleCustomKeyDown(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addCustomSkill();
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -50,10 +97,7 @@ export default function ForgeSetup() {
         branch,
         mos: mos.trim(),
         target_sector: targetSector,
-        skills: skills
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+        skills: selectedSkills,
       };
       const userData = await apiFetch("/api/v1/auth/profile/", {
         method: "PATCH",
@@ -72,6 +116,12 @@ export default function ForgeSetup() {
       setSaving(false);
     }
   }
+
+  // All skills to display as tags: O*NET suggestions + any custom skills not in onetSkills
+  const allTagSkills = [
+    ...onetSkills,
+    ...selectedSkills.filter((s) => !onetSkills.includes(s)),
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -129,6 +179,7 @@ export default function ForgeSetup() {
                 type="text"
                 value={mos}
                 onChange={(e) => setMos(e.target.value)}
+                onBlur={handleMosBlur}
                 placeholder="e.g., 11B, IT2, 3D0X4"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -157,16 +208,62 @@ export default function ForgeSetup() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Top Transferable Skills
               </label>
-              <input
-                type="text"
-                value={skills}
-                onChange={(e) => setSkills(e.target.value)}
-                placeholder="e.g., Cross-functional leadership, Agile, Cloud infrastructure"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Separate skills with commas
-              </p>
+
+              {loadingSkills && (
+                <p className="text-xs text-gray-400 mb-2">Loading skills...</p>
+              )}
+
+              {!loadingSkills &&
+                allTagSkills.length === 0 &&
+                onetSkills.length === 0 &&
+                mos.trim() && (
+                  <p className="text-xs text-gray-400 mb-2">
+                    No matching skills found. Add your own below.
+                  </p>
+                )}
+
+              {allTagSkills.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {allTagSkills.map((skill) => {
+                    const isSelected = selectedSkills.includes(skill);
+                    return (
+                      <button
+                        key={skill}
+                        type="button"
+                        onClick={() => toggleSkill(skill)}
+                        className={
+                          isSelected
+                            ? "bg-blue-700 text-white border border-blue-700 rounded-full px-3 py-1 text-sm cursor-pointer flex items-center gap-1"
+                            : "bg-slate-100 text-slate-700 border border-slate-200 rounded-full px-3 py-1 text-sm cursor-pointer hover:bg-blue-50 hover:border-blue-200"
+                        }
+                      >
+                        {skill}
+                        {isSelected && (
+                          <span className="text-xs leading-none">×</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customSkill}
+                  onChange={(e) => setCustomSkill(e.target.value)}
+                  onKeyDown={handleCustomKeyDown}
+                  placeholder="Add custom skill"
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={addCustomSkill}
+                  className="px-3 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
             </div>
 
             <button

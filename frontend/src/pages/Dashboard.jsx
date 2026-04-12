@@ -66,13 +66,7 @@ export default function Dashboard() {
     <>
       <PageHeader
         label="SYSTEM ACTIVE / CORE_OPERATIONS"
-        title={
-          <>
-            YOUR
-            <br />
-            DEPLOYMENTS
-          </>
-        }
+        title="YOUR DEPLOYMENTS"
         action={
           <button
             onClick={handleNewResume}

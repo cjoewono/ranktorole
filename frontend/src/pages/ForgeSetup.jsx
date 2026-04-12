@@ -155,21 +155,7 @@ export default function ForgeSetup() {
 
       <PageHeader
         label={isEditing ? "OPERATOR / PROFILE_UPDATE" : "FORGE / ONBOARDING"}
-        title={
-          isEditing ? (
-            <>
-              EDIT
-              <br />
-              PROFILE
-            </>
-          ) : (
-            <>
-              FORGE
-              <br />
-              SETUP
-            </>
-          )
-        }
+        title={isEditing ? "EDIT PROFILE" : "FORGE SETUP"}
       />
 
       <main className="max-w-xl mx-auto px-4 py-8 pb-28 md:pb-8">

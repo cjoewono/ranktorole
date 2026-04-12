@@ -1,4 +1,6 @@
 import pytest
+from unittest.mock import patch
+from django.core.cache import cache
 from translate_app import services
 
 
@@ -8,3 +10,12 @@ def reset_anthropic_singleton():
     services._anthropic_client = None
     yield
     services._anthropic_client = None
+
+
+@pytest.fixture(autouse=True)
+def disable_tiered_throttling():
+    """Disable all tiered throttles in tests unless a test explicitly needs them."""
+    cache.clear()
+    with patch('translate_app.throttles.TieredThrottle.allow_request', return_value=True):
+        yield
+    cache.clear()

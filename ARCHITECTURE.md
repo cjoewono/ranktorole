@@ -131,18 +131,68 @@ class Resume(models.Model):
 
 Fields are blank=True on partial fields because upload creates the record before draft call.
 
-## Frontend State Machine
+## Frontend Architecture
+
+### AppShell Pattern
+
+`App.jsx` renders an `AppShell` component that owns the persistent NavBar and mounts all
+pages once. Pages are shown/hidden via CSS (`hidden` class) rather than unmounted — this
+prevents NavBar remounts and eliminates layout flash when ResumeBuilder enters fullscreen.
+
+```
+App
+└── AppShell
+    ├── NavBar (always mounted)
+    ├── <Dashboard />  (hidden when path ≠ /dashboard)
+    ├── <Contacts />   (hidden when path ≠ /contacts)
+    └── <ResumeBuilder setFullscreen={...} />  (hidden when path ≠ /resume-builder)
+```
+
+`fullscreen` state lives in AppShell and is passed as `setFullscreen` to ResumeBuilder.
+When the builder enters a split-pane phase, it calls `setFullscreen(true)` — AppShell
+applies `overflow-hidden` to prevent body scroll during the split-pane layout.
+
+### State Machine Hook
+
+All resume builder logic lives in `frontend/src/hooks/useResumeMachine.js`:
+
+- `initialState` — 9-field initial state
+- `reducer` — 18 action cases
+- `useEffect` — re-entry from Dashboard via `?id=&mode=` search params
+- `handleGenerateDraft` — `useCallback`-wrapped, calls `generateDraft()` API
+- `handleChatSend` — `useCallback`-wrapped, calls `sendChatMessage()`, dispatches optimistic + received actions
+
+`ResumeBuilder.jsx` is JSX-only — it calls `useResumeMachine()` and passes results to children.
+
+### State Machine Phases
 
 ```
 IDLE        → upload dropzone visible, no resume_id in state
 UPLOADED    → resume_id in state, JD textarea + "Generate Draft" button visible
+LOADING     → re-entry from Dashboard: loading spinner while fetching resume from DB
 DRAFTING    → loading spinner, both panes empty
 REVIEWING   → split pane: draft left, chat right, "Approve & Finalize" button visible
 FINALIZING  → inline bullet editing enabled, "Confirm Final" button
-DONE        → redirect to /dashboard
+DONE        → export CTA + "Back to Dashboard" link
 ```
 
-Single `status` state variable drives all conditional renders.
+Single `phase` field in state drives all conditional renders.
+
+### DraftPane Component Tree
+
+```
+DraftPane/ (index.jsx)
+├── phase === REVIEWING  → read-only role cards + "Approve & Edit" button
+├── phase === FINALIZING → <FinalizingEditor />
+│   ├── Title + Summary inputs
+│   ├── <BulletEditor /> per bullet
+│   │   ├── Accordion header (current value)
+│   │   ├── Textarea (edit)
+│   │   ├── <DiffView /> (vs ai_initial_draft)
+│   │   └── AI suggestion chip (Accept / Dismiss)
+│   └── Sticky confirm button
+└── phase === DONE       → Export PDF button + Back to Dashboard link
+```
 
 ## PDF Extraction
 
@@ -157,8 +207,25 @@ Single `status` state variable drives all conditional renders.
 - docker compose restart does NOT load new env vars; must use down && up
 - Use PersistentClient pattern for any local storage services
 - Relative paths only — hardcoded IPs break in Docker networking
-- chat_history IS persisted to DB — backend owns it
+- chat_history IS persisted to DB — backend owns it; never pass it in request body
 - multipart/form-data on upload endpoint only — JSON everywhere else
+- AppShell pattern (CSS hide/show) prevents NavBar remounts and fullscreen flash
+- Vite resolves directory imports to index.jsx — use this for component subfolders
+- Custom hooks (useResumeMachine) keep page components as pure JSX; easier to test and reason about
+
+## Tiered Throttling
+
+Rate limits are tier-aware. Every throttled endpoint reads `request.user.tier` (free/pro) and looks up the rate from `settings.TIERED_THROTTLE_RATES[scope][tier]`.
+
+| Scope           | Free   | Pro    | Endpoints                            |
+| --------------- | ------ | ------ | ------------------------------------ |
+| `user_upload`   | 3/day  | 15/day | POST /api/v1/resumes/upload/         |
+| `user_draft`    | 1/day  | 5/day  | POST /api/v1/resumes/{id}/draft/     |
+| `user_chat`     | 10/day | 50/day | POST /api/v1/resumes/{id}/chat/      |
+| `user_finalize` | 3/day  | 15/day | PATCH /api/v1/resumes/{id}/finalize/ |
+| `user_onet`     | 10/day | 30/day | GET /api/v1/onet/search/             |
+
+All throttle classes live in `translate_app/throttles.py`. Cache key includes tier so upgrade/downgrade immediately takes effect. Falls back to `DEFAULT_THROTTLE_RATES` for unknown tiers.
 
 ## Dev vs Production
 

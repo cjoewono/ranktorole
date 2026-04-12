@@ -4,16 +4,13 @@ import requests as http_requests
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
+
+from translate_app.throttles import OnetThrottle
 
 logger = logging.getLogger(__name__)
 
 ONET_BASE = "https://services.onetcenter.org/ws"
-
-
-class OnetThrottle(UserRateThrottle):
-    scope = "user_upload"  # reuse the upload bucket — 20/day is reasonable for MOS lookups
 
 
 class OnetSearchView(APIView):

@@ -5,6 +5,8 @@ from .models import User
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ['email', 'username', 'is_staff', 'created_at']
+    list_display = ['email', 'username', 'tier', 'is_staff', 'created_at']
+    list_filter = ['tier', 'is_staff', 'is_active']
     search_fields = ['email', 'username']
     ordering = ['-created_at']
+    fieldsets = BaseUserAdmin.fieldsets + (('RankToRole', {'fields': ('tier', 'profile_context')}),)

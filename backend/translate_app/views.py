@@ -3,26 +3,9 @@ import logging
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
-
-class UploadThrottle(UserRateThrottle):
-    scope = "user_upload"
-
-
-class DraftThrottle(UserRateThrottle):
-    scope = "user_draft"
-
-
-class ChatThrottle(UserRateThrottle):
-    scope = "user_chat"
-
-
-class FinalizeThrottle(UserRateThrottle):
-    scope = "user_draft"  # reuse the draft rate bucket — 20/day is reasonable
-
-
+from .throttles import ChatThrottle, DraftThrottle, FinalizeThrottle, UploadThrottle
 from .models import Resume
 from .serializers import DraftInputSerializer, FinalizeInputSerializer, ResumeSerializer
 from .services import (

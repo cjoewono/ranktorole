@@ -430,5 +430,106 @@ Backend resilience improved via live testing under actual Anthropic API load. Al
 
 ---
 
+## April 10, 2026 | Session 06 | API Layer Refactor + Service Layer Cleanup
+
+**Status:** ✅ Complete
+
+### API Client Refactor (Frontend)
+
+Centralized error handling across all frontend API modules:
+
+- **APIError class** added to `client.js` — carries `status`, `message`, and `data` fields
+- **`handleResponse()` helper** — single place that checks `res.ok`, parses JSON, and throws `APIError` on failure
+- `apiFetch()` now returns parsed data directly and throws `APIError` instead of raw `Response`
+- **Eliminated manual error handling** from `resumes.js`, `auth.js`, `contacts.js`, and `translations.js` — all four modules now rely on the centralized helper
+
+Previously each module had its own `if (!res.ok)` blocks with inconsistent error extraction. All error paths now flow through one code path.
+
+### PDF Export Utility
+
+- Extracted `exportPDF()` out of `DraftPane.jsx` into standalone `frontend/src/utils/pdfExport.js`
+- `DraftPane.jsx` now imports from the utility module — no behavior change
+
+### Backend Service Layer (services.py)
+
+- **`ChatResult` dataclass** added to `services.py` — encapsulates `(translation, updated_history)` return tuple
+- `call_claude_chat()` now returns a `ChatResult` instead of a bare tuple
+- `ResumeChatView` updated to consume `ChatResult` attributes
+- Test helper `make_chat_result()` added; 4 `TestResumeChatView` tests updated to mock `ChatResult` return type
+
+### Verification
+
+- pytest: **77/77 passing** throughout refactoring
+- No regressions — backend and frontend changes are independent
+
+---
+
+## April 11, 2026 | Session 07 | SPA Architecture + Component Decomposition
+
+**Status:** ✅ Complete
+
+### Part A — SPA Shell Refactor
+
+Replaced per-page NavBar rendering with a persistent `AppShell` pattern:
+
+| Change                       | Detail                                                                                                                           |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `AppShell` component         | Always mounts NavBar once; pages are shown/hidden via CSS (`hidden` class), not unmounted                                        |
+| `ResumeContext`              | New context file (`frontend/src/context/ResumeContext.jsx`) wires up shared resume state                                         |
+| `fullscreen` state           | Lives in `AppShell`, passed as `setFullscreen` prop to `ResumeBuilder` — AppShell applies `overflow-hidden` on split-pane phases |
+| `PageHeader` component       | Shared header (`frontend/src/components/PageHeader.jsx`) — renders label badge, bold headline, optional action slot              |
+| Dashboard refactor           | Imports `PageHeader`, removed NavBar                                                                                             |
+| Contacts refactor            | Imports `PageHeader`, removed NavBar                                                                                             |
+| ResumeBuilder refactor       | Now accepts `setFullscreen` prop; calls `setFullscreen(true)` on split phases, `false` otherwise                                 |
+| `ProtectedRoute.jsx` deleted | Dead code — AppShell's auth guard replaces it entirely                                                                           |
+| Catch-all redirect           | Unknown paths redirect to `/dashboard` instead of blank screen                                                                   |
+
+**Benefit:** NavBar no longer remounts on every route change. SplitPane fullscreen triggers no layout flash.
+
+### Part B — Frontend Component Decomposition
+
+#### useResumeMachine custom hook
+
+Extracted the entire state machine out of `ResumeBuilder.jsx` into `frontend/src/hooks/useResumeMachine.js`:
+
+| Moved to hook         | Detail                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `initialState`        | 9-field initial state object                                                               |
+| `reducer`             | 18 action cases (IDLE → LOADING → UPLOADED → DRAFTING → REVIEWING → FINALIZING → DONE)     |
+| `useEffect` re-entry  | Reads `?id=&mode=` search params on mount, loads resume from DB via `getResume()`          |
+| `handleGenerateDraft` | `useCallback`-wrapped, calls `generateDraft()` API                                         |
+| `handleChatSend`      | `useCallback`-wrapped, calls `sendChatMessage()`, dispatches optimistic + received actions |
+
+Hook returns `{ state, dispatch, handleGenerateDraft, handleChatSend }`. `ResumeBuilder.jsx` reduced to JSX-only (1 hook call, no logic).
+
+#### DraftPane component split
+
+Replaced flat `frontend/src/components/DraftPane.jsx` with a directory:
+
+| File                             | Responsibility                                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `DraftPane/DiffView.jsx`         | Word-level LCS diff, renders added/removed spans                                                                    |
+| `DraftPane/BulletEditor.jsx`     | Accordion bullet editor with AI suggestion chip (Accept/Dismiss)                                                    |
+| `DraftPane/FinalizingEditor.jsx` | Full editing UI — title, summary, role bullets, sticky confirm button                                               |
+| `DraftPane/index.jsx`            | Main DraftPane wrapper — REVIEWING (read-only cards), FINALIZING (delegates to FinalizingEditor), DONE (export CTA) |
+
+All existing consumers (`ResumeBuilder.jsx`, etc.) continue importing `../components/DraftPane` unchanged — Vite resolves directory imports to `index.jsx` automatically.
+
+### Verification
+
+- pytest: **77/77 passing** — no backend regressions
+- Vite production build: **441 modules**, 0 import errors
+- Structural checks: no `useReducer`/`reducer`/`initialState` remaining in `ResumeBuilder.jsx`, only one component function exported from `DraftPane/index.jsx`
+
+---
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 10, 2026 — Post-S05 critical fixes verified
+Last updated: April 11, 2026 — Sessions 06 + 07 complete
+
+---
+
+## April 12, 2026 | Task 6 | Tiered Throttle System
+
+**Status:** ✅ Complete
+
+- Apr 12: Implemented tiered throttle system — User.tier field (free/pro), TieredThrottle base class, 5 throttle subclasses, TIERED_THROTTLE_RATES settings, 20 new tests (64→84 total)

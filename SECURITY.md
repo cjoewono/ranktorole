@@ -26,6 +26,7 @@
 - Resume data scoped to authenticated user only (filter by request.user)
 - Raw PDF bytes never stored — extracted text only
 - chat_history stored in DB server-side — frontend request body history is always ignored to prevent injection
+- User.tier field is read-only in the API (UserSerializer) — tier changes only via Django admin
 
 ## File Uploads
 

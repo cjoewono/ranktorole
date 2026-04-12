@@ -143,10 +143,11 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
         'login': '5/min',
-        'user_translate': '20/day',
-        'user_draft': '20/day',
-        'user_chat': '50/day',
-        'user_upload': '20/day',
+        'user_draft': '1/day',
+        'user_chat': '10/day',
+        'user_upload': '3/day',
+        'user_finalize': '3/day',
+        'user_onet': '10/day',
     },
 }
 
@@ -157,6 +158,19 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         "LOCATION": "ranktorole-cache",
     }
+}
+
+# ---------------------------------------------------------------------------
+# Tiered Throttle Rates
+# ---------------------------------------------------------------------------
+# TieredThrottle subclasses look up rates here by scope + user.tier.
+# Falls back to DEFAULT_THROTTLE_RATES if tier not found.
+TIERED_THROTTLE_RATES = {
+    'user_upload':   {'free': '3/day',  'pro': '15/day'},
+    'user_draft':    {'free': '1/day',  'pro': '5/day'},
+    'user_chat':     {'free': '10/day', 'pro': '50/day'},
+    'user_finalize': {'free': '3/day',  'pro': '15/day'},
+    'user_onet':     {'free': '10/day', 'pro': '30/day'},
 }
 
 # ---------------------------------------------------------------------------

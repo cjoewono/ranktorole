@@ -300,3 +300,27 @@ POST /api/v1/auth/google/callback/
 - No cross-user resume access
 - No admin access to user resume content without explicit grant
 - User can delete their own resumes at any finalization state
+
+---
+
+## User Profile
+
+### GET /api/v1/auth/profile/
+
+Auth: JWT required
+
+**Output**
+
+```json
+{
+  "id": "uuid",
+  "email": "string",
+  "username": "string",
+  "profile_context": {},
+  "tier": "free",
+  "created_at": "ISO8601",
+  "updated_at": "ISO8601"
+}
+```
+
+`tier` is read-only. Values: `free` (default), `pro`.

@@ -18,7 +18,7 @@ export default function DraftPane({
   // DONE — export CTA only appears after finalization
   if (phase === "DONE") {
     return (
-      <div className="bg-surface-container-low p-5 flex flex-col items-center justify-center h-full space-y-6 text-center">
+      <div className="bg-surface-container-low p-5 flex flex-col items-center justify-center flex-1 space-y-6 text-center">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-secondary inline-block" />
           <span className="font-label text-xs tracking-widest uppercase text-secondary">
@@ -56,7 +56,7 @@ export default function DraftPane({
   if (phase === "FINALIZING") {
     if (!draft.roles) return null;
     return (
-      <div className="bg-surface-container-low p-5">
+      <div className="bg-surface-container-low flex flex-col flex-1 overflow-hidden">
         <FinalizingEditor
           draft={draft}
           aiInitialDraft={aiInitialDraft}
@@ -71,7 +71,7 @@ export default function DraftPane({
   // REVIEWING phase — read-only role cards
   if (!draft.roles) return null;
   return (
-    <div className="bg-surface-container-low p-5 space-y-5">
+    <div className="bg-surface-container-low p-5 space-y-5 overflow-y-auto flex-1">
       {/* Title + summary */}
       <div>
         <h2 className="font-headline font-bold text-2xl uppercase text-on-surface">

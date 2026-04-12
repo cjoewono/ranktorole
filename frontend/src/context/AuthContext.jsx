@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
       setToken(data.access);
       setAccessToken(data.access);
       setUser(data.user);
-      navigate(data.user?.profile_context ? "/dashboard" : "/forge-setup");
+      navigate(data.user?.profile_context ? "/dashboard" : "/profile");
     },
     [navigate],
   );

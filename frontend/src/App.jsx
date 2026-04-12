@@ -82,7 +82,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route element={<ProtectedRoute />}>
-                <Route path="/forge-setup" element={<ForgeSetup />} />
+                <Route path="/profile" element={<ForgeSetup />} />
                 <Route path="*" element={<AppShell />} />
               </Route>
             </Routes>

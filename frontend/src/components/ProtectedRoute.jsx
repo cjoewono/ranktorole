@@ -10,13 +10,13 @@ export default function ProtectedRoute() {
 
   if (!token) return <Navigate to="/login" replace />;
 
-  // Allow access to forge-setup even without profile_context
-  if (location.pathname === "/forge-setup") return <Outlet />;
+  // Allow access to profile even without profile_context
+  if (location.pathname === "/profile") return <Outlet />;
 
-  // Redirect to forge-setup if profile not completed
+  // Redirect to profile if profile not completed
   // user may be null during initial refresh — don't redirect until we know
   if (user && !user.profile_context) {
-    return <Navigate to="/forge-setup" replace />;
+    return <Navigate to="/profile" replace />;
   }
 
   return <Outlet />;

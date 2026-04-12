@@ -10,7 +10,7 @@ from rest_framework.test import APIClient
 
 from .context import DecisionsLog, RollingChatWindow
 from .models import Resume
-from .services import MilitaryTranslation, RoleEntry, build_messages, call_claude, compress_session_anchor
+from .services import ChatResult, MilitaryTranslation, RoleEntry, build_messages, call_claude, compress_session_anchor
 
 
 # ---------------------------------------------------------------------------
@@ -176,6 +176,32 @@ class TestCompressSessionAnchor:
             compress_session_anchor("military text here", "job description here")
 
 
+class TestCompressSessionAnchorWithProfile:
+    @patch("translate_app.services.anthropic.Anthropic")
+    def test_profile_context_included_in_prompt(self, MockAnthropic):
+        mock_client = MagicMock()
+        MockAnthropic.return_value = mock_client
+        mock_client.messages.create.return_value = _make_claude_response(_VALID_PAYLOAD)
+
+        profile = {"branch": "Navy", "mos": "IT", "target_sector": "Technology"}
+        compress_session_anchor("I served in Navy IT.", "Need sysadmin.", profile)
+
+        call_args = mock_client.messages.create.call_args
+        user_msg = call_args[1]["messages"][0]["content"]
+        assert "OPERATOR PROFILE" in user_msg
+        assert "Navy" in user_msg
+        assert "Technology" in user_msg
+
+    @patch("translate_app.services.anthropic.Anthropic")
+    def test_none_profile_context_still_works(self, MockAnthropic):
+        mock_client = MagicMock()
+        MockAnthropic.return_value = mock_client
+        mock_client.messages.create.return_value = _make_claude_response(_VALID_PAYLOAD)
+
+        result = compress_session_anchor("Military text.", "Job desc.", None)
+        assert result["civilian_title"] == "Logistics Manager"
+
+
 # ---------------------------------------------------------------------------
 # services.py — build_messages
 # ---------------------------------------------------------------------------
@@ -338,6 +364,20 @@ class TestTranslationView:
         )
         assert Resume.objects.filter(user=user).count() == 1
 
+    @patch("translate_app.views.compress_session_anchor")
+    def test_profile_context_passed_to_anchor(self, mock_anchor, auth_client, user, db):
+        user.profile_context = {"branch": "Navy", "mos": "IT"}
+        user.save()
+        mock_anchor.return_value = _VALID_PAYLOAD
+        auth_client.post(
+            "/api/v1/translations/",
+            {"military_text": "I served in Navy IT for 10 years.",
+             "job_description": "We need a systems administrator."},
+            format="json",
+        )
+        call_args = mock_anchor.call_args
+        assert call_args[0][2] == {"branch": "Navy", "mos": "IT"}
+
 
 # ---------------------------------------------------------------------------
 # Helpers for resume endpoint tests
@@ -380,6 +420,16 @@ def _make_mock_translation(payload: dict) -> MagicMock:
         role_mocks.append(rm)
     mock.roles = role_mocks
     return mock
+
+
+def _make_chat_result(payload: dict, message: str = "test message") -> ChatResult:
+    """Build a ChatResult wrapping a mock translation, for patching call_claude_chat."""
+    translation = _make_mock_translation(payload)
+    updated_history = [
+        {"role": "user", "content": message},
+        {"role": "assistant", "content": payload.get("assistant_reply", "")},
+    ]
+    return ChatResult(translation=translation, updated_history=updated_history)
 
 
 def _create_resume(user, **kwargs):
@@ -594,7 +644,7 @@ class TestResumeDraftView:
 class TestResumeChatView:
     @patch("translate_app.views.call_claude_chat")
     def test_valid_message_returns_200(self, mock_chat, auth_client, user, db):
-        mock_chat.return_value = _make_mock_translation(_CHAT_PAYLOAD)
+        mock_chat.return_value = _make_chat_result(_CHAT_PAYLOAD)
         resume = _create_resume(user)
         response = auth_client.post(
             f"/api/v1/resumes/{resume.id}/chat/",
@@ -607,7 +657,7 @@ class TestResumeChatView:
 
     @patch("translate_app.views.call_claude_chat")
     def test_chat_updates_resume_fields(self, mock_chat, auth_client, user, db):
-        mock_chat.return_value = _make_mock_translation(_CHAT_PAYLOAD)
+        mock_chat.return_value = _make_chat_result(_CHAT_PAYLOAD)
         resume = _create_resume(user)
         auth_client.post(
             f"/api/v1/resumes/{resume.id}/chat/",
@@ -619,7 +669,7 @@ class TestResumeChatView:
 
     @patch("translate_app.views.call_claude_chat")
     def test_chat_persists_history_to_db(self, mock_chat, auth_client, user, db):
-        mock_chat.return_value = _make_mock_translation(_CHAT_PAYLOAD)
+        mock_chat.return_value = _make_chat_result(_CHAT_PAYLOAD, message="Update my summary please.")
         resume = _create_resume(user, chat_history=[])
         auth_client.post(
             f"/api/v1/resumes/{resume.id}/chat/",
@@ -635,7 +685,7 @@ class TestResumeChatView:
     @patch("translate_app.views.call_claude_chat")
     def test_chat_does_not_use_history_from_request(self, mock_chat, auth_client, user, db):
         """Chat endpoint must ignore any 'history' key sent in request body and use DB instead."""
-        mock_chat.return_value = _make_mock_translation(_CHAT_PAYLOAD)
+        mock_chat.return_value = _make_chat_result(_CHAT_PAYLOAD)
         resume = _create_resume(user, chat_history=[])
         auth_client.post(
             f"/api/v1/resumes/{resume.id}/chat/",
@@ -653,14 +703,16 @@ class TestResumeChatView:
         contents = [h.get("content", "") for h in passed_history]
         assert "injected history from client" not in contents
 
-    def test_finalized_resume_returns_409(self, auth_client, user, db):
+    @patch("translate_app.views.call_claude_chat")
+    def test_finalized_resume_allows_chat(self, mock_chat, auth_client, user, db):
+        mock_chat.return_value = _make_chat_result(_CHAT_PAYLOAD)
         resume = _create_resume(user, is_finalized=True)
         response = auth_client.post(
             f"/api/v1/resumes/{resume.id}/chat/",
             {"message": "Update bullets."},
             format="json",
         )
-        assert response.status_code == 409
+        assert response.status_code == 200
 
     def test_empty_message_returns_400(self, auth_client, user, db):
         resume = _create_resume(user)
@@ -756,14 +808,14 @@ class TestResumeFinalizeView:
         resume.refresh_from_db()
         assert resume.roles[0]["title"] == "Operations Manager"
 
-    def test_double_finalize_returns_409(self, auth_client, user, db):
+    def test_double_finalize_returns_200(self, auth_client, user, db):
         resume = _create_resume(user, is_finalized=True)
         response = auth_client.patch(
             f"/api/v1/resumes/{resume.id}/finalize/",
             {},
             format="json",
         )
-        assert response.status_code == 409
+        assert response.status_code == 200
 
     def test_wrong_user_returns_404(self, auth_client, db):
         from django.contrib.auth import get_user_model

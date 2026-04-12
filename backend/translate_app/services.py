@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+from dataclasses import dataclass
 
 import anthropic
 from pydantic import BaseModel, ValidationError
@@ -37,10 +38,33 @@ class MilitaryTranslation(BaseModel):
     assistant_reply: str
 
 
-def compress_session_anchor(military_text: str, job_description: str) -> dict:
+@dataclass
+class ChatResult:
+    translation: MilitaryTranslation
+    updated_history: list[dict]
+
+
+def compress_session_anchor(military_text: str, job_description: str, profile_context: dict | None = None) -> dict:
     """Run ONCE at session start. Returns compressed anchor dict stored to Resume.session_anchor."""
     schema = MilitaryTranslation.model_json_schema()
+
+    profile_block = ""
+    if profile_context:
+        parts = []
+        if profile_context.get("branch"):
+            parts.append(f"Military Branch: {profile_context['branch']}")
+        if profile_context.get("mos"):
+            parts.append(f"MOS/Rating: {profile_context['mos']}")
+        if profile_context.get("target_sector"):
+            parts.append(f"Target Civilian Sector: {profile_context['target_sector']}")
+        if profile_context.get("skills"):
+            skills = ", ".join(profile_context["skills"]) if isinstance(profile_context["skills"], list) else profile_context["skills"]
+            parts.append(f"Key Transferable Skills: {skills}")
+        if parts:
+            profile_block = "OPERATOR PROFILE:\n" + "\n".join(parts) + "\n\n"
+
     user_message = (
+        f"{profile_block}"
         "Translate this military experience into civilian resume language.\n"
         f"Military background: {military_text}\n"
         f"Target job description: {job_description}\n"
@@ -163,7 +187,7 @@ def call_claude_draft(military_text: str, job_description: str) -> MilitaryTrans
     return _call_claude_typed([{"role": "user", "content": user_message}], MilitaryTranslation)
 
 
-def call_claude_chat(anchor: dict, history: list[dict], message: str) -> MilitaryTranslation:
+def call_claude_chat(anchor: dict, history: list[dict], message: str) -> ChatResult:
     """Stateful refinement call. Builds anchor + history + new message context."""
     schema = MilitaryTranslation.model_json_schema()
 
@@ -213,7 +237,13 @@ def call_claude_chat(anchor: dict, history: list[dict], message: str) -> Militar
             messages.extend(history)
         messages.append({"role": "user", "content": message + schema_instruction})
 
-    return _call_claude_typed(messages, MilitaryTranslation)
+    translation = _call_claude_typed(messages, MilitaryTranslation)
+
+    updated_history = list(history)
+    updated_history.append({"role": "user", "content": message})
+    updated_history.append({"role": "assistant", "content": translation.assistant_reply})
+
+    return ChatResult(translation=translation, updated_history=updated_history)
 
 
 def call_claude(messages: list[dict]) -> MilitaryTranslation:

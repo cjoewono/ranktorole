@@ -5,6 +5,7 @@ from .views import (
     GoogleOAuthRedirectView,
     LoginView,
     LogoutView,
+    ProfileView,
     RegisterView,
     TokenRefreshView,
 )
@@ -16,4 +17,5 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='auth-logout'),
     path('google/', GoogleOAuthRedirectView.as_view(), name='auth-google'),
     path('google/callback/', GoogleCallbackView.as_view(), name='auth-google-callback'),
+    path('profile/', ProfileView.as_view(), name='auth-profile'),
 ]

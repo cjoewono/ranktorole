@@ -31,6 +31,7 @@ REGISTER_URL = '/api/v1/auth/register/'
 LOGIN_URL = '/api/v1/auth/login/'
 REFRESH_URL = '/api/v1/auth/refresh/'
 LOGOUT_URL = '/api/v1/auth/logout/'
+PROFILE_URL = '/api/v1/auth/profile/'
 
 
 class TestRegister:
@@ -191,3 +192,57 @@ class TestProtectedEndpoint:
         client.credentials(HTTP_AUTHORIZATION='Bearer invalid.token.here')
         resp = client.get('/api/v1/contacts/')
         assert resp.status_code == 401
+
+
+class TestProfile:
+    def test_patch_profile_context(self, client, user):
+        resp = client.post(LOGIN_URL, {
+            'email': 'test@example.com',
+            'password': 'strongpassword123',
+        })
+        access = resp.data['access']
+        client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+
+        profile_data = {
+            'profile_context': {
+                'branch': 'Navy',
+                'mos': 'IT',
+                'target_sector': 'Technology',
+                'skills': ['Cross-functional leadership', 'Agile', 'Cloud infrastructure']
+            }
+        }
+        resp = client.patch(PROFILE_URL, profile_data, format='json')
+        assert resp.status_code == 200
+        assert resp.data['profile_context']['branch'] == 'Navy'
+
+    def test_profile_context_returned_on_login(self, client, user):
+        user.profile_context = {'branch': 'Army', 'mos': 'Infantry'}
+        user.save()
+        resp = client.post(LOGIN_URL, {
+            'email': 'test@example.com',
+            'password': 'strongpassword123',
+        })
+        assert resp.status_code == 200
+        assert resp.data['user']['profile_context']['branch'] == 'Army'
+
+    def test_patch_requires_auth(self, client, db):
+        resp = client.patch(PROFILE_URL, {'profile_context': {}}, format='json')
+        assert resp.status_code == 401
+
+    def test_profile_context_null_by_default(self, client, user):
+        resp = client.post(LOGIN_URL, {
+            'email': 'test@example.com',
+            'password': 'strongpassword123',
+        })
+        assert resp.data['user']['profile_context'] is None
+
+    def test_get_profile(self, client, user):
+        resp = client.post(LOGIN_URL, {
+            'email': 'test@example.com',
+            'password': 'strongpassword123',
+        })
+        access = resp.data['access']
+        client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+        resp = client.get(PROFILE_URL)
+        assert resp.status_code == 200
+        assert resp.data['email'] == 'test@example.com'

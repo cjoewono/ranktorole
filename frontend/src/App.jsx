@@ -9,9 +9,11 @@ import {
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ResumeProvider } from "./context/ResumeContext";
 import NavBar from "./components/NavBar";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
+const ForgeSetup = lazy(() => import("./pages/ForgeSetup"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Contacts = lazy(() => import("./pages/Contacts"));
 const ResumeBuilder = lazy(() => import("./pages/ResumeBuilder"));
@@ -25,7 +27,7 @@ function Spinner() {
 }
 
 function AppShell() {
-  const { isAuthenticated, hydrating } = useAuth();
+  const { token, hydrating } = useAuth();
   const location = useLocation();
   const [fullscreen, setFullscreen] = useState(false);
   const path = location.pathname;
@@ -35,7 +37,7 @@ function AppShell() {
   }, [path]);
 
   if (hydrating) return <Spinner />;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!token) return <Navigate to="/login" replace />;
 
   // Redirect unknown paths to dashboard
   if (
@@ -79,7 +81,10 @@ export default function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="*" element={<AppShell />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/forge-setup" element={<ForgeSetup />} />
+                <Route path="*" element={<AppShell />} />
+              </Route>
             </Routes>
           </Suspense>
         </ResumeProvider>

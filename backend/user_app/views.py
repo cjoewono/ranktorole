@@ -5,7 +5,7 @@ import requests as http_requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
@@ -193,6 +193,23 @@ class GoogleCallbackView(APIView):
         )
         _set_refresh_cookie(response, str(refresh))
         return response
+
+
+class ProfileView(APIView):
+    """
+    GET   /api/v1/auth/profile/ — return authenticated user data.
+    PATCH /api/v1/auth/profile/ — update authenticated user's profile_context.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(UserSerializer(request.user).data)
 
 
 def _get_or_create_google_user(email: str, userinfo: dict) -> User:

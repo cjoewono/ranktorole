@@ -13,11 +13,13 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
   const [hydrating, setHydrating] = useState(true);
   const navigate = useNavigate();
 
   const logout = useCallback(() => {
     setToken(null);
+    setUser(null);
     setAccessToken(null);
     navigate("/login");
   }, [navigate]);
@@ -27,12 +29,18 @@ export function AuthProvider({ children }) {
       const data = await loginRequest(email, password);
       setToken(data.access);
       setAccessToken(data.access);
-      navigate("/dashboard");
+      setUser(data.user);
+      navigate(data.user?.profile_context ? "/dashboard" : "/forge-setup");
     },
     [navigate],
   );
 
+  const updateUser = useCallback((updatedUser) => {
+    setUser(updatedUser);
+  }, []);
+
   // Silent rehydration on mount — reads httpOnly refresh cookie server-side
+  // then fetches user profile to get profile_context
   useEffect(() => {
     fetch("/api/v1/auth/refresh/", {
       method: "POST",
@@ -42,6 +50,13 @@ export function AuthProvider({ children }) {
       .then((data) => {
         setToken(data.access);
         setAccessToken(data.access);
+        return fetch("/api/v1/auth/profile/", {
+          headers: { Authorization: `Bearer ${data.access}` },
+        });
+      })
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((userData) => {
+        setUser(userData);
       })
       .catch(() => {
         // No valid session — stay logged out
@@ -59,7 +74,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated: !!token, hydrating, login, logout }}
+      value={{ token, user, hydrating, login, logout, updateUser }}
     >
       {children}
     </AuthContext.Provider>

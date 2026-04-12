@@ -57,7 +57,7 @@ class TranslationView(APIView):
         job_description = input_ser.validated_data["job_description"]
 
         try:
-            anchor = compress_session_anchor(military_text, job_description)
+            anchor = compress_session_anchor(military_text, job_description, request.user.profile_context)
         except ValueError:
             return Response(
                 {"error": "Translation failed: invalid response from AI service."},
@@ -253,12 +253,6 @@ class ResumeChatView(APIView):
         except Resume.DoesNotExist:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if resume.is_finalized:
-            return Response(
-                {"error": "Resume is already finalized."},
-                status=status.HTTP_409_CONFLICT,
-            )
-
         message = request.data.get("message", "").strip()
         if not message:
             return Response(
@@ -276,7 +270,7 @@ class ResumeChatView(APIView):
         chat_history: list[dict] = list(resume.chat_history or [])
 
         try:
-            translation = call_claude_chat(anchor, chat_history, message)
+            result = call_claude_chat(anchor, chat_history, message)
         except ValueError:
             return Response(
                 {"error": "Invalid response from AI service."},
@@ -289,23 +283,20 @@ class ResumeChatView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        roles_data = [r.model_dump() for r in translation.roles]
+        roles_data = [r.model_dump() for r in result.translation.roles]
 
-        chat_history.append({"role": "user", "content": message})
-        chat_history.append({"role": "assistant", "content": translation.assistant_reply})
-
-        resume.chat_history = chat_history
+        resume.chat_history = result.updated_history
         resume.roles = roles_data
-        resume.civilian_title = translation.civilian_title
-        resume.summary = translation.summary
+        resume.civilian_title = result.translation.civilian_title
+        resume.summary = result.translation.summary
         resume.save()
 
         return Response(
             {
                 "roles": roles_data,
-                "assistant_reply": translation.assistant_reply,
-                "civilian_title": translation.civilian_title,
-                "summary": translation.summary,
+                "assistant_reply": result.translation.assistant_reply,
+                "civilian_title": result.translation.civilian_title,
+                "summary": result.translation.summary,
             },
             status=status.HTTP_200_OK,
         )
@@ -321,12 +312,6 @@ class ResumeFinalizeView(APIView):
             resume = Resume.objects.get(pk=pk, user=request.user)
         except Resume.DoesNotExist:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        if resume.is_finalized:
-            return Response(
-                {"error": "Resume is already finalized."},
-                status=status.HTTP_409_CONFLICT,
-            )
 
         ser = FinalizeInputSerializer(data=request.data)
         if not ser.is_valid():

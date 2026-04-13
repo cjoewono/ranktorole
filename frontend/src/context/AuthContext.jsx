@@ -39,6 +39,12 @@ export function AuthProvider({ children }) {
     setUser(updatedUser);
   }, []);
 
+  const loginWithToken = useCallback((accessToken, userData) => {
+    setToken(accessToken);
+    setAccessToken(accessToken);
+    setUser(userData);
+  }, []);
+
   // Silent rehydration on mount — reads httpOnly refresh cookie server-side
   // then fetches user profile to get profile_context
   useEffect(() => {
@@ -74,7 +80,15 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ token, user, hydrating, login, logout, updateUser }}
+      value={{
+        token,
+        user,
+        hydrating,
+        login,
+        loginWithToken,
+        logout,
+        updateUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

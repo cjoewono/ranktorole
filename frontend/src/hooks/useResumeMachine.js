@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useCallback } from "react";
+import { useReducer, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { generateDraft, sendChatMessage, getResume } from "../api/resumes";
 
@@ -83,6 +83,8 @@ function reducer(state, action) {
       return { ...state, error: action.message };
     case "LOADING":
       return { ...state, phase: "LOADING" };
+    case "RESET":
+      return { ...initialState };
     case "RESUME_LOADED":
       return {
         ...state,
@@ -106,13 +108,24 @@ export default function useResumeMachine() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const loadedIdRef = useRef(null);
 
-  // Resume re-entry from Dashboard — runs once on mount
+  const id = searchParams.get("id");
+  const mode = searchParams.get("mode");
+
+  // Resume re-entry from Dashboard — re-runs whenever ?id param changes
   useEffect(() => {
-    const id = searchParams.get("id");
-    const mode = searchParams.get("mode");
-    if (!id) return; // fresh session
+    if (!id) {
+      // Navigated to /resume-builder without params — reset to fresh state
+      if (loadedIdRef.current !== null) {
+        loadedIdRef.current = null;
+        dispatch({ type: "RESET" });
+      }
+      return;
+    }
+    if (loadedIdRef.current === id) return; // already loaded this resume
 
+    loadedIdRef.current = id;
     dispatch({ type: "LOADING" });
     getResume(id)
       .then((resume) => {
@@ -130,9 +143,10 @@ export default function useResumeMachine() {
         });
       })
       .catch(() => {
+        loadedIdRef.current = null;
         navigate("/dashboard");
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGenerateDraft = useCallback(async () => {
     if (state.jobDescription.trim().length < 10) {

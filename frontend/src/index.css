@@ -1,3 +1,41 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
+
+@layer base {
+  body {
+    @apply bg-background font-body text-on-background;
+    min-height: 100dvh;
+  }
+}
+
+@layer utilities {
+  .tactical-grid {
+    background-image: radial-gradient(circle, #434749 1px, transparent 1px);
+    background-size: 32px 32px;
+    opacity: 0.08;
+    pointer-events: none;
+  }
+  .mission-gradient {
+    background: linear-gradient(135deg, #ffb692 0%, #5a2200 100%);
+  }
+  .material-symbols-outlined {
+    font-variation-settings:
+      "FILL" 0,
+      "wght" 400,
+      "GRAD" 0,
+      "opsz" 24;
+  }
+  /* Focus bottom-border only, no box outline */
+  .tactical-input {
+    @apply bg-surface-container-highest text-on-surface font-body text-sm
+           border-0 border-b-2 border-outline-variant outline-none
+           px-3 pt-5 pb-2 w-full transition-colors;
+  }
+  .tactical-input:focus {
+    @apply border-secondary;
+  }
+}

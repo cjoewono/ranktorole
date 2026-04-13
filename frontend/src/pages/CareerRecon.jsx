@@ -123,15 +123,9 @@ export default function CareerRecon() {
               : "RECON / INITIALIZE"
         }
         title={
-          phase === "DETAIL" ? (
-            detail?.title?.toUpperCase() || "CAREER DETAIL"
-          ) : (
-            <>
-              CAREER
-              <br />
-              RECON
-            </>
-          )
+          phase === "DETAIL"
+            ? detail?.title?.toUpperCase() || "CAREER DETAIL"
+            : "CAREER RECON"
         }
         action={
           phase !== "SEARCH" ? (

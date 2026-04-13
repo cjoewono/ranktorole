@@ -1,5 +1,28 @@
 const BASE = "";
 
+export class APIError extends Error {
+  constructor(message, data, status) {
+    super(message);
+    this.name = "APIError";
+    this.data = data;
+    this.status = status;
+  }
+}
+
+async function handleResponse(res) {
+  let data = {};
+  try {
+    data = await res.json();
+  } catch (_) {
+    // non-JSON or empty body (e.g. 204 No Content)
+  }
+  if (!res.ok) {
+    const message = data.error || data.detail || "An unexpected error occurred";
+    throw new APIError(message, data, res.status);
+  }
+  return data;
+}
+
 let _accessToken = null;
 
 export function setAccessToken(token) {
@@ -23,21 +46,33 @@ async function refreshTokens() {
 }
 
 export async function apiFetch(path, options = {}) {
-  const headers = { "Content-Type": "application/json", ...options.headers };
-  if (options.body instanceof FormData) delete headers["Content-Type"];
-  if (_accessToken) headers["Authorization"] = `Bearer ${_accessToken}`;
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+
+  if (options.body instanceof FormData) {
+    delete headers["Content-Type"];
+  }
+
+  if (_accessToken) {
+    headers["Authorization"] = `Bearer ${_accessToken}`;
+  }
 
   let res = await fetch(`${BASE}${path}`, { ...options, headers });
 
+  // Handle transparent token rotation
   if (res.status === 401) {
     const newAccess = await refreshTokens();
+
     if (!newAccess) {
       window.dispatchEvent(new CustomEvent("auth:logout"));
       throw new Error("Session expired. Please log in again.");
     }
+
     headers["Authorization"] = `Bearer ${newAccess}`;
     res = await fetch(`${BASE}${path}`, { ...options, headers });
   }
 
-  return res;
+  return handleResponse(res);
 }

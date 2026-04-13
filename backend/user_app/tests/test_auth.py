@@ -33,6 +33,7 @@ LOGIN_URL = '/api/v1/auth/login/'
 REFRESH_URL = '/api/v1/auth/refresh/'
 LOGOUT_URL = '/api/v1/auth/logout/'
 PROFILE_URL = '/api/v1/auth/profile/'
+CHANGE_PASSWORD_URL = '/api/v1/auth/change-password/'
 
 
 class TestRegister:
@@ -278,3 +279,59 @@ class TestGoogleOAuth:
             'state': 'wrong_or_missing_state',
         })
         assert resp.status_code == 400
+
+
+class TestChangePassword:
+    def test_change_password_success(self, client, user):
+        resp = client.post(LOGIN_URL, {
+            'email': 'test@example.com',
+            'password': 'strongpassword123',
+        })
+        access = resp.data['access']
+        client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+        resp = client.post(CHANGE_PASSWORD_URL, {
+            'current_password': 'strongpassword123',
+            'new_password': 'newpassword456',
+        })
+        assert resp.status_code == 200
+
+        # Verify new password works
+        client.credentials()  # clear auth
+        resp = client.post(LOGIN_URL, {
+            'email': 'test@example.com',
+            'password': 'newpassword456',
+        })
+        assert resp.status_code == 200
+
+    def test_wrong_current_password(self, client, user):
+        resp = client.post(LOGIN_URL, {
+            'email': 'test@example.com',
+            'password': 'strongpassword123',
+        })
+        access = resp.data['access']
+        client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+        resp = client.post(CHANGE_PASSWORD_URL, {
+            'current_password': 'wrongpassword',
+            'new_password': 'newpassword456',
+        })
+        assert resp.status_code == 400
+
+    def test_short_new_password(self, client, user):
+        resp = client.post(LOGIN_URL, {
+            'email': 'test@example.com',
+            'password': 'strongpassword123',
+        })
+        access = resp.data['access']
+        client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+        resp = client.post(CHANGE_PASSWORD_URL, {
+            'current_password': 'strongpassword123',
+            'new_password': 'short',
+        })
+        assert resp.status_code == 400
+
+    def test_requires_auth(self, client, db):
+        resp = client.post(CHANGE_PASSWORD_URL, {
+            'current_password': 'any',
+            'new_password': 'newpassword456',
+        })
+        assert resp.status_code == 401

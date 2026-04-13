@@ -29,13 +29,22 @@ export default function UploadForm({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-      <h2 className="font-semibold text-gray-800 text-lg">
+    <div className="bg-surface-container-low p-6 space-y-5">
+      {/* Status chip */}
+      <div className="flex items-center gap-2 mb-1">
+        <span className="w-2 h-2 rounded-full bg-secondary inline-block" />
+        <span className="font-label text-xs tracking-widest uppercase text-secondary">
+          UPLOAD RESUME / INITIALIZE
+        </span>
+      </div>
+
+      <h2 className="font-headline font-bold text-2xl uppercase text-on-surface">
         Upload Your Resume
       </h2>
 
+      {/* File input */}
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">
+        <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-2">
           Resume PDF
         </label>
         <input
@@ -43,13 +52,18 @@ export default function UploadForm({
           accept=".pdf"
           disabled={isUploaded}
           onChange={(e) => setFile(e.target.files[0] || null)}
-          className="block w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+          className="block w-full font-body text-sm text-on-surface-variant
+            file:mr-3 file:py-1.5 file:px-4 file:rounded-md file:border-0
+            file:font-label file:text-xs file:tracking-widest file:uppercase
+            file:mission-gradient file:text-on-primary
+            hover:file:opacity-90 disabled:opacity-50 transition-opacity"
         />
       </div>
 
+      {/* Job description */}
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">
-          Job Description
+        <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
+          Target Job Description
         </label>
         <textarea
           rows={6}
@@ -58,38 +72,43 @@ export default function UploadForm({
             dispatch({ type: "JD_CHANGED", value: e.target.value })
           }
           placeholder="Paste the job description here..."
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+          className="tactical-input resize-none"
         />
         {(state.jobDescription ?? "").trim().length > 0 &&
           (state.jobDescription ?? "").trim().length < 10 && (
-            <p className="text-xs text-red-400 mt-1">
+            <p className="font-label text-xs tracking-widest text-error mt-1">
               {10 - (state.jobDescription ?? "").trim().length} more characters
               needed
             </p>
           )}
       </div>
 
-      {state.error && <p className="text-red-600 text-sm">{state.error}</p>}
+      {state.error && (
+        <div className="bg-error-container text-on-error-container font-body text-sm px-4 py-3">
+          {state.error}
+        </div>
+      )}
 
+      {/* Action buttons */}
       {!isUploaded ? (
         <button
           onClick={handleUpload}
           disabled={!file || uploading}
-          className="bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+          className="mission-gradient text-on-primary font-label font-semibold tracking-widest uppercase text-sm px-6 py-2.5 rounded-md disabled:opacity-50 transition-opacity"
         >
-          {uploading ? "Uploading..." : "Upload PDF"}
+          {uploading ? "UPLOADING..." : "UPLOAD PDF"}
         </button>
       ) : (
-        <div className="flex items-center gap-4">
-          <span className="text-green-700 text-sm font-medium">
-            ✓ PDF uploaded
+        <div className="flex items-center gap-5">
+          <span className="font-label text-xs tracking-widest uppercase text-secondary">
+            ✓ PDF UPLOADED
           </span>
           <button
             onClick={onGenerateDraft}
             disabled={(state.jobDescription ?? "").trim().length < 10}
-            className="bg-blue-700 hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+            className="mission-gradient text-on-primary font-label font-semibold tracking-widest uppercase text-sm px-6 py-2.5 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
-            Generate Draft
+            GENERATE DRAFT
           </button>
         </div>
       )}

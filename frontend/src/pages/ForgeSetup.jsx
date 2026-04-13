@@ -58,7 +58,7 @@ function TacticalSelect({ value, onChange, required, children }) {
 }
 
 export default function ForgeSetup() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
   const isEditing = Boolean(user?.profile_context);
 
@@ -77,6 +77,12 @@ export default function ForgeSetup() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(null);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   async function handleMosBlur() {
     if (!mos.trim()) return;
@@ -108,6 +114,43 @@ export default function ForgeSetup() {
     if (e.key === "Enter") {
       e.preventDefault();
       addCustomSkill();
+    }
+  }
+
+  async function handlePasswordChange(e) {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters.");
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await apiFetch("/api/v1/auth/change-password/", {
+        method: "POST",
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+      setPasswordSuccess("Password updated successfully.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPasswordSuccess(null), 5000);
+    } catch (err) {
+      setPasswordError(
+        err.data?.error || err.message || "Failed to change password.",
+      );
+    } finally {
+      setChangingPassword(false);
     }
   }
 
@@ -417,6 +460,120 @@ export default function ForgeSetup() {
             )}
           </div>
         </form>
+
+        {/* Account Settings */}
+        {isEditing && (
+          <div className="mt-8 space-y-6">
+            {/* Account Info */}
+            <div className="bg-surface-container-low p-6 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-2 h-2 rounded-full bg-tertiary inline-block" />
+                <span className="font-label text-xs tracking-widest uppercase text-tertiary">
+                  ACCOUNT
+                </span>
+              </div>
+
+              <div>
+                <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
+                  Email
+                </label>
+                <p className="tactical-input opacity-60 cursor-not-allowed">
+                  {user?.email}
+                </p>
+                <p className="font-label text-xs tracking-widest text-outline mt-1">
+                  Email cannot be changed
+                </p>
+              </div>
+
+              <div>
+                <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
+                  Account Tier
+                </label>
+                <p className="tactical-input opacity-60 cursor-not-allowed uppercase">
+                  {user?.tier || "free"}
+                </p>
+              </div>
+            </div>
+
+            {/* Password Change */}
+            <div className="bg-surface-container-low p-6 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-2 h-2 rounded-full bg-primary inline-block" />
+                <span className="font-label text-xs tracking-widest uppercase text-primary">
+                  CHANGE PASSWORD
+                </span>
+              </div>
+
+              {passwordError && (
+                <div className="bg-error-container text-on-error-container font-body text-sm px-4 py-3">
+                  {passwordError}
+                </div>
+              )}
+              {passwordSuccess && (
+                <div className="bg-secondary/10 text-secondary font-body text-sm px-4 py-3">
+                  {passwordSuccess}
+                </div>
+              )}
+
+              <form onSubmit={handlePasswordChange} className="space-y-4">
+                <div>
+                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="tactical-input"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="At least 8 characters"
+                    className="tactical-input"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="tactical-input"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="mission-gradient w-full text-on-primary font-label font-semibold tracking-widest uppercase text-sm py-3 rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {changingPassword ? "UPDATING..." : "UPDATE PASSWORD"}
+                </button>
+              </form>
+            </div>
+
+            {/* Logout */}
+            <div className="bg-surface-container-low p-6">
+              <button
+                onClick={logout}
+                className="w-full border border-error text-error font-label font-semibold tracking-widest uppercase text-sm py-3 rounded-md hover:bg-error hover:text-on-primary transition-colors"
+              >
+                SIGN OUT
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </>
   );

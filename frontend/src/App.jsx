@@ -14,10 +14,12 @@ import NavBar from "./components/NavBar";
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
+const GoogleCallback = lazy(() => import("./pages/GoogleCallback"));
 const ForgeSetup = lazy(() => import("./pages/ForgeSetup"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Contacts = lazy(() => import("./pages/Contacts"));
 const ResumeBuilder = lazy(() => import("./pages/ResumeBuilder"));
+const CareerRecon = lazy(() => import("./pages/CareerRecon"));
 
 function Spinner() {
   return (
@@ -50,7 +52,8 @@ function AppShell() {
     path !== "/dashboard" &&
     path !== "/contacts" &&
     path !== "/resume-builder" &&
-    path !== "/profile"
+    path !== "/profile" &&
+    path !== "/recon"
   ) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -63,6 +66,11 @@ function AppShell() {
       <div className={path === "/profile" ? "pb-20 md:pb-0" : "hidden"}>
         <Suspense fallback={<Spinner />}>
           <ForgeSetup />
+        </Suspense>
+      </div>
+      <div className={path === "/recon" ? "pb-20 md:pb-0" : "hidden"}>
+        <Suspense fallback={<Spinner />}>
+          <CareerRecon />
         </Suspense>
       </div>
       <div className={path === "/dashboard" ? "pb-20 md:pb-0" : "hidden"}>
@@ -101,10 +109,15 @@ export default function App() {
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route
+                  path="/auth/google/callback"
+                  element={<GoogleCallback />}
+                />
                 <Route path="/profile" element={<AppShell />} />
                 <Route path="/dashboard" element={<AppShell />} />
                 <Route path="/contacts" element={<AppShell />} />
                 <Route path="/resume-builder" element={<AppShell />} />
+                <Route path="/recon" element={<AppShell />} />
                 <Route path="*" element={<DefaultRedirect />} />
               </Routes>
             </Suspense>

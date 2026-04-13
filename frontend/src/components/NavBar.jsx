@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useResumes } from "../context/ResumeContext";
 
@@ -8,7 +8,7 @@ const NAV_ITEMS = [
 ];
 
 export default function NavBar() {
-  const { logout } = useAuth();
+  const { logout, token } = useAuth();
   const { resumes } = useResumes();
   const navigate = useNavigate();
 
@@ -24,11 +24,14 @@ export default function NavBar() {
   return (
     <>
       {/* Desktop top bar */}
-      <nav className="hidden md:flex items-center justify-between bg-surface-container-low px-6 py-3">
+      <nav className="hidden md:flex items-center justify-between bg-surface-container-low border-b border-outline-variant px-6 py-3">
         <div className="flex items-center gap-3">
-          <span className="text-primary font-headline font-bold text-lg">
+          <Link
+            to="/"
+            className="text-primary font-headline font-bold text-sm hover:opacity-80 transition-opacity"
+          >
             ▣ RankToRole
-          </span>
+          </Link>
           <span className="font-headline font-bold text-primary tracking-wide text-sm"></span>
         </div>
         <div className="flex items-center gap-8">
@@ -50,6 +53,18 @@ export default function NavBar() {
           >
             Editor
           </button>
+          <NavLink
+            to="/recon"
+            className={({ isActive }) =>
+              `font-label text-xs tracking-widest uppercase transition-colors ${
+                isActive
+                  ? "text-secondary"
+                  : "text-on-surface-variant hover:text-on-surface"
+              }`
+            }
+          >
+            Recon
+          </NavLink>
           <NavLink
             to="/contacts"
             className={({ isActive }) =>
@@ -103,6 +118,17 @@ export default function NavBar() {
           <span className="text-base">⊟</span>
           Editor
         </button>
+        <NavLink
+          to="/recon"
+          className={({ isActive }) =>
+            `flex-1 flex flex-col items-center py-3 gap-1 font-label text-[10px] tracking-widest uppercase transition-colors ${
+              isActive ? "text-primary" : "text-on-surface-variant"
+            }`
+          }
+        >
+          <span className="text-base">◎</span>
+          Recon
+        </NavLink>
         <NavLink
           to="/contacts"
           className={({ isActive }) =>

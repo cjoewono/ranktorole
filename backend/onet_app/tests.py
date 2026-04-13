@@ -38,6 +38,25 @@ class TestOnetSearchView:
             assert "skills" in resp.data
 
 
+    def test_api_key_header_sent(self, auth_client):
+        """Verify X-API-Key header is included in outbound O*NET requests."""
+        with patch("onet_app.views.http_requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.json.return_value = {"career": []}
+            mock_get.return_value = mock_resp
+
+            with patch("onet_app.views.settings") as mock_settings:
+                mock_settings.ONET_API_KEY = "test-key-123"
+                auth_client.get("/api/v1/onet/search/?keyword=medic")
+
+            # Verify the header was passed
+            call_args = mock_get.call_args
+            assert call_args is not None
+            headers = call_args[1].get("headers", {})
+            assert "X-API-Key" in headers
+
+
 class TestOnetMilitarySearchView:
     """Veterans military search endpoint."""
 
@@ -103,6 +122,24 @@ class TestOnetMilitarySearchView:
         assert resp.status_code == 401
 
 
+    def test_api_key_header_sent(self, auth_client):
+        """Verify X-API-Key header is included in military search requests."""
+        with patch("onet_app.views.http_requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.json.return_value = {"career": [], "military_matches": {}}
+            mock_get.return_value = mock_resp
+
+            with patch("onet_app.views.settings") as mock_settings:
+                mock_settings.ONET_API_KEY = "test-key-456"
+                auth_client.get("/api/v1/onet/military/?keyword=11B")
+
+            call_args = mock_get.call_args
+            assert call_args is not None
+            headers = call_args[1].get("headers", {})
+            assert "X-API-Key" in headers
+
+
 class TestOnetCareerDetailView:
     """Career detail aggregation endpoint."""
 
@@ -145,3 +182,20 @@ class TestOnetCareerDetailView:
         client = APIClient()
         resp = client.get("/api/v1/onet/career/47-2061.00/")
         assert resp.status_code == 401
+
+    def test_api_key_header_sent(self, auth_client):
+        """Verify X-API-Key header is included in career detail requests."""
+        with patch("onet_app.views.http_requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.json.return_value = {"title": "Test", "description": "Test", "tags": {}}
+            mock_get.return_value = mock_resp
+
+            with patch("onet_app.views.settings") as mock_settings:
+                mock_settings.ONET_API_KEY = "test-key-789"
+                auth_client.get("/api/v1/onet/career/47-2061.00/")
+
+            call_args = mock_get.call_args
+            assert call_args is not None
+            headers = call_args[1].get("headers", {})
+            assert "X-API-Key" in headers

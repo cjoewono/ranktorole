@@ -12,7 +12,15 @@ from translate_app.throttles import OnetThrottle
 
 logger = logging.getLogger(__name__)
 
-ONET_BASE = "https://services.onetcenter.org/ws"
+ONET_BASE = "https://api-v2.onetcenter.org"
+
+
+def _onet_headers():
+    """Shared headers for all O*NET v2 API requests."""
+    return {
+        "Accept": "application/json",
+        "X-API-Key": settings.ONET_API_KEY,
+    }
 
 
 def _onet_auth():
@@ -45,7 +53,7 @@ class OnetSearchView(APIView):
             search_resp = http_requests.get(
                 f"{ONET_BASE}/mnm/search",
                 params={"keyword": keyword},
-                headers={"Accept": "application/json"},
+                headers=_onet_headers(),
                 auth=_onet_auth(),
                 timeout=10,
             )
@@ -72,7 +80,7 @@ class OnetSearchView(APIView):
                 if code:
                     skills_resp = http_requests.get(
                         f"{ONET_BASE}/online/occupations/{code}/summary/skills",
-                        headers={"Accept": "application/json"},
+                        headers=_onet_headers(),
                         auth=_onet_auth(),
                         timeout=10,
                     )
@@ -135,7 +143,7 @@ class OnetMilitarySearchView(APIView):
             resp = http_requests.get(
                 f"{ONET_BASE}/veterans/military/",
                 params=params,
-                headers={"Accept": "application/json"},
+                headers=_onet_headers(),
                 auth=_onet_auth(),
                 timeout=15,
             )
@@ -206,7 +214,7 @@ class OnetCareerDetailView(APIView):
         try:
             resp = http_requests.get(
                 url,
-                headers={"Accept": "application/json"},
+                headers=_onet_headers(),
                 auth=_onet_auth(),
                 timeout=10,
             )

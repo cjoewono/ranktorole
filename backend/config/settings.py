@@ -306,6 +306,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 ONET_USERNAME = os.environ.get('ONET_USERNAME', '')
 ONET_PASSWORD = os.environ.get('ONET_PASSWORD', '')
+ONET_API_KEY = os.environ.get('ONET_API_KEY', '')
 
 # ---------------------------------------------------------------------------
 # Security headers — all gated on not DEBUG, inert in local dev

@@ -134,9 +134,10 @@ Raw military_text and job_description are NEVER passed after call 1.
 - JWT auth on all endpoints except /api/v1/auth/
 - multipart/form-data on upload endpoint only; JSON everywhere else
 
-## Public API (no key)
+## O\*NET API (authenticated v2)
 
-- O\*NET Web Services: https://services.onetcenter.org/ws/
+- O\*NET v2 API: https://api-v2.onetcenter.org
+- Auth: `X-API-Key` header (key from `ONET_API_KEY` env var)
 - Purpose: map military occupation codes to civilian job titles
 - Server-side proxy only, never call from frontend
 - Endpoint: GET /api/v1/onet/search/?keyword={mos_code}

@@ -6,6 +6,8 @@
 - Never log request bodies containing user data
 - .env.example must stay updated with key names (no values)
 
+Required secrets: `SECRET_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ONET_API_KEY`
+
 ## Authentication
 
 - JWT access token: 15min expiry

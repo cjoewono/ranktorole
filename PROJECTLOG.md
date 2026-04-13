@@ -634,3 +634,23 @@ knowledge, technology, salary, and job outlook data — all at zero LLM cost.
 | `pages/CareerRecon.jsx` | Created  | Three-phase career explorer (SEARCH → RESULTS → DETAIL) |
 | `App.jsx`               | Modified | Added `/recon` route and AppShell visibility            |
 | `NavBar.jsx`            | Modified | Added "Recon" link (desktop + mobile)                   |
+
+---
+
+## April 13, 2026 | O*NET v2 API Migration
+
+**Status:** ✅ Complete
+
+### Summary
+
+Migrated all three O*NET proxy views from the public `services.onetcenter.org/ws` endpoint to the authenticated v2 API at `api-v2.onetcenter.org`. Auth uses `X-API-Key` header sourced from `ONET_API_KEY` env var. No endpoint path changes — all routes and response shapes unchanged.
+
+### Changes
+
+| File | Action | Detail |
+|------|--------|--------|
+| `config/settings.py` | Modified | Added `ONET_API_KEY` from env |
+| `onet_app/views.py` | Modified | New base URL, shared `_onet_headers()` helper, all requests now send `X-API-Key` |
+| `onet_app/tests.py` | Modified | Added 3 tests verifying API key header is sent |
+| `.env.example` | Modified | Added `ONET_API_KEY` |
+| Docs | Modified | CLAUDE.md, ARCHITECTURE.md, SECURITY.md, PROJECTLOG.md updated |

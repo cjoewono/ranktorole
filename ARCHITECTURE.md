@@ -162,6 +162,7 @@ SEARCH → RESULTS → DETAIL. Serves as a conversion funnel into the resume bui
 
 Backend: two views in onet_app — `OnetMilitarySearchView` (military search) and
 `OnetCareerDetailView` (aggregated career report). Both use `OnetThrottle`.
+O\*NET v2 API (`https://api-v2.onetcenter.org`) with `X-API-Key` auth (env: `ONET_API_KEY`).
 
 ### State Machine Hook
 

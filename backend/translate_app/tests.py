@@ -710,3 +710,18 @@ class TestResumeListDetailView:
         response = auth_client.delete(f"/api/v1/resumes/{resume.id}/")
         assert response.status_code == 204
         assert not Resume.objects.filter(id=resume.id).exists()
+
+
+class TestAnthropicSafetyNet:
+    """Verify the root conftest blocks real API calls."""
+
+    def test_unmocked_client_is_mock(self):
+        """Without an explicit @patch, the Anthropic client should be a MagicMock from root conftest."""
+        from unittest.mock import MagicMock
+        from translate_app import services
+
+        # Reset singleton so it picks up the fixture's mock
+        services._anthropic_client = None
+        client = services._get_client()
+        assert isinstance(client, MagicMock), \
+            "Anthropic client is NOT mocked — real API calls could leak!"

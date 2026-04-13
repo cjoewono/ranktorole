@@ -356,6 +356,47 @@ class TestResumeDraftView:
         )
         assert response.status_code == 400
 
+    def test_jd_exactly_9_chars_returns_400(self, auth_client, user, db):
+        resume = _create_resume(user)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/draft/",
+            {"job_description": "123456789"},
+            format="json",
+        )
+        assert response.status_code == 400
+
+    def test_jd_too_long_returns_400(self, auth_client, user, db):
+        resume = _create_resume(user)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/draft/",
+            {"job_description": "x" * 15001},
+            format="json",
+        )
+        assert response.status_code == 400
+
+    @patch("translate_app.views.call_claude_draft")
+    def test_jd_at_minimum_length_returns_200(self, mock_draft, auth_client, user, db):
+        mock_draft.return_value = _make_mock_translation(_DRAFT_PAYLOAD)
+        resume = _create_resume(user)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/draft/",
+            {"job_description": "1234567890"},  # exactly 10 chars
+            format="json",
+        )
+        assert response.status_code == 200
+
+    @patch("translate_app.views.call_claude_draft")
+    def test_draft_on_existing_draft_is_idempotent(self, mock_draft, auth_client, user, db):
+        """Re-calling draft on an already-drafted resume overwrites it and returns 200."""
+        mock_draft.return_value = _make_mock_translation(_DRAFT_PAYLOAD)
+        resume = _create_resume(user)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/draft/",
+            {"job_description": "We need a supply chain manager with 5+ years."},
+            format="json",
+        )
+        assert response.status_code == 200
+
     def test_wrong_user_returns_404(self, auth_client, db):
         from django.contrib.auth import get_user_model
         other = get_user_model().objects.create_user(username="other", email="other@x.com", password="pw")
@@ -445,16 +486,6 @@ class TestResumeChatView:
         contents = [h.get("content", "") for h in passed_history]
         assert "injected history from client" not in contents
 
-    @patch("translate_app.views.call_claude_chat")
-    def test_finalized_resume_allows_chat(self, mock_chat, auth_client, user, db):
-        mock_chat.return_value = _make_chat_result(_CHAT_PAYLOAD)
-        resume = _create_resume(user, is_finalized=True)
-        response = auth_client.post(
-            f"/api/v1/resumes/{resume.id}/chat/",
-            {"message": "Update bullets."},
-            format="json",
-        )
-        assert response.status_code == 200
 
     def test_empty_message_returns_400(self, auth_client, user, db):
         resume = _create_resume(user)
@@ -464,6 +495,24 @@ class TestResumeChatView:
             format="json",
         )
         assert response.status_code == 400
+
+    def test_chat_message_too_long_returns_400(self, auth_client, user, db):
+        resume = _create_resume(user)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/chat/",
+            {"message": "x" * 2001},
+            format="json",
+        )
+        assert response.status_code == 400
+
+    def test_finalized_resume_chat_returns_409(self, auth_client, user, db):
+        resume = _create_resume(user, is_finalized=True)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/chat/",
+            {"message": "Update bullets."},
+            format="json",
+        )
+        assert response.status_code == 409
 
     def test_no_session_anchor_returns_400(self, auth_client, user, db):
         resume = _create_resume(user, session_anchor=None)
@@ -550,14 +599,63 @@ class TestResumeFinalizeView:
         resume.refresh_from_db()
         assert resume.roles[0]["title"] == "Operations Manager"
 
-    def test_double_finalize_returns_200(self, auth_client, user, db):
+    def test_double_finalize_returns_409(self, auth_client, user, db):
         resume = _create_resume(user, is_finalized=True)
         response = auth_client.patch(
             f"/api/v1/resumes/{resume.id}/finalize/",
             {},
             format="json",
         )
-        assert response.status_code == 200
+        assert response.status_code == 409
+
+    def test_finalize_civilian_title_too_long_returns_400(self, auth_client, user, db):
+        resume = _create_resume(user)
+        response = auth_client.patch(
+            f"/api/v1/resumes/{resume.id}/finalize/",
+            {"civilian_title": "x" * 201},
+            format="json",
+        )
+        assert response.status_code == 400
+
+    def test_finalize_summary_too_long_returns_400(self, auth_client, user, db):
+        resume = _create_resume(user)
+        response = auth_client.patch(
+            f"/api/v1/resumes/{resume.id}/finalize/",
+            {"summary": "x" * 3001},
+            format="json",
+        )
+        assert response.status_code == 400
+
+    def test_finalize_too_many_roles_returns_400(self, auth_client, user, db):
+        resume = _create_resume(user)
+        roles = [
+            {"title": "Role", "org": "Org", "dates": "2020", "bullets": ["Did things."]}
+            for _ in range(21)
+        ]
+        response = auth_client.patch(
+            f"/api/v1/resumes/{resume.id}/finalize/",
+            {"roles": roles},
+            format="json",
+        )
+        assert response.status_code == 400
+
+    def test_finalize_role_bullet_too_long_returns_400(self, auth_client, user, db):
+        resume = _create_resume(user)
+        response = auth_client.patch(
+            f"/api/v1/resumes/{resume.id}/finalize/",
+            {"roles": [{"title": "T", "org": "O", "dates": "D", "bullets": ["x" * 501]}]},
+            format="json",
+        )
+        assert response.status_code == 400
+
+    def test_finalize_too_many_bullets_per_role_returns_400(self, auth_client, user, db):
+        resume = _create_resume(user)
+        response = auth_client.patch(
+            f"/api/v1/resumes/{resume.id}/finalize/",
+            {"roles": [{"title": "T", "org": "O", "dates": "D", "bullets": ["b"] * 11}]},
+            format="json",
+        )
+        assert response.status_code == 400
 
     def test_wrong_user_returns_404(self, auth_client, db):
         from django.contrib.auth import get_user_model

@@ -1,4 +1,5 @@
 import logging
+import secrets
 from urllib.parse import urlencode
 
 import requests as http_requests
@@ -26,6 +27,10 @@ class LoginRateThrottle(AnonRateThrottle):
     scope = 'login'
 
 
+class RegisterThrottle(AnonRateThrottle):
+    scope = 'register'
+
+
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     response.set_cookie(
         'refresh_token',
@@ -39,10 +44,15 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [RegisterThrottle]
 
-    def post(self, request):
+    def post(self, request: 'Request') -> Response:
         serializer = RegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return Response(
+                {"error": "Registration failed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
         response = Response(
@@ -60,11 +70,14 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [LoginRateThrottle]
 
-    def post(self, request):
+    def post(self, request: 'Request') -> Response:
         serializer = LoginSerializer(data=request.data)
         if not serializer.is_valid():
             logger.warning('Failed login attempt for email: %s', request.data.get('email', ''))
-            return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {"error": "Invalid email or password."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
         user = serializer.validated_data['user']
         refresh = RefreshToken.for_user(user)
         response = Response(
@@ -118,6 +131,8 @@ class GoogleOAuthRedirectView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        state = secrets.token_urlsafe(32)
+        request.session['google_oauth_state'] = state
         params = {
             'client_id': settings.SOCIAL_AUTH_GOOGLE_OAUTH2_KEY,
             'redirect_uri': settings.GOOGLE_OAUTH_REDIRECT_URI,
@@ -125,6 +140,7 @@ class GoogleOAuthRedirectView(APIView):
             'scope': 'openid email profile',
             'access_type': 'offline',
             'prompt': 'select_account',
+            'state': state,
         }
         auth_url = f'{GOOGLE_AUTH_URL}?{urlencode(params)}'
         return Response({'auth_url': auth_url})
@@ -135,9 +151,19 @@ class GoogleCallbackView(APIView):
 
     def post(self, request):
         code = request.data.get('code')
+        state = request.data.get('state')
+
         if not code:
             return Response(
                 {'detail': 'code is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate state parameter to prevent CSRF
+        saved_state = request.session.pop('google_oauth_state', None)
+        if not saved_state or saved_state != state:
+            return Response(
+                {'detail': 'Invalid or missing state parameter.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

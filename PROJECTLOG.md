@@ -524,7 +524,7 @@ All existing consumers (`ResumeBuilder.jsx`, etc.) continue importing `../compon
 ---
 
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 11, 2026 — Sessions 06 + 07 complete
+Last updated: April 13, 2026 — Security hardening complete
 
 ---
 
@@ -533,3 +533,70 @@ Last updated: April 11, 2026 — Sessions 06 + 07 complete
 **Status:** ✅ Complete
 
 - Apr 12: Implemented tiered throttle system — User.tier field (free/pro), TieredThrottle base class, 5 throttle subclasses, TIERED_THROTTLE_RATES settings, 20 new tests (64→84 total)
+
+---
+
+## April 13, 2026 | Session — HTTPS/SSL + Production Deployment Prep
+
+**Status:** ✅ Complete
+
+### Changes Made
+
+- **settings.py:** Fixed HSTS bug (`0 if DEBUG else 0` → `0 if DEBUG else 31536000`). Added `CSRF_TRUSTED_ORIGINS` setting (required by Django 4.2+ behind HTTPS proxy).
+- **nginx/default.conf:** Rewritten for SSL termination — port 80 serves ACME challenge + redirects to HTTPS, port 443 serves frontend + proxies API with full security headers (HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy).
+- **docker-compose.yml:** Added port 443 to Nginx. Added `/etc/letsencrypt` and `/var/lib/letsencrypt` read-only volume mounts to Nginx container.
+- **.env.example:** Updated with all production env vars including `CSRF_TRUSTED_ORIGINS`, production override comments.
+- **SECURITY.md, ARCHITECTURE.md, CLAUDE.md:** Updated with SSL/HTTPS deployment details.
+
+### Dev Workflow Impact
+
+None. Dev still uses Vite on host + backend in Docker with runserver. Nginx is never started in dev. All new settings gated on `DEBUG` or read from `.env` with safe defaults.
+
+### Manual Steps Required (not in repo)
+
+1. DNS: Point `cjoewono.com` and `www.cjoewono.com` A records to EC2 public IP
+2. EC2 security group: Confirm ports 80/443 open, 22 from your IP only, no 8000/5432
+3. Install Docker on EC2 if not already installed
+4. Install Certbot on EC2: `sudo apt install certbot`
+5. Create production `.env` on EC2 with `DEBUG=False`, rotated `SECRET_KEY`, real DB password, production `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_OAUTH_REDIRECT_URI=https://cjoewono.com/auth/google/callback`
+6. Google Cloud Console: Add `https://cjoewono.com/auth/google/callback` as authorized redirect URI
+7. Run Certbot to obtain cert
+8. Start Docker Compose, run migrations, verify end-to-end
+
+---
+
+## April 13, 2026 | Security Hardening — Input Validation, Rate Limiting, Code Quality
+
+**Status:** ✅ Complete — 84 → 97 tests passing
+
+### Category 1 — Input Validation
+
+- **JD length (ResumeDraftView):** Explicit 10-char minimum and 15,000-char maximum enforced in view (belt-and-suspenders over serializer's min_length).
+- **Chat message cap (ResumeChatView):** 2,000-char maximum added to prevent context window abuse.
+- **Finalize payload (FinalizeInputSerializer + RoleEntrySerializer):** Added max_length on all fields — civilian_title (200), summary (3,000), roles list (20 items), each role.title/org (200), dates (100), bullets list (10 items), each bullet (500 chars).
+- **ContactSerializer:** Added max_length to all fields — name/company/role (200), email (254, RFC 5321), notes (5,000).
+
+### Category 2 — Security
+
+- **is_finalized gate on chat:** POST /chat/ now returns 409 if resume is already finalized, matching DATA_CONTRACT.
+- **is_finalized gate on finalize:** PATCH /finalize/ now returns 409 if already finalized, matching DATA_CONTRACT.
+- **RegisterThrottle:** New `AnonRateThrottle` subclass (scope=register, 5/hour) added to RegisterView.
+- **Login error normalization:** LoginView always returns `{"error": "Invalid email or password."}` — prevents user enumeration.
+- **Register error normalization:** RegisterView returns generic `{"error": "Registration failed."}` — prevents email enumeration.
+- **HTML sanitization:** `strip_tags()` applied to all Claude-generated string fields in `_call_claude_typed` before returning — prevents stored XSS in PDF export or email contexts.
+- **FinalizeThrottle / user_finalize:** Already present. CSP header: already in nginx. Token blacklist: already in INSTALLED_APPS.
+
+### Category 3 — Code Quality
+
+- **Dead code removed:** Unused `compress_session_anchor` import removed from views.py; unused `TranslationOutputSerializer` removed from serializers.py.
+- **Type hints:** `Request` + `Response` type annotations added to all view methods.
+- **Docstrings:** Comprehensive docstrings added to all services.py functions.
+- **`get_user_resume()` helper:** Extracted repeated try/except Resume.objects.get() into a shared utility used by DraftView, ChatView, FinalizeView, DetailView.
+- **`__str__` on User:** `User.__str__` returns `email (tier)` for admin readability.
+
+### Tests Added (84 → 97)
+
+- `test_jd_exactly_9_chars_returns_400`, `test_jd_too_long_returns_400`, `test_jd_at_minimum_length_returns_200`, `test_draft_on_existing_draft_is_idempotent`
+- `test_chat_message_too_long_returns_400`, `test_finalized_resume_chat_returns_409`
+- `test_double_finalize_returns_409` (was 200), finalize boundary tests (6 new)
+- `test_register_throttle_returns_429`, `test_google_callback_invalid_state_returns_400`, `test_google_callback_missing_code_returns_400`

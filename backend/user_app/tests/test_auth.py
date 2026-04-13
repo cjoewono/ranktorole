@@ -8,9 +8,10 @@ User = get_user_model()
 @pytest.fixture(autouse=True)
 def disable_throttling(db, monkeypatch):
     from django.core.cache import cache
-    from user_app.views import LoginRateThrottle
+    from user_app.views import LoginRateThrottle, RegisterThrottle
     cache.clear()
     monkeypatch.setattr(LoginRateThrottle, "allow_request", lambda self, request, view: True)
+    monkeypatch.setattr(RegisterThrottle, "allow_request", lambda self, request, view: True)
 
 
 @pytest.fixture
@@ -246,3 +247,34 @@ class TestProfile:
         resp = client.get(PROFILE_URL)
         assert resp.status_code == 200
         assert resp.data['email'] == 'test@example.com'
+
+
+class TestRegisterThrottle:
+    def test_register_throttle_returns_429(self, client, db, monkeypatch):
+        from user_app.views import RegisterThrottle
+        # DRF calls wait() after allow_request returns False; patch both.
+        monkeypatch.setattr(RegisterThrottle, "allow_request", lambda self, request, view: False)
+        monkeypatch.setattr(RegisterThrottle, "wait", lambda self: None)
+        resp = client.post(REGISTER_URL, {
+            'email': 'throttled@example.com',
+            'username': 'throttleduser',
+            'password': 'strongpassword123',
+        })
+        assert resp.status_code == 429
+
+
+GOOGLE_CALLBACK_URL = '/api/v1/auth/google/callback/'
+
+
+class TestGoogleOAuth:
+    def test_google_callback_missing_code_returns_400(self, client, db):
+        resp = client.post(GOOGLE_CALLBACK_URL, {'state': 'some-state'})
+        assert resp.status_code == 400
+
+    def test_google_callback_invalid_state_returns_400(self, client, db):
+        """State mismatch (no session state set) must be rejected to prevent CSRF."""
+        resp = client.post(GOOGLE_CALLBACK_URL, {
+            'code': 'some_authorization_code',
+            'state': 'wrong_or_missing_state',
+        })
+        assert resp.status_code == 400

@@ -195,6 +195,12 @@ Content-Type: application/json
 }
 ```
 
+**Validation Rules**
+
+- civilian_title: optional string, max 200 chars
+- summary: optional string, max 3,000 chars
+- roles: optional list, max 20 items; each item: title (max 200), org (max 200), dates (max 100), bullets (max 10 items, each max 500 chars)
+
 **Behavior**
 
 - All fields optional — any provided field overwrites current Resume value
@@ -204,6 +210,7 @@ Content-Type: application/json
 
 **Error Responses**
 
+- 400 → payload violates validation rules
 - 401 → missing or expired JWT
 - 404 → resume not found or not owned by user
 - 409 → already finalized

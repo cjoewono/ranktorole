@@ -1,7 +1,9 @@
+import uuid
 import logging
 
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -11,11 +13,18 @@ from .serializers import DraftInputSerializer, FinalizeInputSerializer, ResumeSe
 from .services import (
     call_claude_chat,
     call_claude_draft,
-    compress_session_anchor,
     extract_pdf_text,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def get_user_resume(pk, user) -> Resume | None:
+    """Return the Resume with the given pk owned by user, or None if not found."""
+    try:
+        return Resume.objects.get(pk=pk, user=user)
+    except Resume.DoesNotExist:
+        return None
 
 
 class ResumeListView(APIView):
@@ -23,7 +32,7 @@ class ResumeListView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request: Request) -> Response:
         resumes = Resume.objects.filter(user=request.user)
         return Response(ResumeSerializer(resumes, many=True).data)
 
@@ -33,17 +42,15 @@ class ResumeDetailView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, pk):
-        try:
-            resume = Resume.objects.get(pk=pk, user=request.user)
-        except Resume.DoesNotExist:
+    def get(self, request: Request, pk: uuid.UUID) -> Response:
+        resume = get_user_resume(pk, request.user)
+        if resume is None:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(ResumeSerializer(resume).data)
 
-    def delete(self, request, pk):
-        try:
-            resume = Resume.objects.get(pk=pk, user=request.user)
-        except Resume.DoesNotExist:
+    def delete(self, request: Request, pk: uuid.UUID) -> Response:
+        resume = get_user_resume(pk, request.user)
+        if resume is None:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         resume.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -55,7 +62,7 @@ class ResumeUploadView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [UploadThrottle]
 
-    def post(self, request):
+    def post(self, request: Request) -> Response:
         uploaded_file = request.FILES.get("file")
         if not uploaded_file:
             return Response(
@@ -121,16 +128,31 @@ class ResumeDraftView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [DraftThrottle]
 
-    def post(self, request, pk):
-        try:
-            resume = Resume.objects.get(pk=pk, user=request.user)
-        except Resume.DoesNotExist:
+    def post(self, request: Request, pk: uuid.UUID) -> Response:
+        resume = get_user_resume(pk, request.user)
+        if resume is None:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
         input_ser = DraftInputSerializer(data=request.data)
         if not input_ser.is_valid():
             return Response(input_ser.errors, status=status.HTTP_400_BAD_REQUEST)
         job_description = input_ser.validated_data.get("job_description", "")
+
+        if not job_description:
+            return Response(
+                {"error": "job_description is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(job_description) < 10:
+            return Response(
+                {"error": "Job description must be at least 10 characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(job_description) > 15000:
+            return Response(
+                {"error": "Job description must be under 15,000 characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             translation = call_claude_draft(
@@ -187,10 +209,9 @@ class ResumeChatView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [ChatThrottle]
 
-    def post(self, request, pk):
-        try:
-            resume = Resume.objects.get(pk=pk, user=request.user)
-        except Resume.DoesNotExist:
+    def post(self, request: Request, pk: uuid.UUID) -> Response:
+        resume = get_user_resume(pk, request.user)
+        if resume is None:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
         message = request.data.get("message", "").strip()
@@ -198,6 +219,18 @@ class ResumeChatView(APIView):
             return Response(
                 {"error": "message is required."},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(message) > 2000:
+            return Response(
+                {"error": "Message must be under 2,000 characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if resume.is_finalized:
+            return Response(
+                {"error": "Resume is already finalized."},
+                status=status.HTTP_409_CONFLICT,
             )
 
         anchor = resume.session_anchor
@@ -248,11 +281,16 @@ class ResumeFinalizeView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [FinalizeThrottle]
 
-    def patch(self, request, pk):
-        try:
-            resume = Resume.objects.get(pk=pk, user=request.user)
-        except Resume.DoesNotExist:
+    def patch(self, request: Request, pk: uuid.UUID) -> Response:
+        resume = get_user_resume(pk, request.user)
+        if resume is None:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if resume.is_finalized:
+            return Response(
+                {"error": "Resume is already finalized."},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         ser = FinalizeInputSerializer(data=request.data)
         if not ser.is_valid():

@@ -15,25 +15,23 @@ class ResumeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'session_anchor', 'ai_initial_draft']
 
 
-class TranslationOutputSerializer(serializers.Serializer):
-    civilian_title = serializers.CharField()
-    summary = serializers.CharField()
-    roles = serializers.ListField(child=serializers.DictField())
-
-
 class RoleEntrySerializer(serializers.Serializer):
-    title = serializers.CharField()
-    org = serializers.CharField()
-    dates = serializers.CharField()
-    bullets = serializers.ListField(child=serializers.CharField())
+    title = serializers.CharField(max_length=200)
+    org = serializers.CharField(max_length=200)
+    dates = serializers.CharField(max_length=100)
+    bullets = serializers.ListField(
+        child=serializers.CharField(max_length=500),
+        max_length=10,
+    )
 
 
 class FinalizeInputSerializer(serializers.Serializer):
-    civilian_title = serializers.CharField(required=False)
-    summary = serializers.CharField(required=False)
+    civilian_title = serializers.CharField(required=False, max_length=200)
+    summary = serializers.CharField(required=False, max_length=3000)
     roles = serializers.ListField(
         child=RoleEntrySerializer(),
         required=False,
+        max_length=20,
     )
     # Keep bullets for backward compatibility with existing tests
     bullets = serializers.ListField(child=serializers.CharField(), required=False)

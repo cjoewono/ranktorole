@@ -11,10 +11,16 @@ from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
+
+def strip_tags(text: str) -> str:
+    """Remove any HTML/XML tags from text to prevent stored XSS in rendered output."""
+    return re.sub(r'<[^>]+>', '', text)
+
 _anthropic_client = None
 
 
 def _get_client() -> anthropic.Anthropic:
+    """Return the shared Anthropic client, creating it on first call (singleton)."""
     global _anthropic_client
     if _anthropic_client is None:
         _anthropic_client = anthropic.Anthropic(
@@ -78,7 +84,24 @@ def _build_profile_block(profile_context: dict | None) -> str:
 
 
 def compress_session_anchor(military_text: str, job_description: str, profile_context: dict | None = None) -> dict:
-    """Run ONCE at session start. Returns compressed anchor dict stored to Resume.session_anchor."""
+    """
+    Run ONCE at session start to produce the compact anchor stored in Resume.session_anchor.
+
+    Calls Claude with the full military_text and job_description. The returned dict
+    (civilian_title, summary, roles) is stored to the DB and reused on every subsequent
+    chat call — the raw texts are never sent again after this call.
+
+    Args:
+        military_text: Extracted PDF text from the uploaded resume.
+        job_description: The target civilian job description.
+        profile_context: Optional user profile dict (branch, MOS, target_sector, skills).
+
+    Returns:
+        Dict with keys: civilian_title (str), summary (str), roles (list[dict]).
+
+    Raises:
+        ValueError: If Claude returns unparseable or invalid JSON.
+    """
     schema = MilitaryTranslation.model_json_schema()
 
     profile_block = _build_profile_block(profile_context)
@@ -99,7 +122,21 @@ def compress_session_anchor(military_text: str, job_description: str, profile_co
 
 
 def extract_pdf_text(file_bytes: bytes) -> str:
-    """Extract text from PDF bytes using PyMuPDF. Returns concatenated page text."""
+    """
+    Extract plain text from PDF bytes using PyMuPDF (fitz).
+
+    Concatenates all pages with newline separators. Raw bytes are discarded
+    after extraction — only the returned string is stored.
+
+    Args:
+        file_bytes: Raw PDF bytes (must not be empty; caller validates MIME type).
+
+    Returns:
+        Concatenated text from all pages. May be empty for image-only PDFs.
+
+    Raises:
+        Exception: Propagates any fitz/PyMuPDF errors for the caller to handle.
+    """
     import fitz
 
     with fitz.open(stream=file_bytes, filetype="pdf") as doc:
@@ -107,7 +144,16 @@ def extract_pdf_text(file_bytes: bytes) -> str:
 
 
 def _call_claude_typed(messages: list[dict], model_class):
-    """Call Claude API and validate the text response against any Pydantic model class."""
+    """
+    Call Claude API and validate the text response against a Pydantic model class.
+
+    Strips markdown fences before JSON parsing. After Pydantic validation, sanitises
+    all string fields with strip_tags() to prevent stored XSS if output is ever
+    rendered in an unescaped context (PDF export, email, etc.).
+
+    Raises ValueError on JSON decode failure or Pydantic validation failure.
+    Raises anthropic.APIError / Exception on network or API errors.
+    """
     client = _get_client()
 
     try:
@@ -135,10 +181,28 @@ def _call_claude_typed(messages: list[dict], model_class):
 
     try:
         data = json.loads(raw)
-        return model_class(**data)
+        result = model_class(**data)
     except (json.JSONDecodeError, ValidationError) as exc:
         logger.error("Claude response parsing failed: %s", type(exc).__name__)
         raise ValueError("Invalid response from Claude API") from exc
+
+    # Sanitise all string fields to prevent stored XSS
+    if hasattr(result, 'civilian_title'):
+        result.civilian_title = strip_tags(result.civilian_title)
+    if hasattr(result, 'summary'):
+        result.summary = strip_tags(result.summary)
+    if hasattr(result, 'clarifying_question'):
+        result.clarifying_question = strip_tags(result.clarifying_question)
+    if hasattr(result, 'assistant_reply'):
+        result.assistant_reply = strip_tags(result.assistant_reply)
+    if hasattr(result, 'roles'):
+        for role in result.roles:
+            role.title = strip_tags(role.title)
+            role.org = strip_tags(role.org)
+            role.dates = strip_tags(role.dates)
+            role.bullets = [strip_tags(b) for b in role.bullets]
+
+    return result
 
 
 def call_claude_draft(
@@ -146,7 +210,27 @@ def call_claude_draft(
     job_description: str,
     profile_context: dict | None = None,
 ) -> MilitaryTranslation:
-    """Single Claude call for the draft endpoint."""
+    """
+    Generate the initial resume draft from military text and a job description.
+
+    This is the first (and most expensive) Claude call in the session. It processes
+    the full military_text and job_description, which are never sent to Claude again
+    after this call.
+
+    Args:
+        military_text: Extracted PDF text from the uploaded resume.
+        job_description: The target civilian job description (10–15000 chars).
+        profile_context: Optional user profile dict (branch, MOS, target_sector, skills).
+
+    Returns:
+        MilitaryTranslation with civilian_title, summary, roles, clarifying_question,
+        and assistant_reply (empty string on draft call).
+
+    Raises:
+        ValueError: If Claude returns unparseable or schema-invalid JSON.
+        anthropic.APIError: On Claude API HTTP errors.
+        Exception: On unexpected network or SDK errors.
+    """
     schema = MilitaryTranslation.model_json_schema()
 
     profile_block = _build_profile_block(profile_context)
@@ -176,7 +260,27 @@ def call_claude_draft(
 
 
 def call_claude_chat(anchor: dict, history: list[dict], message: str) -> ChatResult:
-    """Stateful refinement call. Builds anchor + history + new message context."""
+    """
+    Execute a stateful refinement turn using the session anchor and DB-loaded history.
+
+    Builds the Claude message list from anchor + history + new message, calls Claude,
+    and returns the updated translation along with the new history to persist.
+
+    Args:
+        anchor: The session_anchor dict stored at draft time (civilian_title, summary,
+                roles, job_description_snippet, profile_context).
+        history: Chat history loaded from the DB (list of {role, content} dicts).
+                 This must come from the DB — never from the request body.
+        message: The user's new chat message (max 2000 chars, validated by caller).
+
+    Returns:
+        ChatResult with the updated MilitaryTranslation and the new history to save.
+
+    Raises:
+        ValueError: If Claude returns unparseable or schema-invalid JSON.
+        anthropic.APIError: On Claude API HTTP errors.
+        Exception: On unexpected network or SDK errors.
+    """
     schema = MilitaryTranslation.model_json_schema()
 
     roles_lines = []

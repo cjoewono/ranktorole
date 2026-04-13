@@ -13,3 +13,4 @@ dist/
 postgres_data/
 repomix-output.xml
 claude-mem.worktrees/
+.worktrees/

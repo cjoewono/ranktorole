@@ -521,6 +521,33 @@ export default function CareerRecon() {
             </div>
           </div>
         )}
+        {/* O*NET Attribution */}
+        <div className="mt-8 pt-4 border-t border-outline-variant flex items-center gap-3">
+          <a
+            href="https://services.onetcenter.org/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="This site incorporates information from O*NET Web Services. Click to learn more."
+          >
+            <img
+              src="https://www.onetcenter.org/image/link/onet-in-it.svg"
+              alt="O*NET in-it"
+              className="h-7 w-auto opacity-60 hover:opacity-100 transition-opacity"
+            />
+          </a>
+          <p className="font-body text-xs text-outline leading-relaxed">
+            Career data from{" "}
+            <a
+              href="https://services.onetcenter.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-tertiary hover:underline"
+            >
+              O*NET Web Services
+            </a>{" "}
+            · USDOL/ETA. O*NET® is a trademark of USDOL/ETA.
+          </p>
+        </div>
       </main>
     </>
   );

@@ -2,6 +2,7 @@ import logging
 import re as re_module
 
 import requests as http_requests
+from django.conf import settings
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,6 +13,13 @@ from translate_app.throttles import OnetThrottle
 logger = logging.getLogger(__name__)
 
 ONET_BASE = "https://services.onetcenter.org/ws"
+
+
+def _onet_auth():
+    """Return HTTP Basic Auth tuple for O*NET Web Services, or None if unconfigured."""
+    if settings.ONET_USERNAME and settings.ONET_PASSWORD:
+        return (settings.ONET_USERNAME, settings.ONET_PASSWORD)
+    return None
 
 
 class OnetSearchView(APIView):
@@ -38,6 +46,7 @@ class OnetSearchView(APIView):
                 f"{ONET_BASE}/mnm/search",
                 params={"keyword": keyword},
                 headers={"Accept": "application/json"},
+                auth=_onet_auth(),
                 timeout=10,
             )
             if not search_resp.ok:
@@ -64,6 +73,7 @@ class OnetSearchView(APIView):
                     skills_resp = http_requests.get(
                         f"{ONET_BASE}/online/occupations/{code}/summary/skills",
                         headers={"Accept": "application/json"},
+                        auth=_onet_auth(),
                         timeout=10,
                     )
                     if skills_resp.ok:
@@ -126,6 +136,7 @@ class OnetMilitarySearchView(APIView):
                 f"{ONET_BASE}/veterans/military/",
                 params=params,
                 headers={"Accept": "application/json"},
+                auth=_onet_auth(),
                 timeout=15,
             )
 
@@ -196,6 +207,7 @@ class OnetCareerDetailView(APIView):
             resp = http_requests.get(
                 url,
                 headers={"Accept": "application/json"},
+                auth=_onet_auth(),
                 timeout=10,
             )
             if resp.ok:

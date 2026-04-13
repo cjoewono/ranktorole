@@ -143,6 +143,8 @@ prevents NavBar remounts and eliminates layout flash when ResumeBuilder enters f
 App
 └── AppShell
     ├── NavBar (always mounted)
+    ├── <ForgeSetup />  (hidden when path ≠ /profile)
+    ├── <CareerRecon />  (hidden when path ≠ /recon)
     ├── <Dashboard />  (hidden when path ≠ /dashboard)
     ├── <Contacts />   (hidden when path ≠ /contacts)
     └── <ResumeBuilder setFullscreen={...} />  (hidden when path ≠ /resume-builder)
@@ -151,6 +153,15 @@ App
 `fullscreen` state lives in AppShell and is passed as `setFullscreen` to ResumeBuilder.
 When the builder enters a split-pane phase, it calls `setFullscreen(true)` — AppShell
 applies `overflow-hidden` to prevent body scroll during the split-pane layout.
+
+### Career Recon
+
+Standalone O*NET-powered career exploration tool at `/recon`. Zero LLM cost — pure
+server-side proxy to O*NET's My Next Move for Veterans API. Three-phase UI:
+SEARCH → RESULTS → DETAIL. Serves as a conversion funnel into the resume builder.
+
+Backend: two views in onet_app — `OnetMilitarySearchView` (military search) and
+`OnetCareerDetailView` (aggregated career report). Both use `OnetThrottle`.
 
 ### State Machine Hook
 
@@ -241,3 +252,13 @@ All throttle classes live in `translate_app/throttles.py`. Cache key includes ti
 - npm run build → dist/
 - docker compose up --build
 - Nginx serves dist/ and proxies /api/ → backend:8000
+
+## SSL / HTTPS (Production)
+
+- Certbot runs on EC2 host: `sudo certbot certonly --webroot -w /var/lib/letsencrypt -d cjoewono.com -d www.cjoewono.com`
+- Nginx serves ACME challenge on port 80, redirects all else to 443
+- SSL certs mounted read-only into Nginx container via `/etc/letsencrypt` volume
+- Django trusts `X-Forwarded-Proto: https` header from Nginx (`SECURE_PROXY_SSL_HEADER`)
+- HSTS, CSP, X-Frame-Options, X-Content-Type-Options all set in Nginx
+- Gunicorn on EC2: override backend command at launch — `docker compose run -d backend gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3`
+- Dev workflow unchanged: Vite on host, backend in Docker with runserver, no Nginx

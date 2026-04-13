@@ -274,6 +274,73 @@ Auth: JWT required
 Server-side proxy — proxies to O\*NET Web Services
 Returns: {occupations: [{code, title}], skills: [string]}
 
+### GET /api/v1/onet/military/?keyword={mos}&branch={branch}
+
+Auth: JWT required
+Server-side proxy — proxies to O\*NET My Next Move for Veterans military search
+
+**Query params:**
+
+- `keyword` (required): MOS code or military job title
+- `branch` (optional): army, navy, air_force, marine_corps, coast_guard. Default: all.
+
+**Output:**
+
+```json
+{
+  "keyword": "11B",
+  "branch": "all",
+  "military_matches": [
+    {
+      "branch": "army",
+      "code": "11B",
+      "title": "Infantryman (Enlisted)",
+      "active": true
+    }
+  ],
+  "careers": [
+    {
+      "code": "47-2061.00",
+      "title": "Construction Laborers",
+      "match_type": "some_duties",
+      "tags": { "bright_outlook": true, "apprenticeship": true },
+      "preparation_needed": "First term",
+      "pay_grade": "E1"
+    }
+  ]
+}
+```
+
+### GET /api/v1/onet/career/{onet_code}/
+
+Auth: JWT required
+Server-side proxy — aggregates career overview, skills, knowledge, technology, and job outlook from O\*NET
+
+**Output:**
+
+```json
+{
+  "code": "47-2061.00",
+  "title": "Construction Laborers",
+  "description": "...",
+  "tags": { "bright_outlook": true },
+  "skills": [{ "name": "...", "description": "..." }],
+  "knowledge": [{ "name": "...", "description": "..." }],
+  "technology": [
+    { "category": "...", "examples": [{ "name": "...", "hot": false }] }
+  ],
+  "outlook": {
+    "category": "Bright",
+    "description": "...",
+    "salary": {
+      "annual_median": "40000",
+      "annual_10th": "30000",
+      "annual_90th": "55000"
+    }
+  }
+}
+```
+
 ---
 
 ## Auth Endpoints (no JWT required)

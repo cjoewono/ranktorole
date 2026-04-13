@@ -604,4 +604,33 @@ None. Dev still uses Vite on host + backend in Docker with runserver. Nginx is n
 ---
 
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 13, 2026 — Security hardening complete, 97 tests passing
+Last updated: April 13, 2026 — Career Recon feature complete, 108 tests passing
+
+---
+
+## April 13, 2026 | Session 10 | Career Recon — Standalone O\*NET Career Explorer
+
+**Status:** ✅ Complete
+
+### Summary
+
+Built a standalone career exploration tool at `/recon` using O\*NET's My Next Move for
+Veterans API. Users enter a MOS code and explore matching civilian careers with skills,
+knowledge, technology, salary, and job outlook data — all at zero LLM cost.
+
+### Backend Changes
+
+| File                | Action   | Detail                                                    |
+| ------------------- | -------- | --------------------------------------------------------- |
+| `onet_app/views.py` | Modified | Added `OnetMilitarySearchView` and `OnetCareerDetailView` |
+| `onet_app/urls.py`  | Modified | Added `/military/` and `/career/<onet_code>/` routes      |
+| `onet_app/tests.py` | Created  | 11 tests covering search, detail, validation, auth        |
+
+### Frontend Changes
+
+| File                    | Action   | Detail                                                  |
+| ----------------------- | -------- | ------------------------------------------------------- |
+| `api/onet.js`           | Created  | API functions for military search and career detail     |
+| `pages/CareerRecon.jsx` | Created  | Three-phase career explorer (SEARCH → RESULTS → DETAIL) |
+| `App.jsx`               | Modified | Added `/recon` route and AppShell visibility            |
+| `NavBar.jsx`            | Modified | Added "Recon" link (desktop + mobile)                   |

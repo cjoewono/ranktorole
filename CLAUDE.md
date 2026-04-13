@@ -88,6 +88,8 @@ PATCH  /api/v1/resumes/{id}/finalize/   final edits → is_finalized=True
 GET    /api/v1/resumes/                 list resumes for authenticated user
 GET    /api/v1/resumes/{id}/            retrieve single resume
 DELETE /api/v1/resumes/{id}/            delete resume
+GET    /api/v1/onet/military/            MOS search → civilian career matches (Veterans API)
+GET    /api/v1/onet/career/{code}/       career detail aggregation (skills, knowledge, salary, outlook)
 ```
 
 ## Context Window Budget (per call)

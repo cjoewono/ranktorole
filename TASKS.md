@@ -244,6 +244,17 @@
 
 ---
 
+## Session 10 — Career Recon
+
+- [x] OnetMilitarySearchView: GET /api/v1/onet/military/
+- [x] OnetCareerDetailView: GET /api/v1/onet/career/{code}/
+- [x] onet_app/tests.py: 11 tests (108 total)
+- [x] frontend/src/api/onet.js: searchMilitaryCareers, getCareerDetail
+- [x] frontend/src/pages/CareerRecon.jsx: SEARCH → RESULTS → DETAIL
+- [x] /recon route wired in App.jsx + NavBar.jsx
+
+---
+
 ## Phase 5 — EC2 Deployment (after Phase 4 complete)
 
 - [ ] Provision EC2 instance (Ubuntu 22.04)

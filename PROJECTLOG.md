@@ -600,3 +600,8 @@ None. Dev still uses Vite on host + backend in Docker with runserver. Nginx is n
 - `test_chat_message_too_long_returns_400`, `test_finalized_resume_chat_returns_409`
 - `test_double_finalize_returns_409` (was 200), finalize boundary tests (6 new)
 - `test_register_throttle_returns_429`, `test_google_callback_invalid_state_returns_400`, `test_google_callback_missing_code_returns_400`
+
+---
+
+Project log maintained: github.com/cjoewono/ranktorole
+Last updated: April 13, 2026 — Security hardening complete, 97 tests passing

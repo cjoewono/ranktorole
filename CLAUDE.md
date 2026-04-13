@@ -32,6 +32,14 @@ April 24, 2026
 
 - `docker compose exec frontend npm run build`
 
+### Production (EC2)
+
+- `sudo certbot certonly --webroot -w /var/lib/letsencrypt -d cjoewono.com -d www.cjoewono.com`
+- `docker compose up -d db nginx frontend`
+- `docker compose run -d backend gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3`
+- `docker compose exec backend python manage.py migrate`
+- `sudo crontab -e` → add `0 */12 * * * certbot renew --quiet && docker compose -f /path/to/docker-compose.yml exec nginx nginx -s reload`
+
 ## Architecture
 
 See ARCHITECTURE.md for system design patterns and Docker lessons.

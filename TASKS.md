@@ -68,18 +68,38 @@
 
 ---
 
-## Current — Session 08 (Code Review Fixes)
+### Completed — Session 08 (April 11)
 
-- [ ] Fix fetchOnetSkills crash (apiFetch returns parsed data)
-- [ ] Remove ProtectedRoute.jsx, consolidate auth into AppShell
-- [ ] Profile gate in AppShell (require profile_context)
-- [ ] Delete dead call_claude() function
-- [ ] Extract \_build_profile_block helper (DRY)
-- [ ] Anthropic client singleton
-- [ ] Add throttle to ResumeFinalizeView and OnetSearchView
-- [ ] Add ErrorBoundary component
-- [ ] Remove legacy TranslationView, translations.js, context.py dead code
-- [ ] Doc sync (CLAUDE.md, DATA_CONTRACT.md, ARCHITECTURE.md, TASKS.md)
+- [x] Code review fixes — fetchOnetSkills crash, ProtectedRoute removal,
+      profile gate in AppShell, \_build_profile_block DRY helper,
+      dead call_claude removal, Anthropic client singleton,
+      throttles on FinalizeView + OnetSearchView, ErrorBoundary,
+      legacy dead code purge (TranslationView, translations.js, context.py)
+
+### Completed — Tiered Throttle (April 12)
+
+- [x] User.tier field (free/pro) + migration 0004
+- [x] TieredThrottle base class + 5 subclasses in throttles.py
+- [x] TIERED_THROTTLE_RATES in settings.py
+- [x] 20 throttle tests added
+
+### Completed — HTTPS/SSL Deployment Prep (April 13)
+
+- [x] settings.py HSTS fix + CSRF_TRUSTED_ORIGINS
+- [x] nginx/default.conf SSL termination rewrite
+- [x] docker-compose.yml port 443 + cert volumes
+- [x] .env.example expanded with all production vars
+
+### Completed — Security Hardening (April 13)
+
+- [x] Input validation: JD 10-15k, chat 2k, finalize field limits, contact limits
+- [x] RegisterThrottle (5/hour)
+- [x] Login/register error normalization (anti-enumeration)
+- [x] strip_tags on AI output
+- [x] get_user_resume helper extracted
+- [x] Type hints on all view methods
+- [x] Docstrings on all services.py functions
+- [x] 13 new tests (97 total)
 
 ---
 
@@ -244,4 +264,5 @@ None
 
 ## Start Next Session With
 
-> "Let's continue RankToRole — pick up from TASKS.md Phase 5: EC2 deployment. Run pytest first to confirm 77/77, then start provisioning."
+> "Let's continue RankToRole — UI/UX redesign. Read .stitch/DESIGN.md
+> first. Run pytest to confirm 97 passing, then start implementation."

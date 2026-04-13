@@ -654,3 +654,15 @@ Migrated all three O*NET proxy views from the public `services.onetcenter.org/ws
 | `onet_app/tests.py` | Modified | Added 3 tests verifying API key header is sent |
 | `.env.example` | Modified | Added `ONET_API_KEY` |
 | Docs | Modified | CLAUDE.md, ARCHITECTURE.md, SECURITY.md, PROJECTLOG.md updated |
+
+### Follow-up: v2 Response Shape Fix
+
+Fixed field name mismatches between v1 and v2 API responses:
+
+- `military_matches.match` → `military_match` (top-level flat array)
+- Overview `description` → `what_they_do` (v2 uses different field name)
+- Skills/knowledge: v2 returns a list of categories with sub-`element` arrays (not `{"element": [...]}` dict)
+- Technology: v2 returns list directly; category `title` is a plain string (not `{"name": "..."}`); examples use `title` key (not `name`)
+- Outlook sub-endpoint: `outlook` → `job_outlook`
+- Updated test mocks to use v2 field shapes
+- Tests: 115/115 passing

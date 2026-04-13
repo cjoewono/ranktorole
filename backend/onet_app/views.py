@@ -158,7 +158,7 @@ class OnetMilitarySearchView(APIView):
 
             # Extract military matches
             military_matches = []
-            raw_matches = data.get("military_matches", {}).get("match", [])
+            raw_matches = data.get("military_match", [])
             if isinstance(raw_matches, dict):
                 raw_matches = [raw_matches]
             for m in raw_matches:
@@ -245,31 +245,32 @@ class OnetCareerDetailView(APIView):
         skills_data = self._fetch_json(f"{base}/skills")
         knowledge_data = self._fetch_json(f"{base}/knowledge")
         technology_data = self._fetch_json(f"{base}/technology")
-        outlook_data = self._fetch_json(f"{base}/outlook")
+        outlook_data = self._fetch_json(f"{base}/job_outlook")
 
-        # Extract skills list
+        # Extract skills list — v2 returns a list of categories, each with sub-elements
         skills = []
-        for element in skills_data.get("element", []):
-            name = element.get("name", "")
-            desc = element.get("description", "")
-            if name:
-                skills.append({"name": name, "description": desc})
+        for category in (skills_data if isinstance(skills_data, list) else []):
+            for elem in category.get("element", []):
+                name = elem.get("name", "")
+                if name:
+                    skills.append({"name": name, "description": ""})
 
-        # Extract knowledge list
+        # Extract knowledge list — same v2 shape as skills
         knowledge = []
-        for element in knowledge_data.get("element", []):
-            name = element.get("name", "")
-            desc = element.get("description", "")
-            if name:
-                knowledge.append({"name": name, "description": desc})
+        for category in (knowledge_data if isinstance(knowledge_data, list) else []):
+            for elem in category.get("element", []):
+                name = elem.get("name", "")
+                if name:
+                    knowledge.append({"name": name, "description": ""})
 
-        # Extract technology items
+        # Extract technology items — v2 returns list directly; title is a string; examples use "title" key
         technology = []
-        for cat in technology_data.get("category", []):
-            cat_title = cat.get("title", {}).get("name", "")
+        for cat in (technology_data if isinstance(technology_data, list) else technology_data.get("category", [])):
+            raw_title = cat.get("title", "")
+            cat_title = raw_title if isinstance(raw_title, str) else raw_title.get("name", "")
             examples = []
             for ex in cat.get("example", []):
-                ex_name = ex.get("name", "")
+                ex_name = ex.get("title", ex.get("name", ""))
                 hot = ex.get("hot_technology", False)
                 if ex_name:
                     examples.append({"name": ex_name, "hot": hot})
@@ -294,7 +295,7 @@ class OnetCareerDetailView(APIView):
         return Response({
             "code": onet_code,
             "title": overview_data.get("title", ""),
-            "description": overview_data.get("description", ""),
+            "description": overview_data.get("what_they_do", overview_data.get("description", "")),
             "tags": overview_data.get("tags", {}),
             "skills": skills,
             "knowledge": knowledge,

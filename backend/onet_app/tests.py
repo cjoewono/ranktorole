@@ -69,11 +69,9 @@ class TestOnetMilitarySearchView:
             mock_resp = MagicMock()
             mock_resp.ok = True
             mock_resp.json.return_value = {
-                "military_matches": {
-                    "match": [
-                        {"branch": "army", "code": "11B", "title": "Infantryman (Enlisted)", "active": True}
-                    ]
-                },
+                "military_match": [
+                    {"branch": "army", "code": "11B", "title": "Infantryman (Enlisted)", "active": True}
+                ],
                 "career": [
                     {
                         "code": "47-2061.00",
@@ -127,7 +125,7 @@ class TestOnetMilitarySearchView:
         with patch("onet_app.views.http_requests.get") as mock_get:
             mock_resp = MagicMock()
             mock_resp.ok = True
-            mock_resp.json.return_value = {"career": [], "military_matches": {}}
+            mock_resp.json.return_value = {"career": [], "military_match": []}
             mock_get.return_value = mock_resp
 
             with patch("onet_app.views.settings") as mock_settings:

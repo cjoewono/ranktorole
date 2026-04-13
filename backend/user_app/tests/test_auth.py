@@ -6,7 +6,7 @@ User = get_user_model()
 
 
 @pytest.fixture(autouse=True)
-def disable_throttling(monkeypatch):
+def disable_throttling(db, monkeypatch):
     from django.core.cache import cache
     from user_app.views import LoginRateThrottle
     cache.clear()

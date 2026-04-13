@@ -151,12 +151,10 @@ REST_FRAMEWORK = {
     },
 }
 
-# Switch to RedisCache in production for cross-worker throttle
-# consistency across Gunicorn workers.
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "ranktorole-cache",
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "django_cache",
     }
 }
 
@@ -171,6 +169,47 @@ TIERED_THROTTLE_RATES = {
     'user_chat':     {'free': '10/day', 'pro': '50/day'},
     'user_finalize': {'free': '3/day',  'pro': '15/day'},
     'user_onet':     {'free': '10/day', 'pro': '30/day'},
+}
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'translate_app': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'user_app': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -198,6 +237,17 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+# ---------------------------------------------------------------------------
+# CSRF Trusted Origins — required by Django 4.2+ behind HTTPS proxy
+# ---------------------------------------------------------------------------
+_csrf_trusted_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in _csrf_trusted_env.split(',') if o.strip()
+] or [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
 
 if not DEBUG and not _cors_origins_env.strip():
     import warnings
@@ -271,7 +321,7 @@ CSRF_COOKIE_SECURE = not DEBUG
 
 # HSTS — set to 0 in dev; activate to 31536000 ONLY after SSL cert is
 # confirmed working on EC2, or browsers will be locked out for 1 year
-SECURE_HSTS_SECONDS = 0 if DEBUG else 0  # manually flip on deploy
+SECURE_HSTS_SECONDS = 0 if DEBUG else 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
 SECURE_HSTS_PRELOAD = not DEBUG
 

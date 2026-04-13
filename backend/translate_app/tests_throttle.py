@@ -34,7 +34,7 @@ def disable_tiered_throttling():
 
 
 @pytest.fixture(autouse=True)
-def clear_cache():
+def clear_cache(db):
     """Clear the throttle cache before every test."""
     cache.clear()
     yield

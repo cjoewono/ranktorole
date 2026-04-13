@@ -13,7 +13,7 @@ def reset_anthropic_singleton():
 
 
 @pytest.fixture(autouse=True)
-def disable_tiered_throttling():
+def disable_tiered_throttling(db):
     """Disable all tiered throttles in tests unless a test explicitly needs them."""
     cache.clear()
     with patch('translate_app.throttles.TieredThrottle.allow_request', return_value=True):

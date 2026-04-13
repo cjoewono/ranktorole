@@ -72,7 +72,13 @@ export default function CareerRecon() {
 
     try {
       const data = await searchMilitaryCareers(keyword.trim(), branch);
-      setResults(data);
+      if (data.careers?.length > 0) {
+        setResults(data);
+      } else {
+        setSearchError(
+          `No civilian career matches found for "${keyword.trim()}". Try a different code or broaden the branch filter.`,
+        );
+      }
     } catch (err) {
       setSearchError(err.message || "Search failed. Please try again.");
     } finally {

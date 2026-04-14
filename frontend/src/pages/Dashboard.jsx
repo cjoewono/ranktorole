@@ -71,7 +71,7 @@ export default function Dashboard() {
         action={
           <button
             onClick={handleNewResume}
-            className="mission-gradient font-label text-xs tracking-widest font-semibold uppercase text-on-primary px-4 py-2.5 rounded-md transition-opacity hover:opacity-90"
+            className="mission-gradient font-label text-sm tracking-widest font-semibold uppercase text-on-primary px-6 py-3 rounded-md transition-opacity hover:opacity-90"
           >
             + NEW RESUME
           </button>
@@ -111,6 +111,31 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
+
+        {!loading && resumes.every((r) => r.is_finalized) && (
+          <button
+            onClick={handleNewResume}
+            className="w-full bg-surface-container-low border border-primary/20 p-6 text-left hover:bg-surface-container transition-colors group"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-label text-xs tracking-widest uppercase text-primary mb-1">
+                  READY FOR YOUR NEXT MISSION?
+                </p>
+                <p className="font-headline font-semibold text-lg text-on-surface">
+                  Translate your military experience into a civilian resume
+                </p>
+                <p className="font-body text-sm text-on-surface-variant mt-1">
+                  Upload your military resume and target a job description — AI
+                  handles the translation.
+                </p>
+              </div>
+              <span className="text-primary text-2xl group-hover:translate-x-1 transition-transform shrink-0 ml-4">
+                →
+              </span>
+            </div>
+          </button>
+        )}
 
         {loading ? (
           <div className="text-center text-on-surface-variant py-16 font-label text-xs tracking-widest uppercase">

@@ -3,6 +3,14 @@ import { Link } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
 import { searchMilitaryCareers, getCareerDetail } from "../api/onet";
 
+const loadingKeyframes = `
+@keyframes loading {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(60%); }
+  100% { transform: translateX(200%); }
+}
+`;
+
 const BRANCHES = [
   { value: "all", label: "All Branches" },
   { value: "army", label: "Army" },
@@ -114,6 +122,7 @@ export default function CareerRecon() {
 
   return (
     <>
+      <style>{loadingKeyframes}</style>
       <PageHeader
         label={
           phase === "DETAIL"
@@ -229,33 +238,76 @@ export default function CareerRecon() {
             )}
 
             {/* Inline search bar for refinement */}
-            <form onSubmit={handleSearch} className="flex gap-2">
-              <input
-                type="text"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder="Search another MOS..."
-                className="tactical-input flex-1"
-              />
-              <select
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                className="tactical-input appearance-none cursor-pointer w-40"
-              >
-                {BRANCHES.map((b) => (
-                  <option key={b.value} value={b.value}>
-                    {b.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="submit"
-                disabled={searching}
-                className="mission-gradient text-on-primary font-label font-semibold tracking-widest uppercase text-xs px-6 py-3 rounded-md hover:opacity-90 transition-opacity"
-              >
-                {searching ? "..." : "GO"}
-              </button>
+            <form
+              onSubmit={handleSearch}
+              className="bg-surface-container-low p-4 space-y-3"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-2 h-2 rounded-full bg-secondary inline-block" />
+                <span className="font-label text-xs tracking-widest uppercase text-secondary">
+                  SEARCH
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
+                    MOS / Rating / AFSC
+                  </label>
+                  <input
+                    type="text"
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                    placeholder="e.g., 11B, IT2, 3D0X4"
+                    className="tactical-input w-full"
+                    required
+                  />
+                </div>
+                <div className="w-40">
+                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
+                    Branch
+                  </label>
+                  <select
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    className="tactical-input appearance-none cursor-pointer w-full"
+                  >
+                    {BRANCHES.map((b) => (
+                      <option key={b.value} value={b.value}>
+                        {b.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    disabled={searching || !keyword.trim()}
+                    className="mission-gradient text-on-primary font-label font-semibold tracking-widest uppercase text-xs px-6 py-3 rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    {searching ? "..." : "GO"}
+                  </button>
+                </div>
+              </div>
             </form>
+
+            {loadingDetail && (
+              <div className="bg-surface-container-low p-4 flex items-center gap-3">
+                <div className="w-full">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <span className="font-label text-xs tracking-widest uppercase text-primary">
+                      LOADING CAREER INTEL
+                    </span>
+                  </div>
+                  <div className="w-full bg-surface-container-highest rounded-full h-1 overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full animate-[loading_1.5s_ease-in-out_infinite]"
+                      style={{ width: "60%" }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Empty state */}
             {results.careers?.length === 0 && (
@@ -274,7 +326,7 @@ export default function CareerRecon() {
                   key={career.code}
                   onClick={() => handleCareerClick(career.code)}
                   disabled={loadingDetail && selectedCode === career.code}
-                  className="w-full text-left bg-surface-container-low p-4 hover:bg-surface-container transition-colors group"
+                  className={`w-full text-left bg-surface-container-low p-4 hover:bg-surface-container transition-colors group ${loadingDetail && selectedCode === career.code ? "opacity-60" : ""}`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">

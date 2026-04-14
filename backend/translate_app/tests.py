@@ -5,11 +5,10 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-from django.urls import reverse
 from rest_framework.test import APIClient
 
 from .models import Resume
-from .services import ChatResult, MilitaryTranslation, RoleEntry, compress_session_anchor
+from .services import ChatResult, compress_session_anchor
 
 
 # ---------------------------------------------------------------------------

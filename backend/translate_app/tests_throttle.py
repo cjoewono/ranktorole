@@ -20,7 +20,6 @@ from .throttles import (
     DraftThrottle,
     FinalizeThrottle,
     OnetThrottle,
-    TieredThrottle,
     UploadThrottle,
 )
 

@@ -19,6 +19,7 @@ const ForgeSetup = lazy(() => import("./pages/ForgeSetup"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ResumeBuilder = lazy(() => import("./pages/ResumeBuilder"));
 const CareerRecon = lazy(() => import("./pages/CareerRecon"));
+const Contacts = lazy(() => import("./pages/Contacts"));
 
 function Spinner() {
   return (
@@ -51,7 +52,8 @@ function AppShell() {
     path !== "/dashboard" &&
     path !== "/resume-builder" &&
     path !== "/profile" &&
-    path !== "/recon"
+    path !== "/recon" &&
+    path !== "/contacts"
   ) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -79,6 +81,11 @@ function AppShell() {
       <div className={path === "/resume-builder" ? "" : "hidden"}>
         <Suspense fallback={<Spinner />}>
           <ResumeBuilder setFullscreen={setFullscreen} />
+        </Suspense>
+      </div>
+      <div className={path === "/contacts" ? "pb-20 md:pb-0" : "hidden"}>
+        <Suspense fallback={<Spinner />}>
+          <Contacts />
         </Suspense>
       </div>
     </div>
@@ -110,6 +117,7 @@ export default function App() {
                 <Route path="/dashboard" element={<AppShell />} />
                 <Route path="/resume-builder" element={<AppShell />} />
                 <Route path="/recon" element={<AppShell />} />
+                <Route path="/contacts" element={<AppShell />} />
                 <Route path="*" element={<DefaultRedirect />} />
               </Routes>
             </Suspense>

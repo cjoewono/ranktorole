@@ -36,6 +36,9 @@ export default function NavBar() {
           <NavLink to="/recon" className={navLinkClass}>
             Recon
           </NavLink>
+          <NavLink to="/contacts" className={navLinkClass}>
+            Contacts
+          </NavLink>
           <NavLink to="/profile" className={navLinkClass}>
             Profile
           </NavLink>
@@ -51,6 +54,10 @@ export default function NavBar() {
         <NavLink to="/recon" className={mobileTabClass}>
           <span className="text-base">◎</span>
           Recon
+        </NavLink>
+        <NavLink to="/contacts" className={mobileTabClass}>
+          <span className="text-base">◈</span>
+          Contacts
         </NavLink>
         <NavLink to="/profile" className={mobileTabClass}>
           <span className="text-base">◇</span>

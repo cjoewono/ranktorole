@@ -196,24 +196,6 @@ export default function ForgeSetup() {
         title={isEditing ? "EDIT PROFILE" : "FORGE SETUP"}
       />
 
-      {/* Context quality explanation */}
-      <div className="bg-surface-container px-4 py-3 border-b border-outline-variant/15">
-        <div className="max-w-xl mx-auto flex items-start gap-3">
-          <span className="text-primary text-lg mt-0.5">◆</span>
-          <div>
-            <p className="font-label text-xs tracking-widest uppercase text-primary mb-1">
-              Why this matters
-            </p>
-            <p className="font-body text-sm text-on-surface-variant leading-relaxed">
-              Your profile feeds directly into the AI translation engine. The
-              more precise your branch, MOS, target sector, and skills — the
-              more accurately your military experience maps to civilian language
-              that hiring managers recognize.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <main className="max-w-xl mx-auto px-4 py-8 pb-28 md:pb-8">
         {error && (
           <div className="bg-error-container text-on-error-container font-body text-sm px-4 py-3 mb-6">
@@ -227,172 +209,192 @@ export default function ForgeSetup() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Military Branch */}
-          <div>
-            <FieldLabel>
-              Military Branch <span className="text-error">*</span>
-            </FieldLabel>
-            <TacticalSelect
-              required
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
-            >
-              <option value="">Select branch</option>
-              {BRANCHES.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </TacticalSelect>
-            <p className="font-label text-xs tracking-widest text-outline mt-1">
-              Determines service-specific terminology mapping
-            </p>
-          </div>
-
-          {/* MOS */}
-          <div>
-            <FieldLabel>MOS / Rating / AFSC</FieldLabel>
-            <input
-              type="text"
-              value={mos}
-              onChange={(e) => setMos(e.target.value)}
-              onBlur={handleMosBlur}
-              placeholder="e.g., 11B, IT2, 3D0X4"
-              className="tactical-input"
-            />
-            <p className="font-label text-xs tracking-widest text-outline mt-1">
-              Leave field to auto-load matching skills from O*NET
-            </p>
-          </div>
-
-          {/* Target Sector */}
-          <div>
-            <FieldLabel>
-              Target Civilian Sector <span className="text-error">*</span>
-            </FieldLabel>
-            <TacticalSelect
-              required
-              value={targetSector}
-              onChange={(e) => setTargetSector(e.target.value)}
-            >
-              <option value="">Select sector</option>
-              {SECTORS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </TacticalSelect>
-            <p className="font-label text-xs tracking-widest text-outline mt-1">
-              Tunes vocabulary and job title suggestions to your target industry
-            </p>
-          </div>
-
-          {/* Skills */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <FieldLabel>Transferable Skills</FieldLabel>
-              {selectedSkills.length > 0 && (
-                <span className="font-label text-xs tracking-widest uppercase text-primary">
-                  {selectedSkills.length} selected
-                </span>
-              )}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* ─── Section 1: Military Background ─── */}
+          <div className="bg-surface-container-low p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <span className="w-2 h-2 rounded-full bg-primary inline-block" />
+              <h2 className="font-label text-xs tracking-widest uppercase text-primary">
+                Military Background
+              </h2>
             </div>
-
-            {/* O*NET preset tags */}
-            {loadingSkills && (
-              <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
-                Scanning O*NET...
-              </p>
-            )}
-
-            {!loadingSkills && onetFetched && presetTags.length === 0 && (
-              <p className="font-label text-xs tracking-widest uppercase text-outline">
-                No matching skills found for that code. Add your own below.
-              </p>
-            )}
-
-            {!loadingSkills && presetTags.length > 0 && (
+            <div className="space-y-5">
               <div>
-                <p className="font-label text-xs tracking-widest uppercase text-outline mb-2">
-                  O*NET suggestions — tap to select
+                <FieldLabel>
+                  Military Branch <span className="text-error">*</span>
+                </FieldLabel>
+                <TacticalSelect
+                  required
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                >
+                  <option value="">Select branch</option>
+                  {BRANCHES.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </TacticalSelect>
+                <p className="font-label text-xs tracking-widest text-outline mt-1.5">
+                  Determines service-specific terminology mapping
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {presetTags.map((skill) => {
-                    const isSelected = selectedSkills.includes(skill);
-                    return (
+              </div>
+
+              <div className="border-t border-outline-variant/10 pt-5">
+                <FieldLabel>MOS / Rating / AFSC</FieldLabel>
+                <input
+                  type="text"
+                  value={mos}
+                  onChange={(e) => setMos(e.target.value)}
+                  onBlur={handleMosBlur}
+                  placeholder="e.g., 11B, IT2, 3D0X4"
+                  className="tactical-input"
+                />
+                <p className="font-label text-xs tracking-widest text-outline mt-1.5">
+                  Leave field to auto-load matching skills from O*NET
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ─── Section 2: Career Goals ─── */}
+          <div className="bg-surface-container-low p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <span className="w-2 h-2 rounded-full bg-primary inline-block" />
+              <h2 className="font-label text-xs tracking-widest uppercase text-primary">
+                Career Goals
+              </h2>
+            </div>
+            <div className="space-y-5">
+              <div>
+                <FieldLabel>
+                  Target Civilian Sector <span className="text-error">*</span>
+                </FieldLabel>
+                <TacticalSelect
+                  required
+                  value={targetSector}
+                  onChange={(e) => setTargetSector(e.target.value)}
+                >
+                  <option value="">Select sector</option>
+                  {SECTORS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </TacticalSelect>
+                <p className="font-label text-xs tracking-widest text-outline mt-1.5">
+                  Tunes vocabulary and job title suggestions to your target
+                  industry
+                </p>
+              </div>
+
+              <div className="border-t border-outline-variant/10 pt-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <FieldLabel>Transferable Skills</FieldLabel>
+                  {selectedSkills.length > 0 && (
+                    <span className="font-label text-xs tracking-widest uppercase text-primary">
+                      {selectedSkills.length} selected
+                    </span>
+                  )}
+                </div>
+
+                {/* O*NET preset tags */}
+                {loadingSkills && (
+                  <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
+                    Scanning O*NET...
+                  </p>
+                )}
+
+                {!loadingSkills && onetFetched && presetTags.length === 0 && (
+                  <p className="font-label text-xs tracking-widest uppercase text-outline">
+                    No matching skills found for that code. Add your own below.
+                  </p>
+                )}
+
+                {!loadingSkills && presetTags.length > 0 && (
+                  <div>
+                    <p className="font-label text-xs tracking-widest uppercase text-outline mb-2">
+                      O*NET suggestions — tap to select
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {presetTags.map((skill) => {
+                        const isSelected = selectedSkills.includes(skill);
+                        return (
+                          <button
+                            key={skill}
+                            type="button"
+                            onClick={() => toggleSkill(skill)}
+                            className={
+                              isSelected
+                                ? "bg-primary/15 text-primary border border-primary/40 font-label text-xs tracking-wide px-3 py-1.5 rounded-sm transition-colors flex items-center gap-1.5"
+                                : "bg-surface-container-highest text-on-surface-variant border border-outline-variant font-label text-xs tracking-wide px-3 py-1.5 rounded-sm hover:border-primary/30 hover:text-on-surface transition-colors"
+                            }
+                          >
+                            {skill}
+                            {isSelected && (
+                              <span className="text-primary/60 text-xs leading-none">
+                                ×
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom-only skills (selected but not from O*NET list) */}
+                {customOnlySkills.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {customOnlySkills.map((skill) => (
                       <button
                         key={skill}
                         type="button"
                         onClick={() => toggleSkill(skill)}
-                        className={
-                          isSelected
-                            ? "bg-primary/15 text-primary border border-primary/40 font-label text-xs tracking-wide px-3 py-1.5 rounded-sm transition-colors flex items-center gap-1.5"
-                            : "bg-surface-container-highest text-on-surface-variant border border-outline-variant font-label text-xs tracking-wide px-3 py-1.5 rounded-sm hover:border-primary/30 hover:text-on-surface transition-colors"
-                        }
+                        className="bg-primary/15 text-primary border border-primary/40 font-label text-xs tracking-wide px-3 py-1.5 rounded-sm transition-colors flex items-center gap-1.5"
                       >
                         {skill}
-                        {isSelected && (
-                          <span className="text-primary/60 text-xs leading-none">
-                            ×
-                          </span>
-                        )}
+                        <span className="text-primary/60 text-xs leading-none">
+                          ×
+                        </span>
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
+                )}
+
+                {/* Custom skill input */}
+                <div className="bg-surface-container p-4 space-y-2">
+                  <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
+                    Add custom skill
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customSkill}
+                      onChange={(e) => setCustomSkill(e.target.value)}
+                      onKeyDown={handleCustomKeyDown}
+                      placeholder="e.g., Cross-functional leadership"
+                      className="tactical-input flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={addCustomSkill}
+                      className="font-label text-xs tracking-widest uppercase text-on-surface-variant bg-surface-container-highest hover:text-on-surface border border-outline-variant px-4 py-2 transition-colors shrink-0"
+                    >
+                      Add
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {/* Custom-only skills (selected but not from O*NET list) */}
-            {customOnlySkills.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {customOnlySkills.map((skill) => (
-                  <button
-                    key={skill}
-                    type="button"
-                    onClick={() => toggleSkill(skill)}
-                    className="bg-primary/15 text-primary border border-primary/40 font-label text-xs tracking-wide px-3 py-1.5 rounded-sm transition-colors flex items-center gap-1.5"
-                  >
-                    {skill}
-                    <span className="text-primary/60 text-xs leading-none">
-                      ×
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Custom skill input */}
-            <div className="bg-surface-container-low p-4 space-y-2">
-              <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
-                Add custom skill
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={customSkill}
-                  onChange={(e) => setCustomSkill(e.target.value)}
-                  onKeyDown={handleCustomKeyDown}
-                  placeholder="e.g., Cross-functional leadership"
-                  className="tactical-input flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={addCustomSkill}
-                  className="font-label text-xs tracking-widest uppercase text-on-surface-variant bg-surface-container-highest hover:text-on-surface border border-outline-variant px-4 py-2 transition-colors shrink-0"
-                >
-                  Add
-                </button>
+                <p className="font-label text-xs tracking-widest text-outline mt-1.5">
+                  Selected skills are prioritized in your translated resume
+                  bullets
+                </p>
               </div>
             </div>
-            <p className="font-label text-xs tracking-widest text-outline mt-1">
-              Selected skills are prioritized in your translated resume bullets
-            </p>
           </div>
 
-          {/* Submit */}
-          <div className="space-y-4 pt-2">
+          {/* ─── Section 3: Profile Strength + Save ─── */}
+          <div className="bg-surface-container-low p-6 space-y-5">
             {/* Profile completeness */}
             {(() => {
               const filled =
@@ -461,61 +463,62 @@ export default function ForgeSetup() {
           </div>
         </form>
 
-        {/* Account Settings */}
+        {/* ─── Section 4: Account Settings (only when editing) ─── */}
         {isEditing && (
-          <div className="mt-8 space-y-6">
-            {/* Account Info */}
-            <div className="bg-surface-container-low p-6 space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-2 h-2 rounded-full bg-tertiary inline-block" />
-                <span className="font-label text-xs tracking-widest uppercase text-tertiary">
-                  ACCOUNT
-                </span>
+          <div className="space-y-6 mt-6">
+            {/* Account Info card */}
+            <div className="bg-surface-container-low p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <span className="w-2 h-2 rounded-full bg-on-surface-variant inline-block" />
+                <h2 className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
+                  Account
+                </h2>
               </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
+                    Email
+                  </label>
+                  <p className="tactical-input opacity-60 cursor-not-allowed">
+                    {user?.email}
+                  </p>
+                  <p className="font-label text-xs tracking-widest text-outline mt-1.5">
+                    Email cannot be changed
+                  </p>
+                </div>
 
-              <div>
-                <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                  Email
-                </label>
-                <p className="tactical-input opacity-60 cursor-not-allowed">
-                  {user?.email}
-                </p>
-                <p className="font-label text-xs tracking-widest text-outline mt-1">
-                  Email cannot be changed
-                </p>
-              </div>
-
-              <div>
-                <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                  Account Tier
-                </label>
-                <p className="tactical-input opacity-60 cursor-not-allowed uppercase">
-                  {user?.tier || "free"}
-                </p>
+                <div className="border-t border-outline-variant/10 pt-4">
+                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
+                    Account Tier
+                  </label>
+                  <p className="tactical-input opacity-60 cursor-not-allowed uppercase">
+                    {user?.tier || "free"}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Password Change */}
-            <div className="bg-surface-container-low p-6 space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-2 h-2 rounded-full bg-primary inline-block" />
-                <span className="font-label text-xs tracking-widest uppercase text-primary">
-                  CHANGE PASSWORD
-                </span>
+            {/* Password Change card */}
+            <div className="bg-surface-container-low p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <span className="w-2 h-2 rounded-full bg-on-surface-variant inline-block" />
+                <h2 className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
+                  Security
+                </h2>
               </div>
 
               {passwordError && (
-                <div className="bg-error-container text-on-error-container font-body text-sm px-4 py-3">
+                <div className="bg-error-container text-on-error-container font-body text-sm px-4 py-3 mb-4">
                   {passwordError}
                 </div>
               )}
               {passwordSuccess && (
-                <div className="bg-secondary/10 text-secondary font-body text-sm px-4 py-3">
+                <div className="bg-secondary/10 text-secondary font-body text-sm px-4 py-3 mb-4">
                   {passwordSuccess}
                 </div>
               )}
 
-              <form onSubmit={handlePasswordChange} className="space-y-4">
+              <form onSubmit={handlePasswordChange} className="space-y-5">
                 <div>
                   <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
                     Current Password
@@ -528,7 +531,7 @@ export default function ForgeSetup() {
                     required
                   />
                 </div>
-                <div>
+                <div className="border-t border-outline-variant/10 pt-5">
                   <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
                     New Password
                   </label>
@@ -541,7 +544,7 @@ export default function ForgeSetup() {
                     required
                   />
                 </div>
-                <div>
+                <div className="border-t border-outline-variant/10 pt-5">
                   <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
                     Confirm New Password
                   </label>
@@ -563,7 +566,7 @@ export default function ForgeSetup() {
               </form>
             </div>
 
-            {/* Logout */}
+            {/* Sign Out card */}
             <div className="bg-surface-container-low p-6">
               <button
                 onClick={logout}

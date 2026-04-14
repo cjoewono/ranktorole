@@ -363,7 +363,7 @@ export default function ForgeSetup() {
                 )}
 
                 {/* Custom skill input */}
-                <div className="bg-surface-container p-4 space-y-2">
+                <div className="bg-surface-container-low p-4 space-y-2">
                   <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
                     Add custom skill
                   </p>

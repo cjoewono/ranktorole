@@ -74,7 +74,6 @@ export default function CareerRecon() {
     if (!keyword.trim()) return;
     setSearching(true);
     setSearchError(null);
-    setResults(null);
     setDetail(null);
     setSelectedCode(null);
 
@@ -83,11 +82,13 @@ export default function CareerRecon() {
       if (data.careers?.length > 0) {
         setResults(data);
       } else {
+        setResults(null);
         setSearchError(
           `No civilian career matches found for "${keyword.trim()}". Try a different code or broaden the branch filter.`,
         );
       }
     } catch (err) {
+      setResults(null);
       setSearchError(err.message || "Search failed. Please try again.");
     } finally {
       setSearching(false);
@@ -320,7 +321,9 @@ export default function CareerRecon() {
             )}
 
             {/* Career cards */}
-            <div className="space-y-2">
+            <div
+              className={`space-y-2 ${searching ? "opacity-40 pointer-events-none" : ""}`}
+            >
               {results.careers?.map((career) => (
                 <button
                   key={career.code}

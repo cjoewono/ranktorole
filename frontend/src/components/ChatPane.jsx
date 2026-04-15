@@ -55,7 +55,9 @@ export default function ChatPane({
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {chatHistory.length === 0 && !isSending && (
           <p className="text-on-surface-variant text-sm text-center pt-8">
-            Clarifying questions will appear here after the draft is generated.
+            {phase === "FINALIZING"
+              ? "Ask for suggestions or request changes to any bullet."
+              : "Clarifying questions will appear here after the draft is generated."}
           </p>
         )}
         {phase === "FINALIZING" && (

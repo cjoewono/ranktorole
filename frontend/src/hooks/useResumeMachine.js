@@ -145,7 +145,7 @@ export default function useResumeMachine() {
           },
           aiInitialDraft: resume.ai_initial_draft || resume.roles || [],
           chatHistory: (resume.chat_history || []).slice(-10),
-          isFinalized: resume.is_finalized || false,
+          isFinalized: false,
         });
       })
       .catch(() => {

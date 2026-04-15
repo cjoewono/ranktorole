@@ -8,7 +8,6 @@ export default function ChatPane({
   dispatch,
   onSend,
   isSending = false,
-  isFinalized = false,
 }) {
   const [input, setInput] = useState("");
   const [lockedMsg, setLockedMsg] = useState(null);
@@ -19,7 +18,7 @@ export default function ChatPane({
     if (phase === "REVIEWING" || phase === "FINALIZING") setLockedMsg(null);
   }, [phase]);
 
-  const isLocked = phase === "DONE" || isFinalized || lockedMsg !== null;
+  const isLocked = phase === "DONE" || lockedMsg !== null;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -137,8 +136,8 @@ export default function ChatPane({
       <UpgradeModal
         open={showUpgrade}
         onClose={() => setShowUpgrade(false)}
-        title="Daily chat limit reached"
-        description="Free accounts get 10 refinement messages per day. Upgrade to Pro for expanded access — $10/month."
+        title="Chat limit reached"
+        description="Free accounts get 10 refinement messages per resume. Upgrade to Pro for unlimited chat on every resume — $10/month."
       />
     </div>
   );

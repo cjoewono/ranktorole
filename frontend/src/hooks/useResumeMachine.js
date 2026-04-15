@@ -1,6 +1,7 @@
 import { useReducer, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { generateDraft, sendChatMessage, getResume } from "../api/resumes";
+import { useResumes } from "../context/ResumeContext";
 
 const initialState = {
   phase: "IDLE", // IDLE | LOADING | UPLOADED | DRAFTING | REVIEWING | FINALIZING | DONE
@@ -110,6 +111,7 @@ function reducer(state, action) {
 export default function useResumeMachine() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [searchParams] = useSearchParams();
+  const { refreshResumes } = useResumes();
   const navigate = useNavigate();
   const loadedIdRef = useRef(null);
 
@@ -151,6 +153,12 @@ export default function useResumeMachine() {
         navigate("/dashboard");
       });
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (state.phase === "DONE") {
+      refreshResumes();
+    }
+  }, [state.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGenerateDraft = useCallback(
     async ({ jobTitle = "", company = "" } = {}) => {

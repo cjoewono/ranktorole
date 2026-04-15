@@ -41,6 +41,7 @@ export default function ResumeBuilder({ setFullscreen }) {
             dispatch={dispatch}
             onSend={handleChatSend}
             isSending={state.isSending}
+            isFinalized={state.isFinalized}
           />
         }
       />

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import UpgradeModal from "./UpgradeModal";
 
 export default function ChatPane({
   chatHistory = [],
@@ -7,16 +8,18 @@ export default function ChatPane({
   dispatch,
   onSend,
   isSending = false,
+  isFinalized = false,
 }) {
   const [input, setInput] = useState("");
   const [lockedMsg, setLockedMsg] = useState(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
     if (phase === "REVIEWING" || phase === "FINALIZING") setLockedMsg(null);
   }, [phase]);
 
-  const isLocked = phase === "DONE" || lockedMsg !== null;
+  const isLocked = phase === "DONE" || isFinalized || lockedMsg !== null;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -31,6 +34,11 @@ export default function ChatPane({
     } catch (err) {
       if (err.status === 409) {
         setLockedMsg("Resume is finalized. No further changes.");
+      } else if (
+        err.status === 403 &&
+        err.data?.code === "CHAT_LIMIT_REACHED"
+      ) {
+        setShowUpgrade(true);
       }
     }
   }
@@ -97,7 +105,9 @@ export default function ChatPane({
         </div>
       ) : isLocked ? (
         <div className="border-t border-outline-variant/20 px-4 py-3 font-label text-xs tracking-widest uppercase text-on-surface-variant">
-          MISSION COMPLETE — RESUME FINALIZED
+          {phase === "DONE"
+            ? "MISSION COMPLETE — RESUME FINALIZED"
+            : "CHAT LOCKED — RESUME ALREADY FINALIZED"}
         </div>
       ) : (
         <div className="border-t border-outline-variant/20 px-4 py-3 flex gap-2">
@@ -123,6 +133,13 @@ export default function ChatPane({
           </button>
         </div>
       )}
+
+      <UpgradeModal
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        title="Daily chat limit reached"
+        description="Free accounts get 10 refinement messages per day. Upgrade to Pro for expanded access — $10/month."
+      />
     </div>
   );
 }

@@ -149,6 +149,7 @@ REST_FRAMEWORK = {
         'user_upload': '3/day',
         'user_finalize': '3/day',
         'user_onet': '10/day',
+        'billing_checkout': '5/min',
     },
 }
 
@@ -307,6 +308,31 @@ ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 ONET_USERNAME = os.environ.get('ONET_USERNAME', '')
 ONET_PASSWORD = os.environ.get('ONET_PASSWORD', '')
 ONET_API_KEY = os.environ.get('ONET_API_KEY', '')
+
+# ---------------------------------------------------------------------------
+# Stripe Billing
+# ---------------------------------------------------------------------------
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+STRIPE_PRICE_ID = os.environ.get('STRIPE_PRICE_ID', '')  # Pro plan recurring price
+STRIPE_CHECKOUT_SUCCESS_URL = os.environ.get(
+    'STRIPE_CHECKOUT_SUCCESS_URL',
+    'http://localhost:5173/billing/success?session_id={CHECKOUT_SESSION_ID}',
+)
+STRIPE_CHECKOUT_CANCEL_URL = os.environ.get(
+    'STRIPE_CHECKOUT_CANCEL_URL',
+    'http://localhost:5173/billing/cancel',
+)
+
+# Free-tier daily usage limits (enforced by IsProOrUnderLimit permission).
+# Pro users (subscription_status == 'active') bypass these entirely.
+FREE_TIER_DAILY_LIMITS = {
+    'resume_tailor_count': 1,
+}
+
+# Free-tier permanent (non-resetting) per-resume chat turn limit.
+# Enforced by ChatTurnLimit against resume.chat_turn_count.
+FREE_TIER_CHAT_LIMIT = 10
 
 # ---------------------------------------------------------------------------
 # Security headers — all gated on not DEBUG, inert in local dev

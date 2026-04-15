@@ -6,7 +6,7 @@
 - Never log request bodies containing user data
 - .env.example must stay updated with key names (no values)
 
-Required secrets: `SECRET_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ONET_API_KEY`
+Required secrets: `SECRET_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ONET_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`
 
 ## Authentication
 
@@ -77,3 +77,13 @@ Required secrets: `SECRET_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE
 - HTTP → HTTPS redirect at both Nginx level and Django level (`SECURE_SSL_REDIRECT`)
 - `CSRF_TRUSTED_ORIGINS` must include `https://cjoewono.com` in production `.env`
 - Auto-renewal: `sudo certbot renew --quiet` via cron (every 12 hours)
+
+## Billing (Stripe)
+
+- PCI-DSS scope: SAQ A — all card data is entered on Stripe-hosted Checkout; the frontend never sees PAN/CVV
+- `stripe_customer_id` is the only Stripe reference stored; no payment methods are persisted
+- Webhook handler verifies every payload with `stripe.Webhook.construct_event` — unsigned requests are rejected with 400
+- Webhook processing is idempotent: duplicate `stripe_event_id` values short-circuit before any DB writes
+- Subscription state transitions write to `SubscriptionAuditLog` (immutable in Django admin) for regulatory audit trail
+- Idempotency keys included on Stripe Customer and Session creation to prevent double-charges on retry
+- Checkout endpoint is rate-limited (5/min) to defeat card-testing/botting

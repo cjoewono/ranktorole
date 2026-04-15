@@ -21,6 +21,7 @@ class Resume(models.Model):
     roles = models.JSONField(default=list)
     chat_history = models.JSONField(default=list)
     ai_initial_draft = models.JSONField(null=True, blank=True)
+    chat_turn_count = models.PositiveIntegerField(default=0)
     is_finalized = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

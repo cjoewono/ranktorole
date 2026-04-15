@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { finalizeResume } from "../../api/resumes";
 import BulletEditor from "./BulletEditor";
 
@@ -22,7 +21,6 @@ export default function FinalizingEditor({
   const [expandedKey, setExpandedKey] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
 
   // Auto-apply AI chat suggestions to the editable state when they arrive
   useEffect(() => {
@@ -58,7 +56,14 @@ export default function FinalizingEditor({
         summary: editSummary,
         roles: editRoles,
       });
-      navigate("/dashboard");
+      dispatch({
+        type: "DONE",
+        draft: {
+          civilian_title: editTitle,
+          summary: editSummary,
+          roles: editRoles,
+        },
+      });
     } catch (err) {
       setError(
         err.data?.civilian_title?.[0] ||

@@ -324,3 +324,38 @@ class ResumeFinalizeView(APIView):
         resume.save()
 
         return Response(ResumeSerializer(resume).data, status=status.HTTP_200_OK)
+
+
+class ResumeReopenView(APIView):
+    """PATCH /api/v1/resumes/{id}/reopen/ — reopen a finalized resume for further editing.
+
+    Sets is_finalized=False and resets chat_turn_count to 0 so the user gets
+    a fresh chat allocation. Does nothing if the resume is not finalized.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [FinalizeThrottle]
+
+    def patch(self, request: Request, pk: uuid.UUID) -> Response:
+        resume = get_user_resume(pk, request.user)
+        if resume is None:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not resume.is_finalized:
+            return Response(
+                {"error": "Resume is not finalized."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        resume.is_finalized = False
+        resume.chat_turn_count = 0
+        resume.save(update_fields=["is_finalized", "chat_turn_count", "updated_at"])
+
+        return Response(
+            {
+                "id": str(resume.id),
+                "is_finalized": resume.is_finalized,
+                "chat_turn_count": resume.chat_turn_count,
+            },
+            status=status.HTTP_200_OK,
+        )

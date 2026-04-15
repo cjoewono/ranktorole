@@ -752,6 +752,45 @@ class TestResumeFinalizeView:
         assert response.status_code == 401
 
 
+class TestResumeReopenView:
+    def test_reopen_finalized_resume_returns_200(self, auth_client, user, db):
+        resume = _create_resume(user, is_finalized=True, chat_turn_count=8)
+        response = auth_client.patch(
+            f"/api/v1/resumes/{resume.id}/reopen/",
+            format="json",
+        )
+        assert response.status_code == 200
+        assert response.data["is_finalized"] is False
+        assert response.data["chat_turn_count"] == 0
+
+    def test_reopen_sets_db_fields(self, auth_client, user, db):
+        resume = _create_resume(user, is_finalized=True, chat_turn_count=10)
+        auth_client.patch(f"/api/v1/resumes/{resume.id}/reopen/", format="json")
+        resume.refresh_from_db()
+        assert resume.is_finalized is False
+        assert resume.chat_turn_count == 0
+
+    def test_reopen_non_finalized_returns_400(self, auth_client, user, db):
+        resume = _create_resume(user, is_finalized=False)
+        response = auth_client.patch(
+            f"/api/v1/resumes/{resume.id}/reopen/",
+            format="json",
+        )
+        assert response.status_code == 400
+
+    def test_reopen_wrong_user_returns_404(self, auth_client, db):
+        from django.contrib.auth import get_user_model
+        other = get_user_model().objects.create_user(
+            username="other_reopen", email="reopen@x.com", password="pw"
+        )
+        resume = _create_resume(other, is_finalized=True)
+        response = auth_client.patch(
+            f"/api/v1/resumes/{resume.id}/reopen/",
+            format="json",
+        )
+        assert response.status_code == 404
+
+
 # ---------------------------------------------------------------------------
 # views.py — GET /api/v1/resumes/ and GET /api/v1/resumes/{id}/
 # ---------------------------------------------------------------------------

@@ -49,6 +49,12 @@ export async function finalizeResume(
   }); // full Resume object
 }
 
+export async function reopenResume(resumeId) {
+  return await apiFetch(`/api/v1/resumes/${resumeId}/reopen/`, {
+    method: "PATCH",
+  });
+}
+
 export async function getResume(resumeId) {
   return await apiFetch(`/api/v1/resumes/${resumeId}/`, {
     method: "GET",

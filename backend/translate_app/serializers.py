@@ -44,3 +44,13 @@ class DraftInputSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
     )
+    job_title = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=200,
+    )
+    company = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=200,
+    )

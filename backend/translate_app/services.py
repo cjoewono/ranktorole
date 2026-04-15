@@ -209,6 +209,8 @@ def call_claude_draft(
     military_text: str,
     job_description: str,
     profile_context: dict | None = None,
+    job_title: str = "",
+    company: str = "",
 ) -> MilitaryTranslation:
     """
     Generate the initial resume draft from military text and a job description.
@@ -235,8 +237,18 @@ def call_claude_draft(
 
     profile_block = _build_profile_block(profile_context)
 
+    job_context_block = ""
+    if job_title or company:
+        parts = []
+        if job_title:
+            parts.append(f"Target Job Title: {job_title}")
+        if company:
+            parts.append(f"Target Company/Agency: {company}")
+        job_context_block = "\n".join(parts) + "\n\n"
+
     user_message = (
         f"{profile_block}"
+        f"{job_context_block}"
         "Translate this military resume into a structured civilian resume draft.\n\n"
         "Instructions:\n"
         "- Extract EVERY role from the experience section of the PDF text.\n"

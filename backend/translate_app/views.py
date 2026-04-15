@@ -7,6 +7,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from django.db.models import F
+
+from user_app.permissions import ChatTurnLimit, IsProOrUnderLimit, bump_counter
+
 from .throttles import ChatThrottle, DraftThrottle, FinalizeThrottle, UploadThrottle
 from .models import Resume
 from .serializers import DraftInputSerializer, FinalizeInputSerializer, ResumeSerializer
@@ -125,8 +129,10 @@ class ResumeUploadView(APIView):
 class ResumeDraftView(APIView):
     """POST /api/v1/resumes/{id}/draft/ — generate draft + clarifying questions via Claude."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsProOrUnderLimit]
     throttle_classes = [DraftThrottle]
+    counter_field = 'resume_tailor_count'
+    counter_limit_key = 'resume_tailor_count'
 
     def post(self, request: Request, pk: uuid.UUID) -> Response:
         resume = get_user_resume(pk, request.user)
@@ -137,6 +143,8 @@ class ResumeDraftView(APIView):
         if not input_ser.is_valid():
             return Response(input_ser.errors, status=status.HTTP_400_BAD_REQUEST)
         job_description = input_ser.validated_data.get("job_description", "")
+        job_title = input_ser.validated_data.get("job_title", "")
+        company = input_ser.validated_data.get("company", "")
 
         if not job_description:
             return Response(
@@ -159,6 +167,8 @@ class ResumeDraftView(APIView):
                 resume.military_text,
                 job_description,
                 request.user.profile_context,
+                job_title=job_title,
+                company=company,
             )
         except ValueError:
             return Response(
@@ -191,6 +201,8 @@ class ResumeDraftView(APIView):
         resume.chat_history = []
         resume.save()
 
+        bump_counter(request.user, 'resume_tailor_count')
+
         return Response(
             {
                 "civilian_title": translation.civilian_title,
@@ -206,7 +218,7 @@ class ResumeDraftView(APIView):
 class ResumeChatView(APIView):
     """POST /api/v1/resumes/{id}/chat/ — stateful refinement turn via Claude (history from DB)."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ChatTurnLimit]
     throttle_classes = [ChatThrottle]
 
     def post(self, request: Request, pk: uuid.UUID) -> Response:
@@ -263,6 +275,9 @@ class ResumeChatView(APIView):
         resume.civilian_title = result.translation.civilian_title
         resume.summary = result.translation.summary
         resume.save()
+
+        Resume.objects.filter(pk=resume.pk).update(chat_turn_count=F('chat_turn_count') + 1)
+        resume.chat_turn_count = (resume.chat_turn_count or 0) + 1
 
         return Response(
             {

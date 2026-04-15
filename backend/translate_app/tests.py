@@ -418,6 +418,35 @@ class TestResumeDraftView:
         )
         assert response.status_code == 503
 
+    @patch("translate_app.views.call_claude_draft")
+    def test_draft_passes_job_title_and_company(self, mock_draft, auth_client, user, db):
+        mock_draft.return_value = _make_mock_translation(_DRAFT_PAYLOAD)
+        resume = _create_resume(user, session_anchor=None)
+        auth_client.post(
+            f"/api/v1/resumes/{resume.id}/draft/",
+            {
+                "job_description": "We need a supply chain manager with 5+ years.",
+                "job_title": "Supply Chain Manager",
+                "company": "Amazon",
+            },
+            format="json",
+        )
+        call_args = mock_draft.call_args
+        assert call_args is not None
+        assert call_args.kwargs.get("job_title") == "Supply Chain Manager"
+        assert call_args.kwargs.get("company") == "Amazon"
+
+    @patch("translate_app.views.call_claude_draft")
+    def test_draft_omitting_job_title_still_works(self, mock_draft, auth_client, user, db):
+        mock_draft.return_value = _make_mock_translation(_DRAFT_PAYLOAD)
+        resume = _create_resume(user, session_anchor=None)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/draft/",
+            {"job_description": "We need a supply chain manager with 5+ years."},
+            format="json",
+        )
+        assert response.status_code == 200
+
 
 # ---------------------------------------------------------------------------
 # views.py — POST /api/v1/resumes/{id}/chat/
@@ -532,6 +561,53 @@ class TestResumeChatView:
             format="json",
         )
         assert response.status_code == 404
+
+    def test_free_user_chat_blocked_at_limit(self, auth_client, user, db):
+        resume = _create_resume(user, chat_turn_count=10)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/chat/",
+            {"message": "Another message."},
+            format="json",
+        )
+        assert response.status_code == 403
+        assert response.data["code"] == "CHAT_LIMIT_REACHED"
+
+    @patch("translate_app.views.call_claude_chat")
+    def test_pro_user_chat_not_blocked(self, mock_chat, auth_client, user, db):
+        mock_chat.return_value = _make_chat_result(_CHAT_PAYLOAD)
+        user.tier = "pro"
+        user.subscription_status = "active"
+        user.save()
+        resume = _create_resume(user, chat_turn_count=100)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/chat/",
+            {"message": "Another message."},
+            format="json",
+        )
+        assert response.status_code == 200
+
+    def test_free_user_chat_blocked_per_resume(self, auth_client, user, db):
+        resume = _create_resume(user, chat_turn_count=10)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/chat/",
+            {"message": "Hit the wall."},
+            format="json",
+        )
+        assert response.status_code == 403
+        assert response.data["code"] == "CHAT_LIMIT_REACHED"
+
+    @patch("translate_app.views.call_claude_chat")
+    def test_chat_count_increments_on_resume(self, mock_chat, auth_client, user, db):
+        mock_chat.return_value = _make_chat_result(_CHAT_PAYLOAD)
+        resume = _create_resume(user, chat_turn_count=0)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/chat/",
+            {"message": "First turn."},
+            format="json",
+        )
+        assert response.status_code == 200
+        resume.refresh_from_db()
+        assert resume.chat_turn_count == 1
 
 
 # ---------------------------------------------------------------------------

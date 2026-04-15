@@ -16,11 +16,20 @@ export async function uploadResume(file) {
   }); // { id, created_at }
 }
 
-export async function generateDraft(resumeId, jobDescription) {
+export async function generateDraft(
+  resumeId,
+  jobDescription,
+  jobTitle = "",
+  company = "",
+) {
   return await apiFetch(`/api/v1/resumes/${resumeId}/draft/`, {
     method: "POST",
-    body: JSON.stringify({ job_description: jobDescription }),
-  }); // { civilian_title, summary, roles[], clarifying_questions }
+    body: JSON.stringify({
+      job_description: jobDescription,
+      ...(jobTitle && { job_title: jobTitle }),
+      ...(company && { company }),
+    }),
+  });
 }
 
 export async function sendChatMessage(resumeId, message) {

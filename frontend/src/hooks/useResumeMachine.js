@@ -11,6 +11,7 @@ const initialState = {
   chatHistory: [], // display-only — [{ role, content }] — NOT sent to backend
   aiSuggestions: null, // roles[] from chat response when phase === FINALIZING
   isSending: false,
+  isFinalized: false,
   error: null,
 };
 
@@ -77,6 +78,7 @@ function reducer(state, action) {
       return {
         ...state,
         phase: "DONE",
+        isFinalized: true,
         ...(action.draft ? { draft: action.draft } : {}),
       };
     case "ERROR":
@@ -93,6 +95,7 @@ function reducer(state, action) {
         draft: action.draft,
         aiInitialDraft: action.aiInitialDraft,
         chatHistory: action.chatHistory,
+        isFinalized: action.isFinalized || false,
         error: null,
       };
     case "CHAT_SENDING":
@@ -140,6 +143,7 @@ export default function useResumeMachine() {
           },
           aiInitialDraft: resume.ai_initial_draft || resume.roles || [],
           chatHistory: (resume.chat_history || []).slice(-10),
+          isFinalized: resume.is_finalized || false,
         });
       })
       .catch(() => {
@@ -148,35 +152,41 @@ export default function useResumeMachine() {
       });
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleGenerateDraft = useCallback(async () => {
-    if (state.jobDescription.trim().length < 10) {
-      dispatch({
-        type: "ERROR",
-        message: "Please paste a job description before generating your draft.",
-      });
-      return;
-    }
-    dispatch({ type: "DRAFT_STARTED" });
-    try {
-      const response = await generateDraft(
-        state.resumeId,
-        state.jobDescription,
-      );
-      dispatch({
-        type: "DRAFT_RECEIVED",
-        draft: {
-          civilian_title: response.civilian_title,
-          summary: response.summary,
-          roles: response.roles,
-        },
-        initialMessages: response.clarifying_question
-          ? [{ role: "assistant", content: response.clarifying_question }]
-          : [],
-      });
-    } catch (err) {
-      dispatch({ type: "DRAFT_FAILED", message: err.message });
-    }
-  }, [state.resumeId, state.jobDescription]);
+  const handleGenerateDraft = useCallback(
+    async ({ jobTitle = "", company = "" } = {}) => {
+      if (state.jobDescription.trim().length < 10) {
+        dispatch({
+          type: "ERROR",
+          message:
+            "Please paste a job description before generating your draft.",
+        });
+        return;
+      }
+      dispatch({ type: "DRAFT_STARTED" });
+      try {
+        const response = await generateDraft(
+          state.resumeId,
+          state.jobDescription,
+          jobTitle,
+          company,
+        );
+        dispatch({
+          type: "DRAFT_RECEIVED",
+          draft: {
+            civilian_title: response.civilian_title,
+            summary: response.summary,
+            roles: response.roles,
+          },
+          initialMessages: response.clarifying_question
+            ? [{ role: "assistant", content: response.clarifying_question }]
+            : [],
+        });
+      } catch (err) {
+        dispatch({ type: "DRAFT_FAILED", message: err.message });
+      }
+    },
+    [state.resumeId, state.jobDescription],
+  );
 
   const handleChatSend = useCallback(
     async (message) => {
@@ -196,6 +206,10 @@ export default function useResumeMachine() {
           });
         }
       } catch (err) {
+        if (err.status === 409) {
+          dispatch({ type: "CHAT_FAILED", message: "" });
+          throw err;
+        }
         dispatch({ type: "CHAT_FAILED", message: err.message });
       } finally {
         dispatch({ type: "CHAT_DONE_SENDING" });

@@ -8,6 +8,8 @@ export default function ChatPane({
   dispatch,
   onSend,
   isSending = false,
+  chatTurnCount = 0,
+  userTier = "free",
 }) {
   const [input, setInput] = useState("");
   const [lockedMsg, setLockedMsg] = useState(null);
@@ -31,12 +33,8 @@ export default function ChatPane({
     try {
       await onSend(message);
     } catch (err) {
-      if (err.status === 409) {
-        setLockedMsg("Resume is finalized. No further changes.");
-      } else if (
-        err.status === 403 &&
-        err.data?.code === "CHAT_LIMIT_REACHED"
-      ) {
+      if (err.status === 403 && err.data?.code === "CHAT_LIMIT_REACHED") {
+        setLockedMsg("You've reached the 10 message limit.");
         setShowUpgrade(true);
       }
     }
@@ -51,6 +49,35 @@ export default function ChatPane({
 
   return (
     <div className="flex flex-col h-full bg-surface-container">
+      {/* Turn counter — free tier only */}
+      {userTier !== "pro" && (
+        <div
+          className={`px-4 py-2 flex items-center justify-between border-b border-outline-variant/20 ${
+            chatTurnCount >= 10
+              ? "bg-error-container"
+              : chatTurnCount >= 8
+                ? "bg-tertiary/10"
+                : "bg-surface-container-highest"
+          }`}
+        >
+          <span className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
+            AI Refinements
+          </span>
+          <span
+            className={`font-label text-xs font-semibold tabular-nums ${
+              chatTurnCount >= 10
+                ? "text-error"
+                : chatTurnCount >= 8
+                  ? "text-tertiary"
+                  : "text-on-surface-variant"
+            }`}
+          >
+            {chatTurnCount >= 10
+              ? "10 / 10 — Upgrade for unlimited"
+              : `${chatTurnCount} / 10`}
+          </span>
+        </div>
+      )}
       {/* Message list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {chatHistory.length === 0 && !isSending && (

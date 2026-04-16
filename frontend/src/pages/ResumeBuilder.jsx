@@ -6,10 +6,12 @@ import SplitPane from "../components/SplitPane";
 import DraftPane from "../components/DraftPane";
 import ChatPane from "../components/ChatPane";
 import useResumeMachine from "../hooks/useResumeMachine";
+import { useAuth } from "../context/AuthContext";
 
 export default function ResumeBuilder({ setFullscreen }) {
   const { state, dispatch, handleGenerateDraft, handleChatSend } =
     useResumeMachine();
+  const { user } = useAuth();
 
   const isSplitPhase =
     state.phase === "REVIEWING" ||
@@ -41,6 +43,8 @@ export default function ResumeBuilder({ setFullscreen }) {
             dispatch={dispatch}
             onSend={handleChatSend}
             isSending={state.isSending}
+            chatTurnCount={state.chatTurnCount}
+            userTier={user?.tier || "free"}
           />
         }
       />

@@ -17,6 +17,7 @@ const initialState = {
   chatHistory: [], // display-only — [{ role, content }] — NOT sent to backend
   aiSuggestions: null, // roles[] from chat response when phase === FINALIZING
   isSending: false,
+  chatTurnCount: 0,
   isFinalized: false,
   error: null,
 };
@@ -101,6 +102,7 @@ function reducer(state, action) {
         draft: action.draft,
         aiInitialDraft: action.aiInitialDraft,
         chatHistory: action.chatHistory,
+        chatTurnCount: action.chatTurnCount || 0,
         isFinalized: action.isFinalized || false,
         error: null,
       };
@@ -108,6 +110,8 @@ function reducer(state, action) {
       return { ...state, isSending: true };
     case "CHAT_DONE_SENDING":
       return { ...state, isSending: false };
+    case "CHAT_TURN_INCREMENTED":
+      return { ...state, chatTurnCount: state.chatTurnCount + 1 };
     default:
       return state;
   }
@@ -160,6 +164,7 @@ export default function useResumeMachine() {
           },
           aiInitialDraft: resume.ai_initial_draft || resume.roles || [],
           chatHistory: (resume.chat_history || []).slice(-10),
+          chatTurnCount: resume.chat_turn_count || 0,
           isFinalized: false,
         });
       })
@@ -218,6 +223,7 @@ export default function useResumeMachine() {
       try {
         const response = await sendChatMessage(state.resumeId, message);
         dispatch({ type: "CHAT_RECEIVED", reply: response.assistant_reply });
+        dispatch({ type: "CHAT_TURN_INCREMENTED" });
         if (state.phase === "FINALIZING") {
           dispatch({ type: "AI_SUGGESTIONS_RECEIVED", roles: response.roles });
         } else {

@@ -9,7 +9,7 @@ import useResumeMachine from "../hooks/useResumeMachine";
 import { useAuth } from "../context/AuthContext";
 
 export default function ResumeBuilder({ setFullscreen }) {
-  const { state, dispatch, handleGenerateDraft, handleChatSend } =
+  const { state, dispatch, handleGenerateDraft, handleChatSend, bulletFlags } =
     useResumeMachine();
   const { user } = useAuth();
 
@@ -30,6 +30,7 @@ export default function ResumeBuilder({ setFullscreen }) {
             draft={state.draft}
             aiInitialDraft={state.aiInitialDraft}
             aiSuggestions={state.aiSuggestions}
+            bulletFlags={bulletFlags}
             phase={state.phase}
             dispatch={dispatch}
             resumeId={state.resumeId}

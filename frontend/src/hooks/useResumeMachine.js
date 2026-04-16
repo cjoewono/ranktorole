@@ -11,6 +11,7 @@ const initialState = {
   aiInitialDraft: null, // frozen snapshot of roles[] from DRAFT_RECEIVED — never overwritten
   chatHistory: [], // display-only — [{ role, content }] — NOT sent to backend
   aiSuggestions: null, // roles[] from chat response when phase === FINALIZING
+  bulletFlags: [], // [{ role_index, bullet_index, flags[] }] from backend grounding validator
   isSending: false,
   chatTurnCount: 0,
   isFinalized: false,
@@ -33,6 +34,7 @@ function reducer(state, action) {
         draft: action.draft,
         aiInitialDraft: action.draft.roles, // frozen snapshot — never updated by chat
         chatHistory: action.initialMessages,
+        bulletFlags: action.bulletFlags || [],
       };
     case "DRAFT_FAILED":
       return { ...state, phase: "UPLOADED", error: action.message };
@@ -63,6 +65,7 @@ function reducer(state, action) {
           civilian_title: action.civilian_title,
           summary: action.summary,
         },
+        bulletFlags: action.bulletFlags ?? state.bulletFlags,
       };
     case "CHAT_FAILED":
       // Pop the optimistically-added user message and set error
@@ -72,7 +75,11 @@ function reducer(state, action) {
         error: action.message,
       };
     case "AI_SUGGESTIONS_RECEIVED":
-      return { ...state, aiSuggestions: action.roles };
+      return {
+        ...state,
+        aiSuggestions: action.roles,
+        bulletFlags: action.bulletFlags ?? state.bulletFlags,
+      };
     case "AI_SUGGESTIONS_CLEARED":
       return { ...state, aiSuggestions: null };
     case "FINALIZE_STARTED":
@@ -227,6 +234,7 @@ export default function useResumeMachine() {
           initialMessages: response.clarifying_question
             ? [{ role: "assistant", content: response.clarifying_question }]
             : [],
+          bulletFlags: response.bullet_flags || [],
         });
       } catch (err) {
         if (err.status === 403 && err.data?.code === "TAILOR_LIMIT_REACHED") {
@@ -252,13 +260,18 @@ export default function useResumeMachine() {
         dispatch({ type: "CHAT_RECEIVED", reply: response.assistant_reply });
         dispatch({ type: "CHAT_TURN_INCREMENTED" });
         if (state.phase === "FINALIZING") {
-          dispatch({ type: "AI_SUGGESTIONS_RECEIVED", roles: response.roles });
+          dispatch({
+            type: "AI_SUGGESTIONS_RECEIVED",
+            roles: response.roles,
+            bulletFlags: response.bullet_flags,
+          });
         } else {
           dispatch({
             type: "CHAT_UPDATED",
             roles: response.roles,
             civilian_title: response.civilian_title,
             summary: response.summary,
+            bulletFlags: response.bullet_flags,
           });
         }
       } catch (err) {
@@ -285,5 +298,6 @@ export default function useResumeMachine() {
     dispatch,
     handleGenerateDraft,
     handleChatSend,
+    bulletFlags: state.bulletFlags,
   };
 }

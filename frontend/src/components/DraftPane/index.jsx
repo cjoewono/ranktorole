@@ -9,6 +9,7 @@ export default function DraftPane({
   draft,
   aiInitialDraft,
   aiSuggestions,
+  bulletFlags,
   phase,
   dispatch,
   resumeId,
@@ -61,6 +62,7 @@ export default function DraftPane({
           draft={draft}
           aiInitialDraft={aiInitialDraft}
           aiSuggestions={aiSuggestions}
+          bulletFlags={bulletFlags}
           resumeId={resumeId}
           dispatch={dispatch}
         />

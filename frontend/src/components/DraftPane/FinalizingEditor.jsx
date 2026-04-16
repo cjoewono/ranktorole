@@ -6,6 +6,7 @@ export default function FinalizingEditor({
   draft,
   aiInitialDraft,
   aiSuggestions,
+  bulletFlags,
   resumeId,
   dispatch,
 }) {
@@ -21,6 +22,28 @@ export default function FinalizingEditor({
   const [expandedKey, setExpandedKey] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmedBullets, setConfirmedBullets] = useState(new Set());
+
+  function getFlagsFor(roleIdx, bulletIdx) {
+    const entry = (bulletFlags || []).find(
+      (f) => f.role_index === roleIdx && f.bullet_index === bulletIdx,
+    );
+    return entry ? entry.flags : [];
+  }
+
+  function toggleConfirmed(roleIdx, bulletIdx) {
+    const key = `${roleIdx}-${bulletIdx}`;
+    setConfirmedBullets((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function isConfirmed(roleIdx, bulletIdx) {
+    return confirmedBullets.has(`${roleIdx}-${bulletIdx}`);
+  }
 
   // Auto-apply AI chat suggestions to the editable state when they arrive
   useEffect(() => {
@@ -36,6 +59,19 @@ export default function FinalizingEditor({
     setExpandedKey((prev) => (prev === key ? null : key));
   }
 
+  function handleAcceptSuggestion(roleIdx, bulletIdx, val) {
+    handleBulletChange(roleIdx, bulletIdx, val);
+    // confirmation cleared inside handleBulletChange
+  }
+
+  function handleDismissSuggestion(roleIdx, bulletIdx) {
+    setConfirmedBullets((prev) => {
+      const next = new Set(prev);
+      next.delete(`${roleIdx}-${bulletIdx}`);
+      return next;
+    });
+  }
+
   function handleBulletChange(roleIdx, bulletIdx, val) {
     setEditRoles((prev) =>
       prev.map((role, ri) => {
@@ -45,6 +81,11 @@ export default function FinalizingEditor({
         return { ...role, bullets };
       }),
     );
+    setConfirmedBullets((prev) => {
+      const next = new Set(prev);
+      next.delete(`${roleIdx}-${bulletIdx}`);
+      return next;
+    });
   }
 
   async function handleConfirm() {
@@ -75,6 +116,13 @@ export default function FinalizingEditor({
       setSaving(false);
     }
   }
+
+  const totalBullets = (editRoles || []).reduce(
+    (sum, r) => sum + (r.bullets?.length || 0),
+    0,
+  );
+  const allConfirmed =
+    totalBullets > 0 && confirmedBullets.size === totalBullets;
 
   return (
     <div className="flex flex-col h-full">
@@ -139,6 +187,18 @@ export default function FinalizingEditor({
                     onChange={(val) =>
                       handleBulletChange(roleIdx, bulletIdx, val)
                     }
+                    suggestion={aiSuggestions?.[roleIdx]?.bullets?.[bulletIdx]}
+                    onAccept={(s) =>
+                      handleAcceptSuggestion(roleIdx, bulletIdx, s)
+                    }
+                    onDismiss={() =>
+                      handleDismissSuggestion(roleIdx, bulletIdx)
+                    }
+                    flags={getFlagsFor(roleIdx, bulletIdx)}
+                    confirmed={isConfirmed(roleIdx, bulletIdx)}
+                    onToggleConfirmed={() =>
+                      toggleConfirmed(roleIdx, bulletIdx)
+                    }
                   />
                 ))}
               </div>
@@ -155,10 +215,13 @@ export default function FinalizingEditor({
 
       {/* Pinned footer — never scrolls */}
       <div className="border-t border-outline-variant/20 bg-surface-container-low p-4">
+        <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant text-center pb-2">
+          {confirmedBullets.size} of {totalBullets} bullets confirmed
+        </p>
         <button
           type="button"
           onClick={handleConfirm}
-          disabled={saving || editRoles.length === 0}
+          disabled={saving || editRoles.length === 0 || !allConfirmed}
           className="mission-gradient w-full text-on-primary font-label font-semibold tracking-widest uppercase text-sm py-3 rounded-md disabled:opacity-50 transition-opacity"
         >
           {saving ? "SAVING..." : "CONFIRM FINAL"}

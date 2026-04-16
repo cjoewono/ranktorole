@@ -50,12 +50,7 @@ export default function Dashboard() {
   }
 
   function handleNewResume() {
-    const inProgress = resumes.find((r) => r.is_finalized === false);
-    if (inProgress) {
-      navigate(`/resume-builder?id=${inProgress.id}&mode=continue`);
-    } else {
-      navigate("/resume-builder");
-    }
+    navigate("/resume-builder");
   }
 
   const finalized = resumes.filter((r) => r.is_finalized).length;
@@ -112,7 +107,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {!loading && resumes.every((r) => r.is_finalized) && (
+        {!loading && resumes.length > 0 && (
           <button
             onClick={handleNewResume}
             className="w-full bg-surface-container-low border border-primary/20 p-6 text-left hover:bg-surface-container transition-colors group"

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
 import { deleteResume, reopenResume } from "../api/resumes";
 import { useResumes } from "../context/ResumeContext";
@@ -132,7 +132,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {!loading && resumes.length > 0 && (
+        {!loading && !resumes.some((r) => !r.is_finalized) && (
           <button
             onClick={handleNewResume}
             className="w-full bg-surface-container-low border border-primary/20 p-6 text-left hover:bg-surface-container transition-colors group"
@@ -161,19 +161,7 @@ export default function Dashboard() {
           <div className="text-center text-on-surface-variant py-16 font-label text-xs tracking-widest uppercase">
             LOADING DEPLOYMENTS...
           </div>
-        ) : resumes.length === 0 ? (
-          <div className="text-center py-16 space-y-3">
-            <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
-              No deployments yet.
-            </p>
-            <Link
-              to="/resume-builder"
-              className="font-label text-xs tracking-widest uppercase text-tertiary hover:text-tertiary-fixed transition-colors"
-            >
-              BUILD YOUR FIRST RESUME
-            </Link>
-          </div>
-        ) : (
+        ) : resumes.length === 0 ? null : (
           <ul className="space-y-3">
             {resumes.map((resume) => (
               <li key={resume.id} className="bg-surface-container p-5">

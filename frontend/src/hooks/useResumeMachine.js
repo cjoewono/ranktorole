@@ -184,7 +184,17 @@ export default function useResumeMachine() {
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (state.phase === "DONE") {
+    // Refresh Dashboard's cached resume list whenever a phase transition
+    // materially changes a row's status on Dashboard:
+    //   UPLOADED   — new orphan just created (appears as UNTITLED / UPLOADED)
+    //   REVIEWING  — draft just landed (UPLOADED → IN PROGRESS, title set)
+    //   DONE       — finalize just landed (IN PROGRESS → FINALIZED)
+    // Without this, users must hard-refresh Dashboard to see new work.
+    if (
+      state.phase === "UPLOADED" ||
+      state.phase === "REVIEWING" ||
+      state.phase === "DONE"
+    ) {
       refreshResumes();
     }
   }, [state.phase]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -861,3 +861,31 @@ class TestAnthropicSafetyNet:
         client = services._get_client()
         assert isinstance(client, MagicMock), \
             "Anthropic client is NOT mocked — real API calls could leak!"
+
+
+class TestSystemPromptGrounding:
+    """Verify the system prompt contains the grounding guardrails."""
+
+    def test_system_prompt_contains_grounding_rules(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        assert "GROUNDING RULES" in _SYSTEM_PROMPT
+
+    def test_system_prompt_prohibits_invented_metrics(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "never invent" in lowered
+        assert "percentages" in lowered or "numbers" in lowered
+
+    def test_system_prompt_prohibits_scope_inflation(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "inflate" in lowered or "seniority" in lowered
+
+    def test_system_prompt_requires_role_preservation(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        assert "Preserve every role" in _SYSTEM_PROMPT
+
+    def test_system_prompt_returns_json_only(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        assert "valid JSON" in _SYSTEM_PROMPT
+        assert "no markdown fences" in _SYSTEM_PROMPT.lower()

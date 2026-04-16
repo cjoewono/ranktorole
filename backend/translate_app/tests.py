@@ -447,6 +447,19 @@ class TestResumeDraftView:
         )
         assert response.status_code == 200
 
+    @patch("translate_app.views.call_claude_draft")
+    def test_draft_response_includes_bullet_flags_key(self, mock_draft, auth_client, user, db):
+        mock_draft.return_value = _make_mock_translation(_DRAFT_PAYLOAD)
+        resume = _create_resume(user, session_anchor=None)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/draft/",
+            {"job_description": "We need a supply chain manager with 5+ years of experience."},
+            format="json",
+        )
+        assert response.status_code == 200
+        assert "bullet_flags" in response.data
+        assert isinstance(response.data["bullet_flags"], list)
+
 
 # ---------------------------------------------------------------------------
 # views.py — POST /api/v1/resumes/{id}/chat/
@@ -889,3 +902,81 @@ class TestSystemPromptGrounding:
         from translate_app.services import _SYSTEM_PROMPT
         assert "valid JSON" in _SYSTEM_PROMPT
         assert "no markdown fences" in _SYSTEM_PROMPT.lower()
+
+
+# ---------------------------------------------------------------------------
+# grounding.py — TestGroundingValidator
+# ---------------------------------------------------------------------------
+
+class TestGroundingValidator:
+    """Unit tests for grounding.flag_bullet and flag_translation."""
+
+    def test_ungrounded_dollar_amount_is_flagged(self):
+        from translate_app.grounding import flag_bullet
+        source = "Managed equipment and coordinated with supply."
+        bullet = "Managed $2.4M equipment portfolio across the unit."
+        flags = flag_bullet(bullet, source)
+        assert any("2.4M" in f or "$2.4M" in f for f in flags)
+
+    def test_grounded_dollar_amount_is_not_flagged(self):
+        from translate_app.grounding import flag_bullet
+        source = "Managed a $2.4M equipment portfolio for the battalion."
+        bullet = "Managed $2.4M equipment portfolio across the unit."
+        flags = flag_bullet(bullet, source)
+        assert not any("2.4M" in f for f in flags)
+
+    def test_ungrounded_percentage_is_flagged(self):
+        from translate_app.grounding import flag_bullet
+        source = "Reduced equipment failures through standardised training."
+        bullet = "Reduced equipment failures by 35% through training."
+        flags = flag_bullet(bullet, source)
+        assert any("35%" in f for f in flags)
+
+    def test_grounded_percentage_is_not_flagged(self):
+        from translate_app.grounding import flag_bullet
+        source = "Reduced equipment failures by 35% over 12 months."
+        bullet = "Reduced failures by 35% through standardised training."
+        flags = flag_bullet(bullet, source)
+        assert not any("35%" in f for f in flags)
+
+    def test_scope_inflation_verb_is_flagged_when_absent_from_source(self):
+        from translate_app.grounding import flag_bullet
+        source = "Assisted platoon sergeant with daily operations and training."
+        bullet = "Led platoon operations and daily training activities."
+        flags = flag_bullet(bullet, source)
+        assert any("scope" in f.lower() for f in flags)
+
+    def test_scope_verb_not_flagged_when_present_in_source(self):
+        from translate_app.grounding import flag_bullet
+        source = "Led a 12-person squad through three combat rotations."
+        bullet = "Led 12-person squad across three deployments."
+        flags = flag_bullet(bullet, source)
+        assert not any("scope" in f.lower() for f in flags)
+
+    def test_empty_inputs_return_empty(self):
+        from translate_app.grounding import flag_bullet
+        assert flag_bullet("", "some source") == []
+        assert flag_bullet("some bullet", "") == []
+
+    def test_flag_translation_returns_only_flagged_entries(self):
+        from translate_app.grounding import flag_translation
+        source = "Led a squad. Managed equipment."
+        roles = [{
+            "title": "Squad Leader",
+            "org": "US Army",
+            "dates": "2019-2022",
+            "bullets": [
+                "Led squad across deployments.",              # grounded — no flag
+                "Managed $5M equipment inventory.",            # ungrounded $5M
+            ],
+        }]
+        result = flag_translation(roles, source)
+        assert len(result) == 1
+        assert result[0]["role_index"] == 0
+        assert result[0]["bullet_index"] == 1
+        assert any("5M" in f for f in result[0]["flags"])
+
+    def test_flag_translation_handles_empty_roles(self):
+        from translate_app.grounding import flag_translation
+        assert flag_translation([], "source") == []
+        assert flag_translation(None, "source") == []

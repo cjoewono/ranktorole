@@ -70,9 +70,20 @@ Content-Type: application/json
     }
   ],
   "clarifying_question": "string",
-  "assistant_reply": ""
+  "assistant_reply": "",
+  "bullet_flags": [
+    {
+      "role_index": 0,
+      "bullet_index": 1,
+      "flags": ["string"]
+    }
+  ]
 }
 ```
+
+`bullet_flags`: list of flagged bullets — each entry has `{role_index: int,
+bullet_index: int, flags: list[str]}`. Only bullets with at least one flag
+are included. Empty list means all bullets passed grounding checks.
 
 **Behavior**
 
@@ -132,9 +143,20 @@ Content-Type: application/json
     }
   ],
   "clarifying_question": "",
-  "assistant_reply": "string"
+  "assistant_reply": "string",
+  "bullet_flags": [
+    {
+      "role_index": 0,
+      "bullet_index": 1,
+      "flags": ["string"]
+    }
+  ]
 }
 ```
+
+`bullet_flags`: list of flagged bullets — each entry has `{role_index: int,
+bullet_index: int, flags: list[str]}`. Only bullets with at least one flag
+are included. Empty list means all bullets passed grounding checks.
 
 **Behavior**
 
@@ -171,8 +193,9 @@ Content-Type: application/json
 ```json
 {
   "civilian_title": "string", // optional — user's inline edits
-  "summary": "string",        // optional — user's inline edits
-  "roles": [                  // optional — user's inline edits
+  "summary": "string", // optional — user's inline edits
+  "roles": [
+    // optional — user's inline edits
     {
       "title": "string",
       "org": "string",
@@ -575,10 +598,10 @@ No PAN, no CVV, no payment methods — ever.
 
 **Status → Tier mapping** (see `billing_views._STATUS_TO_TIER`):
 
-| Stripe status                                                             | Our tier                              |
-| ------------------------------------------------------------------------- | ------------------------------------- |
-| `active`, `trialing`, `past_due`                                          | `pro` (past_due is grace period)      |
-| `incomplete`, `incomplete_expired`, `canceled`, `unpaid`, `inactive`      | `free`                                |
+| Stripe status                                                        | Our tier                         |
+| -------------------------------------------------------------------- | -------------------------------- |
+| `active`, `trialing`, `past_due`                                     | `pro` (past_due is grace period) |
+| `incomplete`, `incomplete_expired`, `canceled`, `unpaid`, `inactive` | `free`                           |
 
 ---
 

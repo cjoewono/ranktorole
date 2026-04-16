@@ -14,6 +14,7 @@ from user_app.permissions import ChatTurnLimit, IsProOrUnderLimit, bump_counter
 from .throttles import ChatThrottle, DraftThrottle, FinalizeThrottle, UploadThrottle
 from .models import Resume
 from .serializers import DraftInputSerializer, FinalizeInputSerializer, ResumeSerializer
+from .grounding import flag_translation
 from .services import (
     call_claude_chat,
     call_claude_draft,
@@ -203,6 +204,11 @@ class ResumeDraftView(APIView):
 
         bump_counter(request.user, 'resume_tailor_count')
 
+        bullet_flags = flag_translation(
+            roles=[r.model_dump() if hasattr(r, "model_dump") else r for r in translation.roles],
+            source_text=resume.military_text or "",
+        )
+
         return Response(
             {
                 "civilian_title": translation.civilian_title,
@@ -210,6 +216,7 @@ class ResumeDraftView(APIView):
                 "roles": roles_data,
                 "clarifying_question": translation.clarifying_question,
                 "assistant_reply": translation.assistant_reply,
+                "bullet_flags": bullet_flags,
             },
             status=status.HTTP_200_OK,
         )
@@ -273,12 +280,18 @@ class ResumeChatView(APIView):
         Resume.objects.filter(pk=resume.pk).update(chat_turn_count=F('chat_turn_count') + 1)
         resume.chat_turn_count = (resume.chat_turn_count or 0) + 1
 
+        bullet_flags = flag_translation(
+            roles=[r.model_dump() if hasattr(r, "model_dump") else r for r in result.translation.roles],
+            source_text=resume.military_text or "",
+        )
+
         return Response(
             {
                 "roles": roles_data,
                 "assistant_reply": result.translation.assistant_reply,
                 "civilian_title": result.translation.civilian_title,
                 "summary": result.translation.summary,
+                "bullet_flags": bullet_flags,
             },
             status=status.HTTP_200_OK,
         )

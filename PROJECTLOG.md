@@ -176,6 +176,9 @@ class MilitaryTranslation(BaseModel):
 
 **Stateless refinement loop** — chat history passed from frontend on each request. Eliminates `chat_history` DB column. Justified by session length (3-4 turns max). Backend reconstructs context from `session_anchor` (DB) + `history` (request body) on every turn.
 
+> **Superseded by Session 05:** chat history moved into the DB; the backend owns
+> it and loads it on every chat turn. See the Session 05 entry below.
+
 **Frontend state machine:**
 
 ```
@@ -227,14 +230,7 @@ Single `status` state variable drives all conditional renders. Split-pane layout
 8. Frontend — replace Translator page with split-pane + status machine + file dropzone
 9. Smoke test full flow end-to-end
 
-**Start next session with:**
-
-> "Let's continue RankToRole — implement the PDF flow. Start with the migration and requirements, then the upload endpoint."
-
 ---
-
-Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 6, 2026 — Session 03 design complete, implementation ready
 
 ## April 7, 2026 | Session 04 | Phase 4 Complete — PDF Builder Flow
 
@@ -337,14 +333,11 @@ and marketing analytics. Translation quality confirmed strong end-to-end.
 - DraftPane rendering more bullets than 3-5 specified in DATA_CONTRACT — prompt
   engineering issue in call_claude_draft, not a UI bug. Follow-up fix needed.
 
-### Next Session
+---
 
-UI/UX improvements before EC2 deployment.
-EC2 deployment pushed to Phase 5 (after UI/UX work complete).
+## April 9, 2026 | Session 05 | UI/UX Overhaul + Phase D Complete
 
-## Session 05 — UI/UX Overhaul + Phase D Complete
-
-Date: April 9, 2026 | Status: ✅ Complete
+**Status:** ✅ Complete
 
 ### What Was Built
 
@@ -373,19 +366,13 @@ Date: April 9, 2026 | Status: ✅ Complete
 ### Issues Encountered & Resolved
 
 | Issue                             | Resolution                                                              |
-| --------------------------------- | ----------------------------------------------------------------------- | --- | ----------------------- |
+| --------------------------------- | ----------------------------------------------------------------------- |
 | draft.roles.map() crash on render | Null guards added across DraftPane + ChatPane                           |
-| Edit & Export loading blank IDLE  | resumeId: resume.id                                                     |     | id fix in RESUME_LOADED |
+| Edit & Export loading blank IDLE  | resumeId: resume.id fix in RESUME_LOADED                                |
 | Sticky chat pane not working      | SplitPane overflow:hidden + height:100% on right pane                   |
 | Export PDF button missing         | Rewrote exportPDF() with jsPDF, button at top-right of FinalizingEditor |
 | Single question schema            | clarifying_questions: list[str] → clarifying_question: str              |
 | Stale build cache                 | docker compose stop + rebuild cleared crash                             |
-
-### Next Session
-
-- Minor visual tweaks (spacing, typography)
-- EC2 deployment (Phase 4 from original plan)
-- Update DATA_CONTRACT.md to reflect roles[] + DB-backed chat history
 
 ---
 
@@ -523,20 +510,17 @@ All existing consumers (`ResumeBuilder.jsx`, etc.) continue importing `../compon
 
 ---
 
-Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 13, 2026 — Security hardening complete
-
----
-
 ## April 12, 2026 | Task 6 | Tiered Throttle System
 
 **Status:** ✅ Complete
 
-- Apr 12: Implemented tiered throttle system — User.tier field (free/pro), TieredThrottle base class, 5 throttle subclasses, TIERED_THROTTLE_RATES settings, 20 new tests (64→84 total)
+Implemented tiered throttle system: `User.tier` field (free/pro), `TieredThrottle` base class, 5 throttle subclasses in `translate_app/throttles.py`, `TIERED_THROTTLE_RATES` settings, 20 new tests (64 → 84 total).
+
+Cache key includes tier so upgrade/downgrade takes effect immediately without waiting for cache expiry.
 
 ---
 
-## April 13, 2026 | Session — HTTPS/SSL + Production Deployment Prep
+## April 13, 2026 | HTTPS/SSL + Production Deployment Prep
 
 **Status:** ✅ Complete
 
@@ -603,11 +587,6 @@ None. Dev still uses Vite on host + backend in Docker with runserver. Nginx is n
 
 ---
 
-Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 13, 2026 — Career Recon feature complete, 108 tests passing
-
----
-
 ## April 13, 2026 | Session 10 | Career Recon — Standalone O\*NET Career Explorer
 
 **Status:** ✅ Complete
@@ -637,23 +616,23 @@ knowledge, technology, salary, and job outlook data — all at zero LLM cost.
 
 ---
 
-## April 13, 2026 | O*NET v2 API Migration
+## April 13, 2026 | O\*NET v2 API Migration
 
 **Status:** ✅ Complete
 
 ### Summary
 
-Migrated all three O*NET proxy views from the public `services.onetcenter.org/ws` endpoint to the authenticated v2 API at `api-v2.onetcenter.org`. Auth uses `X-API-Key` header sourced from `ONET_API_KEY` env var. No endpoint path changes — all routes and response shapes unchanged.
+Migrated all three O\*NET proxy views from the public `services.onetcenter.org/ws` endpoint to the authenticated v2 API at `api-v2.onetcenter.org`. Auth uses `X-API-Key` header sourced from `ONET_API_KEY` env var. No endpoint path changes — all routes and response shapes unchanged.
 
 ### Changes
 
-| File | Action | Detail |
-|------|--------|--------|
-| `config/settings.py` | Modified | Added `ONET_API_KEY` from env |
-| `onet_app/views.py` | Modified | New base URL, shared `_onet_headers()` helper, all requests now send `X-API-Key` |
-| `onet_app/tests.py` | Modified | Added 3 tests verifying API key header is sent |
-| `.env.example` | Modified | Added `ONET_API_KEY` |
-| Docs | Modified | CLAUDE.md, ARCHITECTURE.md, SECURITY.md, PROJECTLOG.md updated |
+| File                 | Action   | Detail                                                                          |
+| -------------------- | -------- | ------------------------------------------------------------------------------- |
+| `config/settings.py` | Modified | Added `ONET_API_KEY` from env                                                   |
+| `onet_app/views.py`  | Modified | New base URL, shared `_onet_headers()` helper, all requests now send `X-API-Key` |
+| `onet_app/tests.py`  | Modified | Added 3 tests verifying API key header is sent                                  |
+| `.env.example`       | Modified | Added `ONET_API_KEY`                                                            |
+| Docs                 | Modified | CLAUDE.md, ARCHITECTURE.md, SECURITY.md, PROJECTLOG.md updated                  |
 
 ### Follow-up: v2 Response Shape Fix
 
@@ -666,3 +645,112 @@ Fixed field name mismatches between v1 and v2 API responses:
 - Outlook sub-endpoint: `outlook` → `job_outlook`
 - Updated test mocks to use v2 field shapes
 - Tests: 115/115 passing
+
+---
+
+## April 14, 2026 | Billing — Stripe Subscription (Free / Pro Tiers)
+
+**Status:** ✅ Complete
+
+### Summary
+
+Wired up Stripe Checkout + Customer Portal to drive the existing `User.tier`
+field. Webhooks flip tier on the server; the frontend only reads billing state.
+PCI scope stays at SAQ A — card data is never seen or stored by our app.
+
+### Backend Changes
+
+| File                             | Action   | Detail                                                                                                                                                        |
+| -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `user_app/models.py`             | Modified | Added `stripe_customer_id`, `subscription_status` fields; added `SubscriptionAuditLog` immutable log model; added `resume_tailor_count` + `last_reset_date` daily counters |
+| `user_app/billing_services.py`   | Created  | Stripe SDK wrapper — `get_or_create_customer`, `create_checkout_session`, `create_portal_session`, `verify_webhook`; idempotency keys on all create calls     |
+| `user_app/billing_views.py`      | Created  | `CheckoutSessionView`, `PortalSessionView`, `BillingStatusView`, `StripeWebhookView`; `_STATUS_TO_TIER` map drives tier transitions; `select_for_update` + audit log under a single transaction |
+| `user_app/billing_throttles.py`  | Created  | `CheckoutThrottle` (5/min) to defeat card-testing                                                                                                             |
+| `user_app/billing_urls.py`       | Created  | `/api/v1/billing/{checkout,portal,status,webhook}/`                                                                                                           |
+| `user_app/permissions.py`        | Created  | `IsProOrUnderLimit` (daily-reset counter) + `ChatTurnLimit` (permanent per-resume chat counter); `PRO_STATUSES = {'active', 'trialing', 'past_due'}`          |
+| `user_app/serializers.py`        | Modified | `UserSerializer` exposes `subscription_status`, `resume_tailor_count`, `last_reset_date` (all read-only)                                                      |
+| `config/urls.py`                 | Modified | Mounted `user_app.billing_urls` at `/api/v1/billing/`                                                                                                         |
+| `config/settings.py`             | Modified | Added `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `STRIPE_CHECKOUT_SUCCESS_URL`, `STRIPE_CHECKOUT_CANCEL_URL`, `FREE_TIER_DAILY_LIMITS`, `FREE_TIER_CHAT_LIMIT` |
+| `requirements.txt`               | Modified | Added `stripe==11.1.1`                                                                                                                                        |
+| `user_app/tests/test_billing.py` | Created  | Checkout/portal/status/webhook coverage including signature verification failures, duplicate event replay, and status→tier transitions                        |
+
+### Security Properties
+
+- Webhook signature verified via `stripe.Webhook.construct_event` before any DB work
+- Idempotency enforced by `stripe_event_id` unique constraint on `SubscriptionAuditLog` — replays return `{received: true, duplicate: true}`
+- Audit log is append-only (no `updated_at`, ordered `-timestamp`) — every status transition is traceable for financial audit
+- `stripe_customer_id` is the only Stripe reference persisted; no PAN/CVV anywhere in our system
+- CSRF exempt on webhook only (required by Stripe); all other billing endpoints behind JWT
+
+### Frontend
+
+- `api/billing.js` added with `createCheckoutSession`, `createPortalSession`, `getBillingStatus`
+- `UpgradeModal.jsx` added — triggered from builder when free-tier limits hit
+- Builder flows read `BillingStatusView` output to render remaining daily quota
+
+---
+
+## April 15, 2026 | Pre-Deployment Audit
+
+**Status:** ✅ Complete
+
+### Summary
+
+Final sweep before pointing DNS at the EC2 host. Focus: CVE patching, test
+hygiene, migration sync, and production config verification. No functional
+changes — everything in this session is infrastructure, dependencies, or docs.
+
+### Dependency Upgrades (CVE-driven)
+
+| Package                         | Before   | After    | Reason                                       |
+| ------------------------------- | -------- | -------- | -------------------------------------------- |
+| Django                          | 4.2.16   | 4.2.30   | 22 CVEs patched (staying on 4.2.x LTS line)  |
+| djangorestframework-simplejwt   | 5.3.1    | 5.5.1    | Signing-key handling fixes                   |
+| requests                        | 2.32.3   | 2.33.0   | CVE-driven bump                              |
+| cryptography                    | 46.0.6   | 46.0.7   | Transitive patch                             |
+
+### Intentionally Pinned (Deferred)
+
+| Package                | Current   | Latest   | Why deferred                                   |
+| ---------------------- | --------- | -------- | ---------------------------------------------- |
+| social-auth-app-django | 5.4.2     | 5.6.0    | 5.6.0 requires Django 5.1; we're on 4.2 LTS     |
+| anthropic              | 0.40.0    | 0.94.x   | Too many breaking changes to absorb pre-deadline |
+| Vite / esbuild         | —         | —        | Dev-only vuln, no production exposure           |
+
+### Model / Migration Changes
+
+- `Resume.chat_turn_count` field added (migration `0005_resume_chat_turn_count`) — backs the per-resume chat quota enforced by `ChatTurnLimit`
+- All migrations verified in sync between `models.py` and `migrations/`
+
+### Test & Code Hygiene
+
+- 116 backend tests passing (up from 108), zero warnings
+- Unused imports cleaned from `views.py` and `serializers.py`
+- Zero `console.log` calls remaining in the frontend bundle
+- Root `backend/conftest.py` verified — `autouse` fixture globally patches `anthropic.Anthropic` with `MagicMock`, so no test ever hits the real API
+
+### Deployment Repo Changes
+
+- `settings.py` — HSTS value finalized (31,536,000s when `DEBUG=False`), `CSRF_TRUSTED_ORIGINS` wired through env
+- `nginx/default.conf` — SSL termination + HTTP → HTTPS redirect confirmed
+- `docker-compose.yml` — port 443 exposed, `/etc/letsencrypt` mounted read-only into Nginx
+- `.env.example` — expanded to cover every production var (Stripe, ONET, Google OAuth, CSRF, CORS)
+- `ARCHITECTURE.md`, `CLAUDE.md`, `DATA_CONTRACT.md`, `SECURITY.md`, `README.md` — all brought current; `AGENTS.md` annotated as historical
+
+### Open Items (Manual, on EC2 Day-Of)
+
+All covered in ARCHITECTURE.md § SSL / HTTPS. Summary:
+
+1. DNS A records for `cjoewono.com` and `www.cjoewono.com` → EC2 public IP
+2. Security group: ports 80/443 open to world; 22 from admin IP; no 8000 or 5432
+3. `apt install docker.io docker-compose-plugin certbot`
+4. Production `.env` on host with `DEBUG=False`, rotated `SECRET_KEY`, real DB password
+5. `sudo certbot certonly --standalone -d cjoewono.com -d www.cjoewono.com`
+6. Google Cloud Console — add `https://cjoewono.com/auth/google/callback` as authorized redirect
+7. Stripe dashboard — live webhook endpoint pointed at `https://cjoewono.com/api/v1/billing/webhook/`, signing secret copied into `.env`
+8. `0 */12 * * * certbot renew --quiet && docker compose exec nginx nginx -s reload` in crontab
+
+---
+
+Project log maintained: github.com/cjoewono/ranktorole
+Last updated: April 15, 2026 — Pre-deployment audit complete, 116 tests passing

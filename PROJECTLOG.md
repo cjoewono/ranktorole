@@ -626,13 +626,13 @@ Migrated all three O\*NET proxy views from the public `services.onetcenter.org/w
 
 ### Changes
 
-| File                 | Action   | Detail                                                                          |
-| -------------------- | -------- | ------------------------------------------------------------------------------- |
-| `config/settings.py` | Modified | Added `ONET_API_KEY` from env                                                   |
+| File                 | Action   | Detail                                                                           |
+| -------------------- | -------- | -------------------------------------------------------------------------------- |
+| `config/settings.py` | Modified | Added `ONET_API_KEY` from env                                                    |
 | `onet_app/views.py`  | Modified | New base URL, shared `_onet_headers()` helper, all requests now send `X-API-Key` |
-| `onet_app/tests.py`  | Modified | Added 3 tests verifying API key header is sent                                  |
-| `.env.example`       | Modified | Added `ONET_API_KEY`                                                            |
-| Docs                 | Modified | CLAUDE.md, ARCHITECTURE.md, SECURITY.md, PROJECTLOG.md updated                  |
+| `onet_app/tests.py`  | Modified | Added 3 tests verifying API key header is sent                                   |
+| `.env.example`       | Modified | Added `ONET_API_KEY`                                                             |
+| Docs                 | Modified | CLAUDE.md, ARCHITECTURE.md, SECURITY.md, PROJECTLOG.md updated                   |
 
 ### Follow-up: v2 Response Shape Fix
 
@@ -660,19 +660,19 @@ PCI scope stays at SAQ A — card data is never seen or stored by our app.
 
 ### Backend Changes
 
-| File                             | Action   | Detail                                                                                                                                                        |
-| -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `user_app/models.py`             | Modified | Added `stripe_customer_id`, `subscription_status` fields; added `SubscriptionAuditLog` immutable log model; added `resume_tailor_count` + `last_reset_date` daily counters |
-| `user_app/billing_services.py`   | Created  | Stripe SDK wrapper — `get_or_create_customer`, `create_checkout_session`, `create_portal_session`, `verify_webhook`; idempotency keys on all create calls     |
+| File                             | Action   | Detail                                                                                                                                                                                          |
+| -------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `user_app/models.py`             | Modified | Added `stripe_customer_id`, `subscription_status` fields; added `SubscriptionAuditLog` immutable log model; added `resume_tailor_count` + `last_reset_date` daily counters                      |
+| `user_app/billing_services.py`   | Created  | Stripe SDK wrapper — `get_or_create_customer`, `create_checkout_session`, `create_portal_session`, `verify_webhook`; idempotency keys on all create calls                                       |
 | `user_app/billing_views.py`      | Created  | `CheckoutSessionView`, `PortalSessionView`, `BillingStatusView`, `StripeWebhookView`; `_STATUS_TO_TIER` map drives tier transitions; `select_for_update` + audit log under a single transaction |
-| `user_app/billing_throttles.py`  | Created  | `CheckoutThrottle` (5/min) to defeat card-testing                                                                                                             |
-| `user_app/billing_urls.py`       | Created  | `/api/v1/billing/{checkout,portal,status,webhook}/`                                                                                                           |
-| `user_app/permissions.py`        | Created  | `IsProOrUnderLimit` (daily-reset counter) + `ChatTurnLimit` (permanent per-resume chat counter); `PRO_STATUSES = {'active', 'trialing', 'past_due'}`          |
-| `user_app/serializers.py`        | Modified | `UserSerializer` exposes `subscription_status`, `resume_tailor_count`, `last_reset_date` (all read-only)                                                      |
-| `config/urls.py`                 | Modified | Mounted `user_app.billing_urls` at `/api/v1/billing/`                                                                                                         |
-| `config/settings.py`             | Modified | Added `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `STRIPE_CHECKOUT_SUCCESS_URL`, `STRIPE_CHECKOUT_CANCEL_URL`, `FREE_TIER_DAILY_LIMITS`, `FREE_TIER_CHAT_LIMIT` |
-| `requirements.txt`               | Modified | Added `stripe==11.1.1`                                                                                                                                        |
-| `user_app/tests/test_billing.py` | Created  | Checkout/portal/status/webhook coverage including signature verification failures, duplicate event replay, and status→tier transitions                        |
+| `user_app/billing_throttles.py`  | Created  | `CheckoutThrottle` (5/min) to defeat card-testing                                                                                                                                               |
+| `user_app/billing_urls.py`       | Created  | `/api/v1/billing/{checkout,portal,status,webhook}/`                                                                                                                                             |
+| `user_app/permissions.py`        | Created  | `IsProOrUnderLimit` (daily-reset counter) + `ChatTurnLimit` (permanent per-resume chat counter); `PRO_STATUSES = {'active', 'trialing', 'past_due'}`                                            |
+| `user_app/serializers.py`        | Modified | `UserSerializer` exposes `subscription_status`, `resume_tailor_count`, `last_reset_date` (all read-only)                                                                                        |
+| `config/urls.py`                 | Modified | Mounted `user_app.billing_urls` at `/api/v1/billing/`                                                                                                                                           |
+| `config/settings.py`             | Modified | Added `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `STRIPE_CHECKOUT_SUCCESS_URL`, `STRIPE_CHECKOUT_CANCEL_URL`, `FREE_TIER_DAILY_LIMITS`, `FREE_TIER_CHAT_LIMIT`            |
+| `requirements.txt`               | Modified | Added `stripe==11.1.1`                                                                                                                                                                          |
+| `user_app/tests/test_billing.py` | Created  | Checkout/portal/status/webhook coverage including signature verification failures, duplicate event replay, and status→tier transitions                                                          |
 
 ### Security Properties
 
@@ -702,20 +702,20 @@ changes — everything in this session is infrastructure, dependencies, or docs.
 
 ### Dependency Upgrades (CVE-driven)
 
-| Package                         | Before   | After    | Reason                                       |
-| ------------------------------- | -------- | -------- | -------------------------------------------- |
-| Django                          | 4.2.16   | 4.2.30   | 22 CVEs patched (staying on 4.2.x LTS line)  |
-| djangorestframework-simplejwt   | 5.3.1    | 5.5.1    | Signing-key handling fixes                   |
-| requests                        | 2.32.3   | 2.33.0   | CVE-driven bump                              |
-| cryptography                    | 46.0.6   | 46.0.7   | Transitive patch                             |
+| Package                       | Before | After  | Reason                                      |
+| ----------------------------- | ------ | ------ | ------------------------------------------- |
+| Django                        | 4.2.16 | 4.2.30 | 22 CVEs patched (staying on 4.2.x LTS line) |
+| djangorestframework-simplejwt | 5.3.1  | 5.5.1  | Signing-key handling fixes                  |
+| requests                      | 2.32.3 | 2.33.0 | CVE-driven bump                             |
+| cryptography                  | 46.0.6 | 46.0.7 | Transitive patch                            |
 
 ### Intentionally Pinned (Deferred)
 
-| Package                | Current   | Latest   | Why deferred                                   |
-| ---------------------- | --------- | -------- | ---------------------------------------------- |
-| social-auth-app-django | 5.4.2     | 5.6.0    | 5.6.0 requires Django 5.1; we're on 4.2 LTS     |
-| anthropic              | 0.40.0    | 0.94.x   | Too many breaking changes to absorb pre-deadline |
-| Vite / esbuild         | —         | —        | Dev-only vuln, no production exposure           |
+| Package                | Current | Latest | Why deferred                                     |
+| ---------------------- | ------- | ------ | ------------------------------------------------ |
+| social-auth-app-django | 5.4.2   | 5.6.0  | 5.6.0 requires Django 5.1; we're on 4.2 LTS      |
+| anthropic              | 0.40.0  | 0.94.x | Too many breaking changes to absorb pre-deadline |
+| Vite / esbuild         | —       | —      | Dev-only vuln, no production exposure            |
 
 ### Model / Migration Changes
 
@@ -724,7 +724,7 @@ changes — everything in this session is infrastructure, dependencies, or docs.
 
 ### Test & Code Hygiene
 
-- 116 backend tests passing (up from 108), zero warnings
+- 132 backend tests passing (up from 115), zero warnings
 - Unused imports cleaned from `views.py` and `serializers.py`
 - Zero `console.log` calls remaining in the frontend bundle
 - Root `backend/conftest.py` verified — `autouse` fixture globally patches `anthropic.Anthropic` with `MagicMock`, so no test ever hits the real API
@@ -753,4 +753,4 @@ All covered in ARCHITECTURE.md § SSL / HTTPS. Summary:
 ---
 
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 15, 2026 — Pre-deployment audit complete, 116 tests passing
+Last updated: April 15, 2026 — Pre-deployment audit complete, 132 tests passing

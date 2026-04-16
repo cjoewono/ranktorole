@@ -267,7 +267,7 @@
 - [x] Vite/esbuild vuln deferred (dev-only, no prod exposure)
 - [x] `Resume.chat_turn_count` migration 0005 applied
 - [x] All migrations in sync between `models.py` and `migrations/`
-- [x] 116 backend tests passing, zero warnings
+- [x] 132 backend tests passing, zero warnings
 - [x] Unused imports cleaned; zero `console.log` in frontend bundle
 - [x] `backend/conftest.py` verified — `autouse` MagicMock on `anthropic.Anthropic` client
 - [x] Production `settings.py`: HSTS, `CSRF_TRUSTED_ORIGINS`
@@ -318,7 +318,7 @@ None.
 
 ## Start Next Session With
 
-> "Let's deploy RankToRole to EC2. Confirm 116 backend tests pass locally,
+> "Let's deploy RankToRole to EC2. Confirm 132 backend tests pass locally,
 > then walk the Phase 5 checklist in order. Stop at any step that requires
 > AWS console, DNS, Google Cloud Console, or Stripe dashboard changes and
 > wait for explicit go-ahead."

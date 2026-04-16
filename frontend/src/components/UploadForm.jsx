@@ -86,6 +86,12 @@ export default function UploadForm({
             ✓ PDF UPLOADED
           </p>
         )}
+        {isUploaded && !file && (
+          <p className="font-body text-xs text-on-surface-variant mt-1 italic">
+            Resuming from a previous session — paste a job description below to
+            finish generating your draft.
+          </p>
+        )}
       </div>
 
       {/* Job title + Company row */}

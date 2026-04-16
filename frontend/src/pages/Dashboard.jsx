@@ -28,9 +28,11 @@ function StatusBadge({ resume }) {
       </span>
     );
   }
+  // Pre-draft: PDF uploaded, no draft yet. CONTINUE routes to UPLOADED
+  // phase where the user can paste a JD and finish the generate flow.
   return (
-    <span className="bg-surface-container-highest text-on-surface-variant font-label text-xs tracking-widest uppercase px-3 py-1 rounded-sm">
-      NOT STARTED
+    <span className="bg-tertiary/10 text-tertiary font-label text-xs tracking-widest uppercase px-3 py-1 rounded-sm">
+      UPLOADED
     </span>
   );
 }
@@ -77,9 +79,9 @@ export default function Dashboard() {
   }
 
   const finalized = resumes.filter((r) => r.is_finalized).length;
-  const inProgress = resumes.filter(
-    (r) => !r.is_finalized && (r.roles?.length ?? 0) > 0,
-  ).length;
+  // "In progress" now includes pre-draft orphans (uploaded PDF, no draft
+  // yet) — these show the UPLOADED badge and resume via CONTINUE.
+  const inProgress = resumes.filter((r) => !r.is_finalized).length;
 
   return (
     <>

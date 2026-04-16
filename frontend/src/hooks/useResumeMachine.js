@@ -144,10 +144,28 @@ export default function useResumeMachine() {
         // Note: reopen (is_finalized True -> False) is handled by the
         // caller (Dashboard Edit button) before navigation, not here.
         // This effect only LOADS; it never mutates server state.
+
+        // Pre-draft orphan: PDF uploaded but draft never generated
+        // (roles empty AND no session anchor). Route to UPLOADED phase
+        // so UploadForm renders with the PDF already attached and the
+        // user can paste a JD + click GENERATE to finish.
+        const hasDraft =
+          (resume.roles && resume.roles.length > 0) ||
+          resume.session_anchor != null;
+
+        let resolvedPhase;
+        if (!hasDraft) {
+          resolvedPhase = "UPLOADED";
+        } else if (mode === "edit") {
+          resolvedPhase = "FINALIZING";
+        } else {
+          resolvedPhase = "REVIEWING";
+        }
+
         dispatch({
           type: "RESUME_LOADED",
           resumeId: resume.id || id,
-          phase: mode === "edit" ? "FINALIZING" : "REVIEWING",
+          phase: resolvedPhase,
           draft: {
             civilian_title: resume.civilian_title,
             summary: resume.summary,

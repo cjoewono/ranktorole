@@ -533,14 +533,17 @@ class TestResumeChatView:
         )
         assert response.status_code == 400
 
-    def test_finalized_resume_chat_returns_409(self, auth_client, user, db):
+    @patch("translate_app.views.call_claude_chat")
+    def test_finalized_resume_chat_still_works(self, mock_chat, auth_client, user, db):
+        """Finalized resumes can still be refined — is_finalized only gates export."""
+        mock_chat.return_value = _make_chat_result(_CHAT_PAYLOAD)
         resume = _create_resume(user, is_finalized=True)
         response = auth_client.post(
             f"/api/v1/resumes/{resume.id}/chat/",
             {"message": "Update bullets."},
             format="json",
         )
-        assert response.status_code == 409
+        assert response.status_code == 200
 
     def test_no_session_anchor_returns_400(self, auth_client, user, db):
         resume = _create_resume(user, session_anchor=None)
@@ -674,14 +677,23 @@ class TestResumeFinalizeView:
         resume.refresh_from_db()
         assert resume.roles[0]["title"] == "Operations Manager"
 
-    def test_double_finalize_returns_409(self, auth_client, user, db):
-        resume = _create_resume(user, is_finalized=True)
-        response = auth_client.patch(
+    def test_double_finalize_is_idempotent(self, auth_client, user, db):
+        """Re-finalizing re-saves edits and returns 200."""
+        resume = _create_resume(user)
+        auth_client.patch(
             f"/api/v1/resumes/{resume.id}/finalize/",
-            {},
+            {"civilian_title": "First Title"},
             format="json",
         )
-        assert response.status_code == 409
+        response = auth_client.patch(
+            f"/api/v1/resumes/{resume.id}/finalize/",
+            {"civilian_title": "Updated Title"},
+            format="json",
+        )
+        assert response.status_code == 200
+        resume.refresh_from_db()
+        assert resume.civilian_title == "Updated Title"
+        assert resume.is_finalized is True
 
     def test_finalize_civilian_title_too_long_returns_400(self, auth_client, user, db):
         resume = _create_resume(user)
@@ -761,14 +773,15 @@ class TestResumeReopenView:
         )
         assert response.status_code == 200
         assert response.data["is_finalized"] is False
-        assert response.data["chat_turn_count"] == 0
+        assert response.data["chat_turn_count"] == 8
 
-    def test_reopen_sets_db_fields(self, auth_client, user, db):
-        resume = _create_resume(user, is_finalized=True, chat_turn_count=10)
+    def test_reopen_preserves_chat_turn_count(self, auth_client, user, db):
+        """Reopen clears is_finalized but preserves chat_turn_count across sessions."""
+        resume = _create_resume(user, is_finalized=True, chat_turn_count=7)
         auth_client.patch(f"/api/v1/resumes/{resume.id}/reopen/", format="json")
         resume.refresh_from_db()
         assert resume.is_finalized is False
-        assert resume.chat_turn_count == 0
+        assert resume.chat_turn_count == 7
 
     def test_reopen_non_finalized_returns_400(self, auth_client, user, db):
         resume = _create_resume(user, is_finalized=False)

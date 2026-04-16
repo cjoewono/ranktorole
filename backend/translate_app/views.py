@@ -239,12 +239,6 @@ class ResumeChatView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if resume.is_finalized:
-            return Response(
-                {"error": "Resume is already finalized."},
-                status=status.HTTP_409_CONFLICT,
-            )
-
         anchor = resume.session_anchor
         if not anchor:
             return Response(
@@ -301,12 +295,6 @@ class ResumeFinalizeView(APIView):
         if resume is None:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if resume.is_finalized:
-            return Response(
-                {"error": "Resume is already finalized."},
-                status=status.HTTP_409_CONFLICT,
-            )
-
         ser = FinalizeInputSerializer(data=request.data)
         if not ser.is_valid():
             return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -348,8 +336,7 @@ class ResumeReopenView(APIView):
             )
 
         resume.is_finalized = False
-        resume.chat_turn_count = 0
-        resume.save(update_fields=["is_finalized", "chat_turn_count", "updated_at"])
+        resume.save(update_fields=["is_finalized", "updated_at"])
 
         return Response(
             {

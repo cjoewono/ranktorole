@@ -10,10 +10,17 @@ April 24, 2026
 
 ## Service Map
 
-- Frontend: Vite internal :5173 → Nginx :80
-- Backend: Django internal :8000 → Nginx :80/api/
-- Database: PostgreSQL :5432, service name: db
-- Nginx: proxies /api/ → backend, / → frontend
+**Dev (hybrid)**
+- Frontend: Vite on host at `:5173` (HMR enabled), proxies `/api/` to `localhost:8000`
+- Backend: Django in Docker at `:8000` (runserver)
+- Database: PostgreSQL in Docker, service name `db`, port never exposed to host
+- Nginx: not started in dev
+
+**Production (full Docker + TLS)**
+- Frontend: `npm run build` → `dist/` → Nginx serves static from `/usr/share/nginx/html`
+- Backend: Django in Docker at `:8000` (gunicorn, 3 workers)
+- Database: PostgreSQL in Docker, port never exposed
+- Nginx: only public-facing service; `:80` (ACME + redirect) and `:443` (TLS via Let's Encrypt); proxies `/api/` → backend, `/` → static dist
 
 ## Key Commands
 
@@ -47,19 +54,19 @@ See ARCHITECTURE.md for system design patterns and Docker lessons.
 ## Product Flow
 
 1. User uploads PDF resume → backend extracts text, creates Resume record, returns resume_id
-2. User pastes job description → single LLM call returns draft + 2-3 clarifying questions
+2. User pastes job description → single LLM call returns draft + 1 targeted clarifying question
 3. User answers questions in chat → stateful refinement turns (history persisted to DB, loaded server-side)
-4. User approves → inline bullet editing → "Approve & Finalize" → is_finalized = True
+4. User approves → inline bullet editing → "Approve & Finalize" → `is_finalized = True`
 
 ## LLM Integration
 
-- Provider: Claude API (claude-sonnet-4-20250514)
-- Location: backend/translate_app/services.py
-- Input call 1: {military_text (string), job_description (string)}
-- Input call 2+: {session_anchor (dict from DB), chat_history (list from DB), message (string)}
-- Output every call: JSON matching MilitaryTranslation schema (see below)
-- Env var: ANTHROPIC_API_KEY
-- SDK: anthropic (pip install anthropic)
+- Provider: Claude API (`claude-sonnet-4-20250514`)
+- Location: `backend/translate_app/services.py`
+- Input call 1: `{military_text (string), job_description (string)}`
+- Input call 2+: `{session_anchor (dict from DB), chat_history (list from DB), message (string)}`
+- Output every call: JSON matching `MilitaryTranslation` schema (see below)
+- Env var: `ANTHROPIC_API_KEY`
+- SDK: `anthropic==0.40.0` (pinned — do not upgrade pre-deadline)
 
 ## Pydantic Schema (MilitaryTranslation)
 
@@ -82,14 +89,19 @@ class MilitaryTranslation(BaseModel):
 
 ```
 POST   /api/v1/resumes/upload/          PDF → military_text, returns resume_id
-POST   /api/v1/resumes/{id}/draft/      JD → draft + questions, sets session_anchor
+POST   /api/v1/resumes/{id}/draft/      JD → draft + question, sets session_anchor
 POST   /api/v1/resumes/{id}/chat/       message → updated draft + reply (history loaded from DB)
 PATCH  /api/v1/resumes/{id}/finalize/   final edits → is_finalized=True
 GET    /api/v1/resumes/                 list resumes for authenticated user
 GET    /api/v1/resumes/{id}/            retrieve single resume
 DELETE /api/v1/resumes/{id}/            delete resume
-GET    /api/v1/onet/military/            MOS search → civilian career matches (Veterans API)
-GET    /api/v1/onet/career/{code}/       career detail aggregation (skills, knowledge, salary, outlook)
+GET    /api/v1/onet/search/?keyword=    legacy keyword search (resume builder)
+GET    /api/v1/onet/military/           MOS search → civilian career matches (Veterans API)
+GET    /api/v1/onet/career/{code}/      career detail aggregation (skills, knowledge, salary, outlook)
+POST   /api/v1/billing/checkout/        Stripe Checkout Session (Pro upgrade)
+POST   /api/v1/billing/portal/          Stripe Customer Portal (manage/cancel)
+GET    /api/v1/billing/status/          current tier, subscription status, usage, limits
+POST   /api/v1/billing/webhook/         Stripe event receiver (signature-verified)
 ```
 
 ## Context Window Budget (per call)
@@ -102,7 +114,7 @@ GET    /api/v1/onet/career/{code}/       career detail aggregation (skills, know
 | New user message | ~100       | Current turn only                    |
 | **Total input**  | **~1,350** | Well under 5,000 token budget        |
 
-Raw military_text and job_description are NEVER passed after call 1.
+Raw `military_text` and `job_description` are NEVER passed after call 1.
 
 ## Cost Reference
 
@@ -116,7 +128,7 @@ Raw military_text and job_description are NEVER passed after call 1.
 ### Python/Django
 
 - PEP 8, explicit imports
-- Thin views; all logic in services.py
+- Thin views; all logic in `services.py`
 - Serializers for all data transformations
 - All models use UUIDv4 primary keys
 
@@ -130,35 +142,46 @@ Raw military_text and job_description are NEVER passed after call 1.
 
 ### API
 
-- RESTful: pluralized nouns, e.g. /api/v1/resumes/
-- JWT auth on all endpoints except /api/v1/auth/
+- RESTful: pluralized nouns, e.g. `/api/v1/resumes/`
+- JWT auth on all endpoints except `/api/v1/auth/` and `/api/v1/billing/webhook/`
 - multipart/form-data on upload endpoint only; JSON everywhere else
 
 ## O\*NET API (authenticated v2)
 
-- O\*NET v2 API: https://api-v2.onetcenter.org
+- Base URL: `https://api-v2.onetcenter.org`
 - Auth: `X-API-Key` header (key from `ONET_API_KEY` env var)
-- Purpose: map military occupation codes to civilian job titles
+- Purpose: map military occupation codes to civilian job titles; career detail lookup
 - Server-side proxy only, never call from frontend
-- Endpoint: GET /api/v1/onet/search/?keyword={mos_code}
+- Routes: `/api/v1/onet/search/`, `/api/v1/onet/military/`, `/api/v1/onet/career/{code}/`
 
 ## OAuth
 
 - Provider: Google OAuth 2.0
-- Library: social-auth-app-django
+- Library: `social-auth-app-django==5.4.2` (pinned — 5.6.0 requires Django 5.1)
 - Purpose: satisfies "secret key with OAuth" requirement
-- Env vars: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
-- Endpoint: /api/v1/auth/google/
+- Env vars: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`
+- Endpoints: `GET /api/v1/auth/google/`, `POST /api/v1/auth/google/callback/`
+
+## Billing (Stripe)
+
+- Checkout: Stripe-hosted only — our frontend never sees a card number
+- Tier changes: server-side only, via the `StripeWebhookView` (signature-verified)
+- `stripe_customer_id` is the only Stripe reference persisted
+- Audit log: every status transition writes a `SubscriptionAuditLog` row (append-only, unique `stripe_event_id` for idempotency)
+- Env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `STRIPE_CHECKOUT_SUCCESS_URL`, `STRIPE_CHECKOUT_CANCEL_URL`
 
 ## Hard Rules
 
 - Do not add packages without asking
 - Do not change model field names
-- Do not run docker compose down (use stop)
-- Do not modify docker-compose.yml or .env without instruction
-- Do not create new Django apps without confirming name
+- Do not run `docker compose down` (use `stop`)
+- Do not modify `docker-compose.yml` or `.env` without instruction
+- Do not create new Django apps without confirming the name
 - See SECURITY.md before touching auth, API keys, or user data
 - Check TASKS.md before starting any work
-- User layer files (.env, docker-compose.yml, migrations/) are read-only unless explicitly told otherwise
+- User layer files (`.env`, `docker-compose.yml`, `migrations/`) are read-only unless explicitly told otherwise
 - Raw PDF bytes are never stored — extracted text only
-- chat_history is persisted to DB server-side — the backend loads it on every call. Never pass history in the request body — it is ignored.
+- `chat_history` is persisted to DB server-side — the backend loads it on every call. **Never pass history in the request body — it is ignored.**
+- Never handle card data. Stripe-hosted Checkout is the only path a PAN/CVV can enter the system. If a frontend task ever calls for a card input field, stop and flag it.
+- The webhook endpoint (`/api/v1/billing/webhook/`) must run `stripe.Webhook.construct_event` before any DB work. Do not add logic between the `request.body` read and the signature check.
+- User tier (`free` / `pro`) is writable only through the Stripe webhook. Do not expose tier in any writable serializer; `UserSerializer` keeps it in `read_only_fields`.

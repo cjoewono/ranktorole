@@ -2,16 +2,16 @@
 
 ## Docker/Nginx Pattern
 
-- All API calls use relative paths (/api/v1/...), never hardcoded hosts
-- Nginx handles routing: /api/ → backend:8000, / → frontend:5173
-- New env vars require docker compose down && up (restart insufficient)
+- All API calls use relative paths (`/api/v1/...`), never hardcoded hosts
+- Nginx handles routing: `/api/` → `backend:8000`, `/` → static `dist/`
+- New env vars require `docker compose down && up` (restart insufficient)
 - Migrations must re-run after full down/up cycle
 
 ## Django App Structure (from BridgeBoard)
 
-- Each feature = its own Django app (e.g. translate_app, user_app)
-- Namespace apps in urls.py to avoid endpoint collisions
-- services.py handles all external API and LLM calls
+- Each feature = its own Django app (`translate_app`, `user_app`, `contact_app`, `onet_app`)
+- Namespace apps in `urls.py` to avoid endpoint collisions
+- `services.py` handles all external API and LLM calls
 - Views only handle request/response, nothing else
 
 ## Product Flow Architecture
@@ -20,6 +20,7 @@
 
 ```
 Frontend (dropzone) → multipart/form-data → POST /api/v1/resumes/upload/
+  → validate MIME type + magic bytes + size (10MB cap)
   → PyMuPDF extracts text
   → Resume.objects.create(military_text=extracted, user=request.user)
   → returns {id, created_at}
@@ -35,11 +36,11 @@ Frontend → POST /api/v1/resumes/{id}/draft/ {job_description}
   → calls call_claude_draft(military_text, job_description)
       → single Claude API call
       → returns MilitaryTranslation (draft + clarifying_question)
-  → saves to Resume: job_description, session_anchor, civilian_title, summary, roles
+  → saves to Resume: job_description, session_anchor, civilian_title, summary, roles, ai_initial_draft
   → returns full MilitaryTranslation to frontend
 Frontend splits response:
-  → left pane: civilian_title + summary + bullets
-  → right pane: clarifying_questions rendered as chat messages
+  → left pane: civilian_title + summary + roles (with bullets)
+  → right pane: clarifying_question rendered as a chat message
 ```
 
 ### Phase 3 — Stateful Refinement Loop
@@ -54,15 +55,15 @@ Frontend → POST /api/v1/resumes/{id}/chat/
   → calls Claude API
   → returns MilitaryTranslation (updated draft, assistant_reply="...")
   → saves updated civilian_title, summary, roles to Resume
-  → appends new turn to chat_history
+  → appends new turn to chat_history, increments chat_turn_count
   → returns full MilitaryTranslation to frontend
 Frontend:
   → left pane live-updates with new draft
-  → right pane appends assistant_reply as chat message
+  → right pane appends assistant_reply as a chat message
 ```
 
-**Key: raw military_text and job_description are never sent again after Phase 2.**
-**Key: chat history is persisted to DB — backend loads it from DB on every call.**
+**Key:** raw `military_text` and `job_description` are never sent again after Phase 2.
+**Key:** chat history is persisted to DB — backend loads it from DB on every call.
 
 ### Phase 4 — Finalization
 
@@ -83,12 +84,13 @@ Frontend:
 
 ## Claude API Integration Pattern
 
-- Use anthropic Python SDK
+- Use `anthropic` Python SDK (pinned at 0.40.0)
 - Pydantic model validates every response (fail-fast on bad JSON)
-- Schema: MilitaryTranslation(civilian_title, summary, roles, clarifying_question, assistant_reply)
-- Never call Claude API directly from views — always via services.py
+- Schema: `MilitaryTranslation(civilian_title, summary, roles, clarifying_question, assistant_reply)`
+- Never call Claude API directly from views — always via `services.py`
 - Response parsed from text block only, never tool_use block
 - Markdown fences stripped before JSON parse
+- `strip_tags()` applied to every string field before persistence (stored-XSS defense)
 
 ## Context Window Management
 
@@ -102,11 +104,11 @@ Every Claude API call stays under 5,000 tokens:
 | New user message | Current turn                    | ~100       | Current turn only                    |
 | **Total**        |                                 | **~1,350** |                                      |
 
-call_claude_draft() runs ONCE on the draft call. After that:
+`call_claude_draft()` runs ONCE on the draft call. After that:
 
-- Raw military_text (~1,400 tokens) → never sent again
-- Raw job_description (~500 tokens) → never sent again
-- session_anchor (~350 tokens) → loaded from DB on every subsequent call
+- Raw `military_text` (~1,400 tokens) → never sent again
+- Raw `job_description` (~500 tokens) → never sent again
+- `session_anchor` (~350 tokens) → loaded from DB on every subsequent call
 
 ## Resume Model
 
@@ -114,22 +116,23 @@ call_claude_draft() runs ONCE on the draft call. After that:
 class Resume(models.Model):
     id                = UUIDField(primary_key=True)
     user              = ForeignKey(User)
-    military_text     = TextField()                    # extracted PDF text
-    job_description   = TextField(blank=True)          # set on draft call
+    military_text     = TextField()                      # extracted PDF text
+    job_description   = TextField(blank=True)            # set on draft call
     session_anchor    = JSONField(null=True, blank=True) # set on draft call
     civilian_title    = CharField(max_length=255, blank=True)
     summary           = TextField(blank=True)
-    roles             = JSONField(default=list)        # set on draft, updated on chat
-    chat_history      = JSONField(default=list)        # populated by backend on every chat turn
+    roles             = JSONField(default=list)          # set on draft, updated on chat
+    chat_history      = JSONField(default=list)          # populated by backend on every chat turn
+    chat_turn_count   = PositiveIntegerField(default=0)  # per-resume chat quota (Free/Pro)
     ai_initial_draft  = JSONField(null=True, blank=True) # set on draft, used for redline diff
-    approved_bullets  = JSONField(default=list)        # reserved for future granular approval
-    rejected_bullets  = JSONField(default=list)        # reserved for future granular rejection
-    is_finalized      = BooleanField(default=False)    # set True on finalize call
+    approved_bullets  = JSONField(default=list)          # reserved for future granular approval
+    rejected_bullets  = JSONField(default=list)          # reserved for future granular rejection
+    is_finalized      = BooleanField(default=False)      # set True on finalize call
     created_at        = DateTimeField(auto_now_add=True)
     updated_at        = DateTimeField(auto_now=True)
 ```
 
-Fields are blank=True on partial fields because upload creates the record before draft call.
+Fields are `blank=True` on partial fields because upload creates the record before the draft call.
 
 ## Frontend Architecture
 
@@ -143,10 +146,10 @@ prevents NavBar remounts and eliminates layout flash when ResumeBuilder enters f
 App
 └── AppShell
     ├── NavBar (always mounted)
-    ├── <ForgeSetup />  (hidden when path ≠ /profile)
-    ├── <CareerRecon />  (hidden when path ≠ /recon)
-    ├── <Dashboard />  (hidden when path ≠ /dashboard)
-    ├── <Contacts />   (hidden when path ≠ /contacts)
+    ├── <ForgeSetup />       (hidden when path ≠ /profile)
+    ├── <CareerRecon />      (hidden when path ≠ /recon)
+    ├── <Dashboard />        (hidden when path ≠ /dashboard)
+    ├── <Contacts />         (hidden when path ≠ /contacts)
     └── <ResumeBuilder setFullscreen={...} />  (hidden when path ≠ /resume-builder)
 ```
 
@@ -156,11 +159,11 @@ applies `overflow-hidden` to prevent body scroll during the split-pane layout.
 
 ### Career Recon
 
-Standalone O*NET-powered career exploration tool at `/recon`. Zero LLM cost — pure
-server-side proxy to O*NET's My Next Move for Veterans API. Three-phase UI:
+Standalone O\*NET-powered career exploration tool at `/recon`. Zero LLM cost — pure
+server-side proxy to O\*NET's My Next Move for Veterans API. Three-phase UI:
 SEARCH → RESULTS → DETAIL. Serves as a conversion funnel into the resume builder.
 
-Backend: two views in onet_app — `OnetMilitarySearchView` (military search) and
+Backend: two views in `onet_app` — `OnetMilitarySearchView` (military search) and
 `OnetCareerDetailView` (aggregated career report). Both use `OnetThrottle`.
 O\*NET v2 API (`https://api-v2.onetcenter.org`) with `X-API-Key` auth (env: `ONET_API_KEY`).
 
@@ -208,51 +211,122 @@ DraftPane/ (index.jsx)
 
 ## PDF Extraction
 
-- Library: PyMuPDF (pymupdf==1.24.11)
-- Text-native PDFs extract cleanly — no OCR needed for Calvin's resume
-- Two-column skills section extracts sequentially (left then right) — fine for LLM
-- Extraction order: page 1 text + page 2 text, concatenated with newline
+- Library: PyMuPDF (`pymupdf==1.24.11`)
+- Text-native PDFs extract cleanly — no OCR needed for typical military resumes
+- Two-column skills sections extract sequentially (left then right) — fine for LLM consumption
+- Extraction order: page-by-page text concatenated with newline
 - Raw PDF bytes discarded after extraction
+
+## Billing & Subscription
+
+Stripe-powered Free/Pro tiers. PCI scope is SAQ A — the application never sees
+card data. All card entry happens on Stripe-hosted Checkout; our system only
+stores a `stripe_customer_id` reference and listens for webhook events.
+
+### Components
+
+- **`user_app/billing_services.py`** — thin Stripe SDK wrapper. `_configure()`
+  sets the API key lazily so tests that monkeypatch settings work. All
+  create-side calls (`Customer`, `Checkout.Session`, `billing_portal.Session`)
+  pass an idempotency key bound to the user plus a UUID, so a single client
+  action cannot produce duplicate Stripe objects on network retry.
+- **`user_app/billing_views.py`** — four endpoints:
+  - `CheckoutSessionView` — creates the Checkout Session for Pro upgrade
+  - `PortalSessionView` — opens the Customer Portal for manage/cancel
+  - `BillingStatusView` — returns `{tier, subscription_status, usage, limits}` for frontend state
+  - `StripeWebhookView` — receives events; signature-verified before any DB work
+- **`user_app/billing_throttles.py`** — `CheckoutThrottle` (5/min) defeats card-testing / botting on the upgrade path
+- **`SubscriptionAuditLog`** — append-only model that records every status transition. `stripe_event_id` is the unique key; replays short-circuit
+
+### Status → Tier Mapping
+
+The webhook handler translates Stripe subscription status into our tier:
+
+| Stripe status                                                             | Our tier                         |
+| ------------------------------------------------------------------------- | -------------------------------- |
+| `active`, `trialing`, `past_due`                                          | `pro` (past_due is grace period) |
+| `incomplete`, `incomplete_expired`, `canceled`, `unpaid`, `inactive`      | `free`                           |
+
+### Webhook Flow
+
+```
+POST /api/v1/billing/webhook/
+  → verify_webhook(payload, signature)    # raises on bad sig → 400
+  → stripe_event_id already in SubscriptionAuditLog?
+        yes → return 200 {received, duplicate}     # idempotent
+  → dispatch on event.type:
+        checkout.session.completed            → _apply_status('active')
+        customer.subscription.updated|created → _apply_status(event.data.status)
+        customer.subscription.deleted         → _apply_status('canceled')
+  → _apply_status runs under select_for_update + transaction.atomic:
+        update User.subscription_status, User.tier
+        append SubscriptionAuditLog row
+```
+
+### Daily Usage Counters
+
+`User.resume_tailor_count` + `User.last_reset_date` track daily quota for free
+tier. The counter resets at UTC midnight on first hit (lazy reset — no cron).
+`Resume.chat_turn_count` tracks per-resume chat quota so a single conversation
+cannot drain a user's whole daily allowance.
+
+These counters feed two custom DRF permissions in `user_app/permissions.py`:
+
+- `IsProOrUnderLimit` — daily-resetting per-user counter; views opt in with `counter_field = 'resume_tailor_count'`
+- `ChatTurnLimit` — permanent per-resume counter against `settings.FREE_TIER_CHAT_LIMIT`
+
+Pro users (`subscription_status ∈ {active, trialing, past_due}` and `tier == 'pro'`) bypass both.
+
+### What We Never Store
+
+- Card numbers, expiries, CVVs — never transmitted through our servers
+- Stripe secret key outside of `.env`
+- Payment methods, invoices, or any PII beyond what Stripe sends in webhook metadata
 
 ## Known Lessons
 
-- docker compose restart does NOT load new env vars; must use down && up
-- Use PersistentClient pattern for any local storage services
+- `docker compose restart` does NOT load new env vars; must use `down && up`
+- Use `PersistentClient` pattern for any local storage services
 - Relative paths only — hardcoded IPs break in Docker networking
-- chat_history IS persisted to DB — backend owns it; never pass it in request body
+- `chat_history` IS persisted to DB — backend owns it; never pass it in request body
 - multipart/form-data on upload endpoint only — JSON everywhere else
 - AppShell pattern (CSS hide/show) prevents NavBar remounts and fullscreen flash
-- Vite resolves directory imports to index.jsx — use this for component subfolders
-- Custom hooks (useResumeMachine) keep page components as pure JSX; easier to test and reason about
+- Vite resolves directory imports to `index.jsx` — use this for component subfolders
+- Custom hooks (`useResumeMachine`) keep page components as pure JSX; easier to test and reason about
+- Stale Docker containers cause phantom bugs — always check for orphaned containers (`docker ps -a`) when behavior doesn't match code
 
 ## Tiered Throttling
 
 Rate limits are tier-aware. Every throttled endpoint reads `request.user.tier` (free/pro) and looks up the rate from `settings.TIERED_THROTTLE_RATES[scope][tier]`.
 
-| Scope           | Free   | Pro    | Endpoints                            |
-| --------------- | ------ | ------ | ------------------------------------ |
-| `user_upload`   | 3/day  | 15/day | POST /api/v1/resumes/upload/         |
-| `user_draft`    | 1/day  | 5/day  | POST /api/v1/resumes/{id}/draft/     |
-| `user_chat`     | 10/day | 50/day | POST /api/v1/resumes/{id}/chat/      |
-| `user_finalize` | 3/day  | 15/day | PATCH /api/v1/resumes/{id}/finalize/ |
-| `user_onet`     | 10/day | 30/day | GET /api/v1/onet/search/             |
+| Scope              | Free   | Pro    | Endpoints                                                  |
+| ------------------ | ------ | ------ | ---------------------------------------------------------- |
+| `user_upload`      | 3/day  | 15/day | POST /api/v1/resumes/upload/                               |
+| `user_draft`       | 1/day  | 5/day  | POST /api/v1/resumes/{id}/draft/                           |
+| `user_chat`        | 10/day | 50/day | POST /api/v1/resumes/{id}/chat/                            |
+| `user_finalize`    | 3/day  | 15/day | PATCH /api/v1/resumes/{id}/finalize/                       |
+| `user_onet`        | 10/day | 30/day | GET /api/v1/onet/{search,military,career}/                 |
+| `billing_checkout` | 5/min  | 5/min  | POST /api/v1/billing/{checkout,portal}/ (anti card-testing) |
 
-All throttle classes live in `translate_app/throttles.py`. Cache key includes tier so upgrade/downgrade immediately takes effect. Falls back to `DEFAULT_THROTTLE_RATES` for unknown tiers.
+All tiered throttle classes live in `translate_app/throttles.py`. The
+`billing_checkout` throttle lives in `user_app/billing_throttles.py`. Cache key
+includes tier so upgrade/downgrade immediately takes effect. Falls back to
+`DEFAULT_THROTTLE_RATES` for unknown tiers.
 
 ## Dev vs Production
 
 ### Development
 
-- Frontend: npm run dev on host (localhost:5173, HMR enabled)
-- Backend: docker compose up (localhost:8000)
-- Vite proxies /api/ to localhost:8000 via vite.config.js
+- Frontend: `npm run dev` on host (`localhost:5173`, HMR enabled)
+- Backend: `docker compose up` (`localhost:8000`)
+- Vite proxies `/api/` to `localhost:8000` via `vite.config.js`
 - No Nginx needed in dev
 
 ### Production
 
-- npm run build → dist/
-- docker compose up --build
-- Nginx serves dist/ and proxies /api/ → backend:8000
+- `npm run build` → `dist/`
+- `docker compose up --build`
+- Nginx serves `dist/` and proxies `/api/` → `backend:8000`
 
 ## SSL / HTTPS (Production)
 

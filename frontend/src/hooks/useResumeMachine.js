@@ -198,6 +198,13 @@ export default function useResumeMachine() {
             : [],
         });
       } catch (err) {
+        if (err.status === 403 && err.data?.code === "TAILOR_LIMIT_REACHED") {
+          // Reset phase so UploadForm re-renders, and re-throw so the
+          // caller (UploadForm) can open the Upgrade modal. Mirrors the
+          // CHAT_LIMIT_REACHED re-throw pattern used in handleChatSend.
+          dispatch({ type: "DRAFT_FAILED", message: "" });
+          throw err;
+        }
         dispatch({ type: "DRAFT_FAILED", message: err.message });
       }
     },

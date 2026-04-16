@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { uploadResume } from "../api/resumes";
+import UpgradeModal from "./UpgradeModal";
 
 const TIPS = [
   "Include the full job description, not just requirements",
@@ -16,10 +17,12 @@ export default function UploadForm({
   const [uploading, setUploading] = useState(false);
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
+  const [tailorLimitHit, setTailorLimitHit] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const isUploaded = state.phase === "UPLOADED";
   const jdLength = (state.jobDescription ?? "").trim().length;
-  const canGenerate = isUploaded && jdLength >= 10;
+  const canGenerate = isUploaded && jdLength >= 10 && !tailorLimitHit;
 
   async function handleUpload() {
     if (!file) return;
@@ -38,8 +41,16 @@ export default function UploadForm({
     }
   }
 
-  function handleGenerateDraft() {
-    onGenerateDraft({ jobTitle, company });
+  async function handleGenerateDraft() {
+    try {
+      await onGenerateDraft({ jobTitle, company });
+    } catch (err) {
+      if (err.status === 403 && err.data?.code === "TAILOR_LIMIT_REACHED") {
+        setTailorLimitHit(true);
+        setShowUpgrade(true);
+      }
+      // Other errors are already surfaced via state.error by the hook.
+    }
   }
 
   return (
@@ -163,8 +174,25 @@ export default function UploadForm({
         ))}
       </div>
 
-      {/* Error */}
-      {state.error && (
+      {/* Tailor-limit banner with upgrade path */}
+      {tailorLimitHit && (
+        <div className="bg-error-container text-on-error-container font-body text-sm px-4 py-3 rounded-md flex items-center justify-between gap-3 flex-wrap">
+          <span>
+            You've reached today's free tailor limit. Upgrade to Pro for
+            unlimited resume tailoring.
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowUpgrade(true)}
+            className="font-label text-xs tracking-widest uppercase text-tertiary hover:text-tertiary-fixed transition-colors"
+          >
+            UPGRADE →
+          </button>
+        </div>
+      )}
+
+      {/* Other errors */}
+      {state.error && !tailorLimitHit && (
         <div className="bg-error-container text-on-error-container font-body text-sm px-4 py-3 rounded-md">
           {state.error}
         </div>
@@ -188,6 +216,13 @@ export default function UploadForm({
           GENERATE TAILORED RESUME →
         </button>
       )}
+
+      <UpgradeModal
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        title="Daily tailor limit reached"
+        description="Free accounts can tailor 1 resume per day. Upgrade to Pro for unlimited resume tailoring and unlimited refinement chat — $10/month."
+      />
     </div>
   );
 }

@@ -1,11 +1,6 @@
 import { useReducer, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import {
-  generateDraft,
-  sendChatMessage,
-  getResume,
-  reopenResume,
-} from "../api/resumes";
+import { generateDraft, sendChatMessage, getResume } from "../api/resumes";
 import { useResumes } from "../context/ResumeContext";
 
 const initialState = {
@@ -142,17 +137,10 @@ export default function useResumeMachine() {
     loadedIdRef.current = id;
     dispatch({ type: "LOADING" });
     getResume(id)
-      .then(async (resume) => {
-        // If re-entering a finalized resume in edit mode, reopen it first
-        // so chat is unlocked and a fresh turn allocation is granted.
-        if (mode === "edit" && resume.is_finalized) {
-          try {
-            await reopenResume(resume.id || id);
-          } catch {
-            // If reopen fails (e.g. network), continue loading read-only
-          }
-        }
-
+      .then((resume) => {
+        // Note: reopen (is_finalized True -> False) is handled by the
+        // caller (Dashboard Edit button) before navigation, not here.
+        // This effect only LOADS; it never mutates server state.
         dispatch({
           type: "RESUME_LOADED",
           resumeId: resume.id || id,
@@ -165,7 +153,7 @@ export default function useResumeMachine() {
           aiInitialDraft: resume.ai_initial_draft || resume.roles || [],
           chatHistory: (resume.chat_history || []).slice(-10),
           chatTurnCount: resume.chat_turn_count || 0,
-          isFinalized: false,
+          isFinalized: resume.is_finalized || false,
         });
       })
       .catch(() => {

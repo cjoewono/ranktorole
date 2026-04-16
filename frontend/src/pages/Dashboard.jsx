@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
-import { deleteResume } from "../api/resumes";
+import { deleteResume, reopenResume } from "../api/resumes";
 import { useResumes } from "../context/ResumeContext";
 import { exportPDF } from "../utils/pdfExport";
 
@@ -38,6 +38,7 @@ function StatusBadge({ resume }) {
 export default function Dashboard() {
   const { resumes, loading, refreshResumes } = useResumes();
   const [error, setError] = useState(null);
+  const [reopeningId, setReopeningId] = useState(null);
   const navigate = useNavigate();
 
   async function handleDelete(id) {
@@ -46,6 +47,28 @@ export default function Dashboard() {
       await refreshResumes();
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  async function handleOpen(resume) {
+    // Not finalized → continue, no server mutation
+    if (!resume.is_finalized) {
+      navigate(`/resume-builder?id=${resume.id}&mode=continue`);
+      return;
+    }
+    // Finalized → reopen on the server FIRST (explicit user action),
+    // then navigate. Replaces the old mount-effect reopen that fired
+    // on every remount with ?mode=edit in the URL.
+    setReopeningId(resume.id);
+    setError(null);
+    try {
+      await reopenResume(resume.id);
+      await refreshResumes();
+      navigate(`/resume-builder?id=${resume.id}&mode=edit`);
+    } catch (err) {
+      setError(err.message || "Could not reopen this resume. Try again.");
+    } finally {
+      setReopeningId(null);
     }
   }
 
@@ -182,16 +205,15 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <button
-                      onClick={() =>
-                        navigate(
-                          resume.is_finalized
-                            ? `/resume-builder?id=${resume.id}&mode=edit`
-                            : `/resume-builder?id=${resume.id}&mode=continue`,
-                        )
-                      }
-                      className="font-label text-xs tracking-widest uppercase text-tertiary hover:text-tertiary-fixed transition-colors"
+                      onClick={() => handleOpen(resume)}
+                      disabled={reopeningId === resume.id}
+                      className="font-label text-xs tracking-widest uppercase text-tertiary hover:text-tertiary-fixed transition-colors disabled:opacity-50"
                     >
-                      {resume.is_finalized ? "EDIT" : "CONTINUE"}
+                      {reopeningId === resume.id
+                        ? "OPENING..."
+                        : resume.is_finalized
+                          ? "EDIT"
+                          : "CONTINUE"}
                     </button>
                     {resume.is_finalized && (
                       <button

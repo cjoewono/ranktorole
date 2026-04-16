@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { uploadResume } from "../api/resumes";
 import UpgradeModal from "./UpgradeModal";
 
@@ -17,12 +17,18 @@ export default function UploadForm({
   const [uploading, setUploading] = useState(false);
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
-  const [tailorLimitHit, setTailorLimitHit] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
   const isUploaded = state.phase === "UPLOADED";
   const jdLength = (state.jobDescription ?? "").trim().length;
+  const tailorLimitHit = state.tailorLimitHit === true;
   const canGenerate = isUploaded && jdLength >= 10 && !tailorLimitHit;
+
+  // Auto-open modal when the machine flips tailorLimitHit on.
+  // Covers the re-render path after DRAFTING -> UPLOADED phase transition.
+  useEffect(() => {
+    if (tailorLimitHit) setShowUpgrade(true);
+  }, [tailorLimitHit]);
 
   async function handleUpload() {
     if (!file) return;
@@ -41,16 +47,8 @@ export default function UploadForm({
     }
   }
 
-  async function handleGenerateDraft() {
-    try {
-      await onGenerateDraft({ jobTitle, company });
-    } catch (err) {
-      if (err.status === 403 && err.data?.code === "TAILOR_LIMIT_REACHED") {
-        setTailorLimitHit(true);
-        setShowUpgrade(true);
-      }
-      // Other errors are already surfaced via state.error by the hook.
-    }
+  function handleGenerateDraft() {
+    onGenerateDraft({ jobTitle, company });
   }
 
   return (

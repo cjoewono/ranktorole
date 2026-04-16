@@ -14,6 +14,7 @@ const initialState = {
   isSending: false,
   chatTurnCount: 0,
   isFinalized: false,
+  tailorLimitHit: false, // true when backend returns 403 TAILOR_LIMIT_REACHED — survives phase transitions
   error: null,
 };
 
@@ -35,6 +36,8 @@ function reducer(state, action) {
       };
     case "DRAFT_FAILED":
       return { ...state, phase: "UPLOADED", error: action.message };
+    case "TAILOR_LIMIT_HIT":
+      return { ...state, phase: "UPLOADED", tailorLimitHit: true, error: "" };
     case "CHAT_SENT":
       return {
         ...state,
@@ -199,11 +202,12 @@ export default function useResumeMachine() {
         });
       } catch (err) {
         if (err.status === 403 && err.data?.code === "TAILOR_LIMIT_REACHED") {
-          // Reset phase so UploadForm re-renders, and re-throw so the
-          // caller (UploadForm) can open the Upgrade modal. Mirrors the
-          // CHAT_LIMIT_REACHED re-throw pattern used in handleChatSend.
-          dispatch({ type: "DRAFT_FAILED", message: "" });
-          throw err;
+          // Set a persistent flag on the machine instead of re-throwing.
+          // The re-throw approach fails here because DRAFT_FAILED would
+          // unmount UploadForm (phase DRAFTING -> UPLOADED) before its
+          // catch handler runs, discarding any local setState calls.
+          dispatch({ type: "TAILOR_LIMIT_HIT" });
+          return;
         }
         dispatch({ type: "DRAFT_FAILED", message: err.message });
       }

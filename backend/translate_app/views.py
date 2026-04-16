@@ -317,8 +317,10 @@ class ResumeFinalizeView(APIView):
 class ResumeReopenView(APIView):
     """PATCH /api/v1/resumes/{id}/reopen/ — reopen a finalized resume for further editing.
 
-    Sets is_finalized=False and resets chat_turn_count to 0 so the user gets
-    a fresh chat allocation. Does nothing if the resume is not finalized.
+    Sets is_finalized=False so chat is unlocked. chat_turn_count is preserved
+    across reopen — the free-tier chat allocation is per-resume, not per-session,
+    to prevent gaming the limit by finalizing and reopening repeatedly.
+    Returns 400 if the resume is not finalized.
     """
 
     permission_classes = [IsAuthenticated]

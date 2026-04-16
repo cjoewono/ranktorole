@@ -10,9 +10,14 @@ class ResumeSerializer(serializers.ModelSerializer):
             'civilian_title', 'summary', 'bullets',
             'roles', 'chat_history', 'ai_initial_draft',
             'session_anchor', 'approved_bullets', 'rejected_bullets',
-            'is_finalized', 'created_at', 'updated_at',
+            'is_finalized', 'chat_turn_count',
+            'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'session_anchor', 'ai_initial_draft']
+        read_only_fields = [
+            'id', 'created_at', 'updated_at',
+            'session_anchor', 'ai_initial_draft',
+            'chat_turn_count',
+        ]
 
 
 class RoleEntrySerializer(serializers.Serializer):

@@ -838,6 +838,15 @@ class TestResumeListDetailView:
         assert response.status_code == 204
         assert not Resume.objects.filter(id=resume.id).exists()
 
+    def test_detail_includes_chat_turn_count(self, auth_client, user, db):
+        """GET /api/v1/resumes/{id}/ must return chat_turn_count so the
+        frontend counter stays in sync across re-entries. Regression test
+        for the post-finalize edit counter-resets-to-zero bug."""
+        resume = _create_resume(user, chat_turn_count=6)
+        response = auth_client.get(f"/api/v1/resumes/{resume.id}/")
+        assert response.status_code == 200
+        assert response.data["chat_turn_count"] == 6
+
 
 class TestAnthropicSafetyNet:
     """Verify the root conftest blocks real API calls."""

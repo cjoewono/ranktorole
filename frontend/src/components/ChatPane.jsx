@@ -20,7 +20,10 @@ export default function ChatPane({
     if (phase === "REVIEWING" || phase === "FINALIZING") setLockedMsg(null);
   }, [phase]);
 
-  const isLocked = phase === "DONE" || lockedMsg !== null;
+  const isLocked =
+    phase === "DONE" ||
+    lockedMsg !== null ||
+    (userTier !== "pro" && chatTurnCount >= 10);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -135,7 +138,9 @@ export default function ChatPane({
         <div className="border-t border-outline-variant/20 px-4 py-3 font-label text-xs tracking-widest uppercase text-on-surface-variant">
           {phase === "DONE"
             ? "MISSION COMPLETE — RESUME FINALIZED"
-            : "CHAT LOCKED — RESUME ALREADY FINALIZED"}
+            : chatTurnCount >= 10
+              ? "CHAT LIMIT REACHED — UPGRADE FOR UNLIMITED"
+              : "CHAT LOCKED — RESUME ALREADY FINALIZED"}
         </div>
       ) : (
         <div className="border-t border-outline-variant/20 px-4 py-3 flex gap-2">

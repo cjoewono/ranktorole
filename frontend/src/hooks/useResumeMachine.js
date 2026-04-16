@@ -239,6 +239,12 @@ export default function useResumeMachine() {
           dispatch({ type: "CHAT_FAILED", message: "" });
           throw err;
         }
+        if (err.status === 403 && err.data?.code === "CHAT_LIMIT_REACHED") {
+          // Pop the optimistic message, don't set a banner — ChatPane's
+          // own catch handler sets lockedMsg + opens the Upgrade modal.
+          dispatch({ type: "CHAT_FAILED", message: "" });
+          throw err;
+        }
         dispatch({ type: "CHAT_FAILED", message: err.message });
       } finally {
         dispatch({ type: "CHAT_DONE_SENDING" });

@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
-import { searchMilitaryCareers, getCareerDetail } from "../api/onet";
+import {
+  searchMilitaryCareers,
+  getCareerDetail,
+  enrichCareer,
+} from "../api/onet";
 
 const loadingKeyframes = `
 @keyframes loading {
@@ -52,6 +56,28 @@ function TagBadge({ label, active }) {
   );
 }
 
+function MatchScoreBadge({ score }) {
+  let color = "bg-error/10 text-error";
+  let label = "LOW MATCH";
+  if (score >= 80) {
+    color = "bg-secondary/10 text-secondary";
+    label = "STRONG MATCH";
+  } else if (score >= 60) {
+    color = "bg-primary/10 text-primary";
+    label = "GOOD MATCH";
+  } else if (score >= 40) {
+    color = "bg-tertiary/10 text-tertiary";
+    label = "PARTIAL MATCH";
+  }
+  return (
+    <span
+      className={`font-label text-xs tracking-widest uppercase px-3 py-1 rounded-sm ${color}`}
+    >
+      {score}% — {label}
+    </span>
+  );
+}
+
 export default function CareerRecon() {
   // Search state
   const [keyword, setKeyword] = useState("");
@@ -66,6 +92,9 @@ export default function CareerRecon() {
   const [selectedCode, setSelectedCode] = useState(null);
   const [detail, setDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [enrichment, setEnrichment] = useState(null);
+  const [enrichError, setEnrichError] = useState(null);
+  const latestClickRef = useRef(null);
 
   const phase = detail ? "DETAIL" : results ? "RESULTS" : "SEARCH";
 
@@ -96,27 +125,51 @@ export default function CareerRecon() {
   }
 
   async function handleCareerClick(onetCode) {
+    latestClickRef.current = onetCode;
     setSelectedCode(onetCode);
     setLoadingDetail(true);
-    try {
-      const data = await getCareerDetail(onetCode);
-      setDetail(data);
-    } catch {
+    setEnrichment(null);
+    setEnrichError(null);
+    setDetail(null);
+
+    const [careerResult, enrichResult] = await Promise.allSettled([
+      getCareerDetail(onetCode),
+      enrichCareer(onetCode),
+    ]);
+
+    // Ignore if user clicked a different career while this fetch was in flight
+    if (latestClickRef.current !== onetCode) return;
+
+    if (careerResult.status === "fulfilled") {
+      setDetail(careerResult.value);
+    } else {
       setSelectedCode(null);
-    } finally {
       setLoadingDetail(false);
+      return;
     }
+
+    if (enrichResult.status === "fulfilled") {
+      setEnrichment(enrichResult.value?.enrichment ?? null);
+    } else {
+      setEnrichError("Personalized analysis unavailable.");
+    }
+
+    setLoadingDetail(false);
   }
 
   function handleBackToResults() {
     setDetail(null);
     setSelectedCode(null);
+    setEnrichment(null);
+    setEnrichError(null);
   }
 
   function handleNewSearch() {
     setResults(null);
     setDetail(null);
     setSelectedCode(null);
+    setEnrichment(null);
+    setEnrichError(null);
     setKeyword("");
     setBranch("all");
   }
@@ -391,6 +444,73 @@ export default function CareerRecon() {
         {/* ─── DETAIL PHASE ─── */}
         {phase === "DETAIL" && detail && (
           <div className="space-y-6">
+            {/* Enrichment — Claude Haiku personalized analysis */}
+            {enrichment && (
+              <div className="bg-surface-container-low p-6 space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-primary inline-block" />
+                    <span className="font-label text-xs tracking-widest uppercase text-primary">
+                      PERSONALIZED CAREER INTELLIGENCE
+                    </span>
+                  </div>
+                  <MatchScoreBadge score={enrichment.match_score ?? 0} />
+                </div>
+
+                <p className="font-body text-sm text-on-surface-variant leading-relaxed">
+                  {enrichment.personalized_description}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <p className="font-label text-xs tracking-widest uppercase text-secondary">
+                      <span className="text-secondary mr-1">✓</span>
+                      TRANSFERABLE SKILLS
+                    </p>
+                    <div className="space-y-1">
+                      {(enrichment.transferable_skills ?? []).map((skill, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="text-secondary shrink-0 mt-0.5 text-xs">✓</span>
+                          <span className="font-body text-sm text-on-surface">{skill}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="font-label text-xs tracking-widest uppercase text-error">
+                      <span className="text-error mr-1">△</span>
+                      SKILL GAPS TO BRIDGE
+                    </p>
+                    <div className="space-y-1">
+                      {(enrichment.skill_gaps ?? []).map((gap, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="text-error shrink-0 mt-0.5 text-xs">△</span>
+                          <span className="font-body text-sm text-on-surface">{gap}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-outline-variant space-y-1">
+                  <p className="font-label text-xs tracking-widest uppercase text-tertiary">
+                    <span className="text-tertiary mr-1">◆</span>
+                    EDUCATION PATH
+                  </p>
+                  <p className="font-body text-sm text-on-surface-variant">
+                    {enrichment.education_recommendation}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {enrichError && !enrichment && (
+              <div className="bg-surface-container-low px-4 py-3 font-body text-sm text-on-surface-variant">
+                {enrichError} Showing O*NET data only.
+              </div>
+            )}
+
             {/* Overview */}
             <div className="bg-surface-container-low p-6 space-y-3">
               <div className="flex items-center gap-3 flex-wrap">

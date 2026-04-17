@@ -338,9 +338,27 @@ None.
 - [x] Smoke-tested against real veteran resume (Brandon Livrago + Unstructured JD) — all acceptance criteria passed
 - [x] Test count: 137 → 163 passing
 
+## Completed — April 17, 2026 (Session 13 — Career Recon Enrichment)
+
+- [x] ReconEnrichThrottle — 15/day free, 25/day pro
+- [x] CareerEnrichment Pydantic schema (match_score clamped 0-100, max_length constraints)
+- [x] recon_enrich_service.py — Haiku 4.5 via shared Anthropic singleton
+- [x] DB-backed result cache (profile-aware SHA256 keys, 7-day TTL)
+- [x] Global 500/day ceiling with incr-first atomic pattern
+- [x] 15s hard timeout on Haiku API call
+- [x] _normalize_career_data() helper extracted and shared
+- [x] ReconEnrichView: POST /api/v1/onet/enrich/
+- [x] enrichCareer() frontend API function
+- [x] Parallel O*NET + Haiku fetch via Promise.allSettled (graceful degradation)
+- [x] MatchScoreBadge — 4-tier color coding
+- [x] Enrichment panel in DETAIL phase
+- [x] Stale-click race guard (latestClickRef pattern)
+- [x] strip_tags on all LLM string outputs
+- [x] 10 new tests (163 → 173 passing)
+
 ## Start Next Session With
 
-> "Let's tackle the remaining deploy blockers before EC2. Confirm 163 backend
+> "Let's tackle the remaining deploy blockers before EC2. Confirm 173 backend
 > tests pass locally, then work through in order: (1) decide the `ResumeChatView`
 > `is_finalized` contract — DATA_CONTRACT says 409, code returns 200, test
 > asserts 200, need a design decision not just a code change. (2) Throttle UX

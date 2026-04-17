@@ -149,6 +149,7 @@ REST_FRAMEWORK = {
         'user_upload': '3/day',
         'user_finalize': '3/day',
         'user_onet': '10/day',
+        'user_recon_enrich': '15/day',
         'billing_checkout': '5/min',
     },
 }
@@ -171,7 +172,17 @@ TIERED_THROTTLE_RATES = {
     'user_chat':     {'free': '10/day', 'pro': '50/day'},
     'user_finalize': {'free': '3/day',  'pro': '15/day'},
     'user_onet':     {'free': '10/day', 'pro': '30/day'},
+    'user_recon_enrich': {'free': '15/day', 'pro': '25/day'},
 }
+
+# ---------------------------------------------------------------------------
+# Recon Enrichment — cost controls
+# ---------------------------------------------------------------------------
+RECON_ENRICH_CACHE_TTL = 7 * 24 * 60 * 60  # 7 days in seconds
+
+RECON_ENRICH_DAILY_CEILING = int(os.environ.get('RECON_ENRICH_DAILY_CEILING', '500'))
+
+RECON_ENRICH_TIMEOUT_SECONDS = 15.0
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -207,6 +218,11 @@ LOGGING = {
             'propagate': False,
         },
         'user_app': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'onet_app': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,

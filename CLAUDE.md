@@ -100,6 +100,7 @@ DELETE /api/v1/resumes/{id}/            delete resume
 GET    /api/v1/onet/search/?keyword=    legacy keyword search (resume builder)
 GET    /api/v1/onet/military/           MOS search → civilian career matches (Veterans API)
 GET    /api/v1/onet/career/{code}/      career detail aggregation (skills, knowledge, salary, outlook)
+POST   /api/v1/onet/enrich/            onet_code → personalized career intelligence (Haiku 4.5)
 POST   /api/v1/billing/checkout/        Stripe Checkout Session (Pro upgrade)
 POST   /api/v1/billing/portal/          Stripe Customer Portal (manage/cancel)
 GET    /api/v1/billing/status/          current tier, subscription status, usage, limits

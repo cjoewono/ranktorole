@@ -639,3 +639,52 @@ No PAN, no CVV, no payment methods — ever.
 - No admin access to user resume content without explicit grant
 - User can delete their own resumes at any finalization state
 - User tier is writable only via the Stripe webhook — never via API
+
+---
+
+## POST /api/v1/onet/enrich/
+
+**Auth:** Required (JWT)
+**Throttle:** ReconEnrichThrottle — 15/day free, 25/day pro
+**Cache:** DB-backed, 7-day TTL, profile-fingerprint key
+
+### Request body
+
+```json
+{ "onet_code": "47-2061.00" }
+```
+
+### Response 200
+
+```json
+{
+  "onet_code": "47-2061.00",
+  "career_title": "Construction Laborers",
+  "enrichment": {
+    "match_score": 72,
+    "personalized_description": "2-3 sentences referencing veteran's branch/MOS/skills.",
+    "skill_gaps": ["OSHA 30-Hour Card", "PMP certification"],
+    "education_recommendation": "1-2 sentences with GI Bill path where applicable.",
+    "transferable_skills": ["Team leadership", "Risk assessment", "Equipment operation", "Safety protocols"]
+  }
+}
+```
+
+### Error responses
+
+| Status | When |
+|--------|------|
+| 400 | `onet_code` missing, malformed, or user has no `profile_context` |
+| 401 | Unauthenticated |
+| 404 | O*NET career code not found |
+| 429 | Per-user throttle exceeded |
+| 502 | O*NET API unreachable |
+| 503 | Global daily ceiling hit or Haiku API failure |
+
+### Storage rules
+
+- Enrichment result is NEVER persisted to the Resume model or any DB table
+- `profile_context` is read from `request.user` — never from request body
+- Cache key: `recon_enrich:{onet_code}:{profile_fingerprint[:16]}`
+- Profile fingerprint: SHA256 of `branch|mos|target_sector|sorted(skills)`
+- Cached dict expires after `RECON_ENRICH_CACHE_TTL` seconds (default: 604800)

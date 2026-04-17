@@ -6,7 +6,7 @@ RankToRole turns a veteran's service record into a targeted civilian resume.
 Upload a PDF, paste a job description, and the app produces a role-grouped
 draft plus a short refinement chat — all grounded in O\*NET career data.
 
-**Live:** [cjoewono.com](https://cjoewono.com) *(pending final deployment)*
+**Live:** [cjoewono.com](https://cjoewono.com) _(pending final deployment)_
 **Deadline:** April 24, 2026
 
 ---
@@ -21,21 +21,22 @@ draft plus a short refinement chat — all grounded in O\*NET career data.
 - **Career Recon** — standalone O\*NET career explorer at `/recon` (MOS code → civilian matches, salary, outlook)
 - **Free / Pro tiers** — Stripe-powered subscription with Customer Portal, tiered rate limits, immutable audit log
 - **Google OAuth** — passwordless sign-in alongside email + password
+- **Honest translation by default** — three-layer validation protects against LLM fabrication: a grounding prompt preserves every metric and proper noun from your source resume, a regex validator flags anything the prompt misses, and the UI surfaces flags for your review before finalize. You never ship a resume with invented numbers or inflated scope.
 
 ---
 
 ## Stack
 
-| Layer        | Technology                                                         |
-| ------------ | ------------------------------------------------------------------ |
-| Frontend     | React 18 (Vite) · Tailwind CSS · React Router DOM · jsPDF           |
-| Backend      | Django 4.2 · Django REST Framework · SimpleJWT                     |
-| Database     | PostgreSQL 16 (named volume)                                       |
-| AI           | Claude API (`claude-sonnet-4-20250514`) via `anthropic` Python SDK  |
-| Billing      | Stripe Checkout + Customer Portal + Webhooks                       |
+| Layer        | Technology                                                                |
+| ------------ | ------------------------------------------------------------------------- |
+| Frontend     | React 18 (Vite) · Tailwind CSS · React Router DOM · jsPDF                 |
+| Backend      | Django 4.2 · Django REST Framework · SimpleJWT                            |
+| Database     | PostgreSQL 16 (named volume)                                              |
+| AI           | Claude API (`claude-sonnet-4-20250514`) via `anthropic` Python SDK        |
+| Billing      | Stripe Checkout + Customer Portal + Webhooks                              |
 | Auth         | JWT (hybrid: access in memory, refresh in httpOnly cookie) + Google OAuth |
-| External API | O\*NET v2 (`api-v2.onetcenter.org`, `X-API-Key` auth)               |
-| Infra        | Docker Compose · Nginx · AWS EC2 · Let's Encrypt                   |
+| External API | O\*NET v2 (`api-v2.onetcenter.org`, `X-API-Key` auth)                     |
+| Infra        | Docker Compose · Nginx · AWS EC2 · Let's Encrypt                          |
 
 ---
 
@@ -76,7 +77,7 @@ STRIPE_PRICE_ID=price_...
 
 ```bash
 docker compose exec backend python manage.py migrate
-docker compose exec backend pytest            # backend test suite (116 passing)
+docker compose exec backend pytest            # backend test suite (163 passing)
 docker compose exec frontend npm run build    # production bundle
 ```
 
@@ -112,14 +113,14 @@ For the full design, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Project Docs
 
-| File                                 | Purpose                                               |
-| ------------------------------------ | ----------------------------------------------------- |
-| [ARCHITECTURE.md](ARCHITECTURE.md)   | System design, product flow, context window strategy  |
-| [DATA_CONTRACT.md](DATA_CONTRACT.md) | Every endpoint's input, output, and error shapes      |
-| [SECURITY.md](SECURITY.md)           | Secrets, auth, input validation, PCI scope, HTTPS     |
-| [CLAUDE.md](CLAUDE.md)               | Rules for AI coding assistants working on the repo    |
-| [TASKS.md](TASKS.md)                 | Current sprint status and completed work              |
-| [PROJECTLOG.md](PROJECTLOG.md)       | Session-by-session build log                          |
+| File                                 | Purpose                                              |
+| ------------------------------------ | ---------------------------------------------------- |
+| [ARCHITECTURE.md](ARCHITECTURE.md)   | System design, product flow, context window strategy |
+| [DATA_CONTRACT.md](DATA_CONTRACT.md) | Every endpoint's input, output, and error shapes     |
+| [SECURITY.md](SECURITY.md)           | Secrets, auth, input validation, PCI scope, HTTPS    |
+| [CLAUDE.md](CLAUDE.md)               | Rules for AI coding assistants working on the repo   |
+| [TASKS.md](TASKS.md)                 | Current sprint status and completed work             |
+| [PROJECTLOG.md](PROJECTLOG.md)       | Session-by-session build log                         |
 
 ---
 

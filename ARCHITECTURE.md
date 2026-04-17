@@ -242,10 +242,10 @@ stores a `stripe_customer_id` reference and listens for webhook events.
 
 The webhook handler translates Stripe subscription status into our tier:
 
-| Stripe status                                                             | Our tier                         |
-| ------------------------------------------------------------------------- | -------------------------------- |
-| `active`, `trialing`, `past_due`                                          | `pro` (past_due is grace period) |
-| `incomplete`, `incomplete_expired`, `canceled`, `unpaid`, `inactive`      | `free`                           |
+| Stripe status                                                        | Our tier                         |
+| -------------------------------------------------------------------- | -------------------------------- |
+| `active`, `trialing`, `past_due`                                     | `pro` (past_due is grace period) |
+| `incomplete`, `incomplete_expired`, `canceled`, `unpaid`, `inactive` | `free`                           |
 
 ### Webhook Flow
 
@@ -299,13 +299,13 @@ Pro users (`subscription_status ∈ {active, trialing, past_due}` and `tier == '
 
 Rate limits are tier-aware. Every throttled endpoint reads `request.user.tier` (free/pro) and looks up the rate from `settings.TIERED_THROTTLE_RATES[scope][tier]`.
 
-| Scope              | Free   | Pro    | Endpoints                                                  |
-| ------------------ | ------ | ------ | ---------------------------------------------------------- |
-| `user_upload`      | 3/day  | 15/day | POST /api/v1/resumes/upload/                               |
-| `user_draft`       | 1/day  | 5/day  | POST /api/v1/resumes/{id}/draft/                           |
-| `user_chat`        | 10/day | 50/day | POST /api/v1/resumes/{id}/chat/                            |
-| `user_finalize`    | 3/day  | 15/day | PATCH /api/v1/resumes/{id}/finalize/                       |
-| `user_onet`        | 10/day | 30/day | GET /api/v1/onet/{search,military,career}/                 |
+| Scope              | Free   | Pro    | Endpoints                                                   |
+| ------------------ | ------ | ------ | ----------------------------------------------------------- |
+| `user_upload`      | 3/day  | 15/day | POST /api/v1/resumes/upload/                                |
+| `user_draft`       | 1/day  | 5/day  | POST /api/v1/resumes/{id}/draft/                            |
+| `user_chat`        | 10/day | 50/day | POST /api/v1/resumes/{id}/chat/                             |
+| `user_finalize`    | 3/day  | 15/day | PATCH /api/v1/resumes/{id}/finalize/                        |
+| `user_onet`        | 10/day | 30/day | GET /api/v1/onet/{search,military,career}/                  |
 | `billing_checkout` | 5/min  | 5/min  | POST /api/v1/billing/{checkout,portal}/ (anti card-testing) |
 
 All tiered throttle classes live in `translate_app/throttles.py`. The
@@ -327,6 +327,96 @@ includes tier so upgrade/downgrade immediately takes effect. Falls back to
 - `npm run build` → `dist/`
 - `docker compose up --build`
 - Nginx serves `dist/` and proxies `/api/` → `backend:8000`
+
+## Honesty Stack
+
+Three layers of validation protect against LLM fabrication and identity
+erasure in the resume translation flow. Built April 17 2026 in response
+to the product question: how do we ensure translations are both optimally
+written for recruiters AND honestly grounded in what the veteran actually
+did?
+
+### Layer 1 — Prompt Guardrails (`translate_app/services.py`)
+
+`_SYSTEM_PROMPT` contains 8 non-negotiable rules:
+
+1. Preserve every concrete source fact (dollar amounts, percentages, team
+   sizes, named scope) when translating the bullet that contains them
+2. Never add concrete facts not in source — including aggregates computed
+   across source numbers (no "$1.2M total" when source lists $275K, $240K,
+   $25K separately)
+3. Preserve ALL proper nouns verbatim — named operations (Ukraine, OIF),
+   programs (ION, Palantir), specialties (PSYOP, SIGINT, red-team),
+   locations, partner forces (UK, Canada, Tier 1 SOF), clearances
+   (TS/SCI), certifications (COR, MILDEC). Generalization destroys ATS
+   discoverability and career identity
+4. Never inflate scope or seniority beyond source
+5. Preserve employer/command context — prefix parent org into each role's
+   `org` field (e.g., three Army deployments all carry
+   `US Army Special Operations, PSYOP — ...`)
+6. Jargon-vs-identity boundary: translate BLUF/S-4/MOS codes, do NOT
+   translate PSYOP/SIGINT/red-team/USSOCOM/Ukraine
+7. Summary fidelity — preserve multi-domain differentiation signals, no
+   generic PM boilerplate
+8. Use strong past-tense civilian action verbs but the underlying facts
+   (numbers, proper nouns, named operations) must remain intact
+
+### Layer 2 — Grounding Validator (`translate_app/grounding.py`)
+
+Pure-Python regex validator. Zero LLM calls. Deterministic. Three
+entry points:
+
+- `flag_bullet(bullet, source_text)` — scans one bullet for numeric claims
+  (regex `_NUMERIC_PATTERN`) and scope-inflation verbs (`_SCOPE_VERBS`
+  tuple) that appear in output but not source
+- `flag_translation(roles, source_text)` — walks every bullet across all
+  roles; returns list of `{role_index, bullet_index, flags}` entries,
+  only including bullets with at least one flag
+- `flag_summary(summary, source_text)` — reuses `flag_bullet` logic on
+  the summary field; returns flat `list[str]` of flag messages
+
+Wired into `ResumeDraftView` and `ResumeChatView`. Response includes:
+
+- `bullet_flags: list` — from `flag_translation()`
+- `summary_flags: list` — from `flag_summary()`
+
+Flags are response-only; not persisted to DB. Regenerated on every draft
+and every chat turn using current `resume.military_text` as source.
+
+### Layer 3 — Flag-Gated Verification UX
+
+`frontend/src/components/DraftPane/`:
+
+- **BulletEditor.jsx** — collapsed row shows ⚠ badge (text-amber-400)
+  when `flags.length > 0`. Expanded view shows "Grounding Check" panel
+  listing flag messages and "I verified this bullet's claims" checkbox.
+  Unflagged bullets show no checkbox — trusted by default.
+- **FinalizingEditor.jsx** — tracks `verifiedFlags: Set<string>`.
+  Summary gets parallel treatment when `summary_flags` non-empty (panel
+  - checkbox below the summary textarea, keyed as `__summary__`).
+    `allFlagsResolved` computes from `totalFlagged === verifiedCount`.
+    `Confirm Final` button disabled until `allFlagsResolved` is true.
+    Editing any flagged item (bullet text OR summary) clears its
+    verification, forcing re-attestation.
+- Progress indicator: `"N of M flagged items verified"` when any flags
+  present, or `"✓ All claims passed grounding checks"` when none —
+  covers both bullets and summary under one umbrella.
+
+### Verification Model
+
+- Unflagged items require no user action (trust by default)
+- Flagged items require explicit "I verified this" checkbox OR user edit
+- Edit clears verification (re-attestation required)
+- AI suggestion accept clears verification
+- Zero flags → Confirm Final enabled immediately
+
+### Smoke-Tested Against
+
+Brandon Livrago real veteran resume (Army PSYOP, Ukraine operations,
+Flynn Financial $110M/$200M/$410M assets) against real JD (Unstructured
+Public Sector Program Manager). All source metrics preserved; all proper
+nouns preserved; summary preserves multi-domain signal; zero flags fired
+on fully-grounded output.
 
 ## SSL / HTTPS (Production)
 

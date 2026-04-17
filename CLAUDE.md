@@ -11,12 +11,14 @@ April 24, 2026
 ## Service Map
 
 **Dev (hybrid)**
+
 - Frontend: Vite on host at `:5173` (HMR enabled), proxies `/api/` to `localhost:8000`
-- Backend: Django in Docker at `:8000` (runserver)
+- Backend: Django in Docker at `:8000` (runserver, hot-reload via bind mount in docker-compose.override.yml)
 - Database: PostgreSQL in Docker, service name `db`, port never exposed to host
 - Nginx: not started in dev
 
 **Production (full Docker + TLS)**
+
 - Frontend: `npm run build` → `dist/` → Nginx serves static from `/usr/share/nginx/html`
 - Backend: Django in Docker at `:8000` (gunicorn, 3 workers)
 - Database: PostgreSQL in Docker, port never exposed
@@ -185,3 +187,6 @@ Raw `military_text` and `job_description` are NEVER passed after call 1.
 - Never handle card data. Stripe-hosted Checkout is the only path a PAN/CVV can enter the system. If a frontend task ever calls for a card input field, stop and flag it.
 - The webhook endpoint (`/api/v1/billing/webhook/`) must run `stripe.Webhook.construct_event` before any DB work. Do not add logic between the `request.body` read and the signature check.
 - User tier (`free` / `pro`) is writable only through the Stripe webhook. Do not expose tier in any writable serializer; `UserSerializer` keeps it in `read_only_fields`.
+- Never weaken `_SYSTEM_PROMPT`'s preservation rules without explicit discussion. Rules exist because smoke tests caught specific failures: metric-erasure (Task 4), aggregate fabrication (Task 5), proper-noun generalization (Task 6). Regression means veterans lose resume quality in ways tests don't catch.
+- `bullet_flags` and `summary_flags` are response-only — do not persist to DB, do not store on Resume model. They regenerate on every Draft and Chat call using current `military_text`.
+- The honesty stack's three layers are coupled. If you change the Pydantic schema, update `grounding.py` too. If you change response shape, update DATA_CONTRACT.md and the frontend `useResumeMachine` reducer that stores `bulletFlags`/`summaryFlags`.

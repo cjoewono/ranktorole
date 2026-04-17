@@ -752,5 +752,118 @@ All covered in ARCHITECTURE.md § SSL / HTTPS. Summary:
 
 ---
 
+## April 16, 2026 | Session 11 | Smoke-Test Fixes + Dev Override
+
+**Status:** ✅ Complete
+
+Post-launch smoke testing surfaced three issues fixed in this session:
+
+- **`chat_turn_count` serializer fix** — the field was persisting correctly on the backend but not being returned to the frontend, so the chat-limit UI couldn't render the counter. Serializer updated to include the field in read responses.
+- **CHAT_LIMIT_REACHED UI** — when a free-tier user hit the 10-turn per-resume chat limit, the backend returned 403 but the frontend surfaced only a generic error. Added a dedicated `CHAT_LIMIT_REACHED` state in `useResumeMachine` that renders an `UpgradeModal`-style prompt in `ChatPane`.
+- **`docker-compose.override.yml`** — initial version checked in to support dev bind mount patterns without touching the production `docker-compose.yml`.
+
+Test count: 132 → 135 passing.
+
+---
+
+## April 16, 2026 | Session 12 | Dev Experience + Orphan Handling
+
+**Status:** ✅ Complete — six commits shipped.
+
+| Commit                | Change                                                                                                                                                                                                                                                                                                                                         |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `b88be47`             | Dev bind mount finalized in `docker-compose.override.yml` — backend hot-reloads on host file changes, runserver picks up edits without rebuild                                                                                                                                                                                                 |
+| `9d17feb`             | Reopen regression fix — clicking "Reopen Resume" now requires an explicit click action (no auto-reopen on Dashboard hover)                                                                                                                                                                                                                     |
+| `4a8fd25` + `bec6a9a` | Tailor-limit `UpgradeModal` — when a free-tier user hits their 1/day resume tailor quota, the modal offers upgrade path. Fix in `bec6a9a` moved the tailor-limit flag from `UploadForm` local `useState` to `useResumeMachine` reducer state (see Learnings below)                                                                             |
+| `5d8b820`             | **Orphans resumable** — pre-draft resumes (PDF uploaded but `roles=[]` AND `session_anchor=null`) are now detectable in `useResumeMachine`, routed to `UPLOADED` phase on re-entry, and displayed on Dashboard with a new `UPLOADED` badge (tertiary color, distinct from `IN PROGRESS`). Stats cards fold UPLOADED into the IN PROGRESS count |
+| `11c30fc`             | Dashboard refresh trigger — `useResumeMachine`'s `useEffect` on phase now calls `refreshResumes()` on all three of UPLOADED, REVIEWING, and DONE (not just DONE). Previously, newly-uploaded orphans required a hard page refresh before appearing on the Dashboard. Also fixes a promo-banner flash on Dashboard re-entry                     |
+
+### Learnings (worth preserving)
+
+- **React lifecycle gotcha (fixed in `bec6a9a`):** when a reducer action triggers a phase transition that unmounts a component, any `setState` calls in that component's local `useState` hooks that fire afterward are silently discarded. Lift persistent-across-phase flags into reducer state, not component-local state.
+- **Dashboard refresh trigger scope:** any phase transition that changes a resume row's visible status must call `refreshResumes()` — UPLOADED, REVIEWING, DONE all qualify, not just DONE.
+- **Pre-draft orphan architecture:** orphans are detected via `roles=[]` AND `session_anchor=null`. `useResumeMachine` routes them to UPLOADED phase on load. Dashboard shows them with the tertiary-color `UPLOADED` badge. Stats fold them into "any non-finalized resume" count.
+
+Test count: 135 → 137 passing.
+
+---
+
+## April 17, 2026 | Honesty Stack | Tasks 1–6
+
+**Status:** ✅ Complete — full honesty stack live, verified against real veteran resume.
+
+Over a single day, built three layers of LLM output validation that raise the product's trust bar from "tests pass" to "resume is materially honest and identity-preserving." The motivating question: _how do we validate that the LLM's translation is both optimally written for recruiters and honestly grounded in what the veteran actually did?_
+
+### Tasks 1–3 — Initial Honesty Stack
+
+| Task | Status | Scope                                                                                                                                                                                                                                                                              |
+| ---- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | ✅     | Grounding-first `_SYSTEM_PROMPT` with explicit non-invention and non-inflation rules. +5 tests (137 → 142).                                                                                                                                                                        |
+| 2    | ✅     | `translate_app/grounding.py` — pure-Python regex validator for metric fabrication and scope-inflation verbs. `flag_translation()` wired into `ResumeDraftView` AND `ResumeChatView` responses as `bullet_flags`. `DATA_CONTRACT.md` updated both endpoints. +10 tests (142 → 152). |
+| 3    | ✅     | Frontend flag-gated UX — ⚠ badge on collapsed flagged bullets, "Grounding Check" panel in expanded editor, "I verified this" checkbox. Confirm Final disabled until all flagged bullets verified.                                                                                  |
+
+### Tasks 4–6 — Tuning Against Real Resume
+
+Smoke test with Brandon Livrago's Army PSYOP resume + Unstructured JD revealed issues the tests couldn't catch; each was addressed with a targeted follow-up task.
+
+| Task | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                         | Fix                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 4    | Layer 1 over-correction — Claude was dropping _source-side_ metrics along with invented ones. `$110M+ in 401(k) assets` became `401(k) assets`. UX was also too heavy — requiring per-bullet confirm when most bullets had zero flags.                                                                                                                                                                                                          | Rewrote `_SYSTEM_PROMPT` with SOURCE PRESERVATION RULES (preserve source facts, never add new ones). Shifted UX from per-bullet confirm to flag-gated: unflagged bullets trusted by default; only flagged bullets need verification. +1 test (152 → 153).                                                                                                                                                   |
+| 5    | Summary field was invoking invented aggregate — `"$1.2M+ in program budgets"` computed by summing real source numbers. Validator scope was bullets only; summary had no guardrails.                                                                                                                                                                                                                                                             | Added rule forbidding aggregates, new `flag_summary()` helper, wired `summary_flags` into Draft and Chat responses, extended frontend verification counter to treat summary as one more eligible flagged item. +5 tests (153 → 159).                                                                                                                                                                        |
+| 6    | Claude was over-translating identity-carrying specifics — "Ukraine" → "international," "PSYOP teams" → "cross-functional teams," "red-team" → "technical support," "ION" platform name stripped, section grouping lost, summary flattened into generic PM boilerplate. For a tool serving veterans, this is product failure: ATS systems match on exact keywords (USSOCOM, PSYOP, Ukraine) and recruiters pattern-match on distinctive signals. | Added three new prompt rules: **PRESERVE ALL PROPER NOUNS VERBATIM** (rule 3), **preserve employer/command context** by prefixing parent org into each role's `org` field (rule 5), **jargon-vs-identity distinction** — translate BLUF/S-4/MOS codes but NOT PSYOP/Ukraine/red-team (rule 6), **summary fidelity** (rule 7) — preserve multi-domain signals, no generic boilerplate. +4 tests (159 → 163). |
+
+### Final Smoke Test (Brandon Livrago resume + Unstructured JD)
+
+All 20+ checklist items passed after Task 6:
+
+- ✅ Every source dollar amount preserved ($110M+, $200M+, $410M, $275K+, $240K+, $950K+, $25K, 12+, 100+)
+- ✅ Every proper noun preserved verbatim (Ukraine, PSYOP ×8, red-team, ION, Tier 1 SOF, UK/Canada, Moldovan NCO Academy, State Dept.'s 7th Floor, Fort Bragg, Tbilisi, Chisinau)
+- ✅ Parent org prefix applied to all three Army deployment roles (`US Army Special Operations, PSYOP — ...`)
+- ✅ Flynn Financial and digital marketing roles correctly _not_ prefixed with military context
+- ✅ Summary preserves multi-domain signal (operations + institutional finance + digital-marketing strategy)
+- ✅ Summary mentions TS/SCI, PSYOP/Special Operations
+- ✅ Zero invented aggregate metrics in summary
+- ✅ `bullet_flags: []` and `summary_flags: []` on a fully grounded draft (validator correctly has nothing to catch)
+
+### Honesty Stack Architecture
+
+```
+Layer 1 — Prompt
+    _SYSTEM_PROMPT (services.py) — 8 rules covering:
+    • Source fact preservation (numbers, proper nouns, scope words)
+    • Non-invention (no fabricated metrics, no aggregates)
+    • Non-inflation (scope/seniority match input)
+    • Role preservation (title, org, dates, parent command)
+    • Jargon-vs-identity boundary (translate BLUF, not PSYOP)
+    • Summary fidelity (multi-domain signal preserved)
+
+Layer 2 — Validator
+    translate_app/grounding.py
+    • flag_bullet()    — regex scan of one bullet vs source text
+    • flag_translation() — all bullets in all roles
+    • flag_summary()   — reuses flag_bullet on summary field
+    Wired into ResumeDraftView + ResumeChatView
+    API keys: bullet_flags, summary_flags
+
+Layer 3 — UX
+    frontend/src/components/DraftPane/BulletEditor.jsx
+    frontend/src/components/DraftPane/FinalizingEditor.jsx
+    • ⚠ badge on collapsed flagged bullets (text-amber-400)
+    • Grounding Check panel in expanded editor
+    • "I verified this" checkbox only on flagged items
+    • Summary gets parallel treatment when summary_flags non-empty
+    • verifiedFlags Set tracks resolutions
+    • Confirm Final disabled until allFlagsResolved
+    • Progress: "N of M flagged items verified" OR "✓ All claims passed grounding checks"
+```
+
+### Post-Launch Backlog (noted but not blocking)
+
+- **Qualitative-aggregate refinement** — prompt tweak to catch claims like "multi-million dollar programs" that cross unrelated role types
+- **LLM-as-judge semantic fidelity pass** — catches scope inflation beyond regex (deferred from Task 2)
+- **Extend validator to scan `civilian_title`** — lower fabrication risk but same-cost protection
+
+---
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 15, 2026 — Pre-deployment audit complete, 132 tests passing
+Last updated: April 17, 2026 — Honesty stack complete, 163 tests passing

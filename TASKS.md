@@ -316,9 +316,38 @@ None.
 
 ---
 
+## Completed — April 16, 2026 (Sessions 11 + 12)
+
+- [x] Chat counter serializer fix + CHAT_LIMIT_REACHED UI
+- [x] Initial docker-compose.override.yml for dev bind mount
+- [x] Dev bind mount — backend hot-reload on host file changes
+- [x] Reopen regression fix — explicit click required
+- [x] Tailor-limit UpgradeModal (free-tier 1/day quota)
+- [x] Pre-draft orphan resumability — UPLOADED phase + badge
+- [x] Dashboard refresh on all phase transitions (UPLOADED/REVIEWING/DONE)
+- [x] Test count: 132 → 137 passing
+
+## Completed — April 17, 2026 (Honesty Stack)
+
+- [x] Task 1 — Grounding-first `_SYSTEM_PROMPT` (non-invention, non-inflation)
+- [x] Task 2 — `translate_app/grounding.py` validator; `bullet_flags` on Draft + Chat
+- [x] Task 3 — Flag-gated UX (⚠ badge, Grounding Check panel, verify checkbox, Confirm Final gating)
+- [x] Task 4 — SOURCE PRESERVATION RULES rewrite; shifted from per-bullet to flag-gated UX
+- [x] Task 5 — Summary honesty (`flag_summary`, `summary_flags`, summary verification in UX)
+- [x] Task 6 — Identity preservation (proper nouns verbatim, employer/command context, jargon/identity boundary, summary fidelity)
+- [x] Smoke-tested against real veteran resume (Brandon Livrago + Unstructured JD) — all acceptance criteria passed
+- [x] Test count: 137 → 163 passing
+
 ## Start Next Session With
 
-> "Let's deploy RankToRole to EC2. Confirm 132 backend tests pass locally,
-> then walk the Phase 5 checklist in order. Stop at any step that requires
-> AWS console, DNS, Google Cloud Console, or Stripe dashboard changes and
-> wait for explicit go-ahead."
+> "Let's tackle the remaining deploy blockers before EC2. Confirm 163 backend
+> tests pass locally, then work through in order: (1) decide the `ResumeChatView`
+> `is_finalized` contract — DATA_CONTRACT says 409, code returns 200, test
+> asserts 200, need a design decision not just a code change. (2) Throttle UX
+> audit — review `DEFAULT_THROTTLE_RATES` for prod values, add a global 429
+> handler in `apiFetch` (current DRF default 'throttled in X seconds' message
+> is user-hostile). (3) Secret rotation — generate fresh `SECRET_KEY`, DB
+> password, Stripe webhook signing secret before they touch EC2. (4) Only then
+> walk Phase 5 EC2 deployment. Stop at any step that requires AWS console,
+> DNS, Google Cloud Console, or Stripe dashboard changes and wait for explicit
+> go-ahead."

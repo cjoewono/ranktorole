@@ -159,13 +159,33 @@ applies `overflow-hidden` to prevent body scroll during the split-pane layout.
 
 ### Career Recon
 
-Standalone O\*NET-powered career exploration tool at `/recon`. Zero LLM cost — pure
-server-side proxy to O\*NET's My Next Move for Veterans API. Three-phase UI:
+O\*NET-powered career exploration tool at `/recon`. Three-phase UI:
 SEARCH → RESULTS → DETAIL. Serves as a conversion funnel into the resume builder.
 
-Backend: two views in `onet_app` — `OnetMilitarySearchView` (military search) and
-`OnetCareerDetailView` (aggregated career report). Both use `OnetThrottle`.
+**O\*NET layer** — pure server-side proxy to O\*NET's My Next Move for Veterans API.
+Three views in `onet_app`: `OnetMilitarySearchView` (military search),
+`OnetCareerDetailView` (aggregated career report), `ReconEnrichView` (Haiku enrichment).
+All search/detail views use `OnetThrottle`. Enrichment uses `ReconEnrichThrottle`.
 O\*NET v2 API (`https://api-v2.onetcenter.org`) with `X-API-Key` auth (env: `ONET_API_KEY`).
+
+**Enrichment layer** — `POST /api/v1/onet/enrich/` adds personalized career intelligence
+via Claude Haiku 4.5. O\*NET data and `profile_context` are combined into a single Haiku
+call. Five cost controls defend the feature (defense in depth):
+
+1. Auth + profile gate — `IsAuthenticated` + non-empty `profile_context` required
+2. Per-user tiered throttle — `ReconEnrichThrottle` (15/day free, 25/day pro)
+3. DB-backed result cache — profile-aware SHA256 keys, 7-day TTL; cache hit = $0
+4. Hard API timeout — 15s ceiling on Haiku call (P95 ~3s)
+5. Global daily ceiling — 500 calls/day max; endpoint returns 503 beyond that
+
+**Shared normalization** — `_normalize_career_data()` helper is used by both
+`OnetCareerDetailView` and `ReconEnrichView` to parse O\*NET v2 response shapes.
+
+**Max spend/day:** $0.04 free / $0.065 pro per user; $1.30 global ceiling.
+**Expected spend at 100 pro users / 10 sessions/month:** ~$3/month with 60-75% cache hit rate.
+
+**Deliberately excluded:** resume bullets. Resume builder is where veterans draft bullets
+with their real numbers. LLM-fabricated XYZ metrics on Recon is a liability not taken on.
 
 ### State Machine Hook
 

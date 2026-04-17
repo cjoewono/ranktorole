@@ -112,3 +112,25 @@ Do **not** upgrade without explicit go-ahead:
 - `social-auth-app-django==5.4.2` — 5.6.0 requires Django 5.1; we are on 4.2 LTS
 - `anthropic==0.40.0` — later SDK versions carry breaking changes not worth absorbing pre-deadline
 - `Django==4.2.30` — on 4.2 LTS line; next minor upgrades should wait until post-launch
+
+## AI Enrichment (Career Recon)
+
+**Five layers of defense (defense in depth):**
+
+1. **Auth + profile gate** — `IsAuthenticated` permission class. Empty `profile_context` returns 400, not a Haiku call. Both checks run before any external API call.
+
+2. **Per-user tiered throttle** — `ReconEnrichThrottle` enforces 15/day (free) / 25/day (pro) via `TIERED_THROTTLE_RATES`. Cache hits do not consume throttle quota.
+
+3. **DB-backed result cache** — Profile-aware SHA256 cache key means MOS/branch changes get fresh enrichment (correctness), not stale output. Two users with identical profile fields share a cache entry (no PII in enrichment response — output is derived solely from O*NET public data + profile tier/branch/mos/skills). 7-day TTL.
+
+4. **Hard API timeout** — `RECON_ENRICH_TIMEOUT_SECONDS = 15.0` prevents backend thread pile-up on Anthropic partial outages. Haiku P95 is ~3s; 15s is a generous backstop.
+
+5. **Global daily ceiling** — `RECON_ENRICH_DAILY_CEILING` (default 500, env-configurable). Ceiling is enforced with incr-first atomic pattern to prevent TOCTOU over-count across gunicorn workers.
+
+**XSS defense** — All Haiku string outputs sanitized with `strip_tags` before caching and before returning to client.
+
+**Prompt injection hardening** — `profile_context` fields (branch/mos/skills) go into the Haiku prompt. Malicious prompt injection via The Forge profile is a recognized attack surface; field values are length-capped in the prompt builder. Schema-level `max_length` constraints on `CareerEnrichment` reject runaway LLM responses.
+
+**No bullet fabrication** — Haiku prompt explicitly instructs: "DO NOT generate resume bullets, XYZ-format accomplishments, or fabricated metrics." Enforced by schema design (no bullets field) and explicit prompt instruction.
+
+**O*NET data trust** — O*NET career data is fetched server-side; client never passes career payload. Profile context is read from `request.user`, never from request body.

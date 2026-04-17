@@ -867,3 +867,66 @@ Layer 3 — UX
 
 Project log maintained: github.com/cjoewono/ranktorole
 Last updated: April 17, 2026 — Honesty stack complete, 163 tests passing
+
+---
+
+## April 17, 2026 | Session 13 | Career Recon Enrichment
+
+**Duration:** Afternoon session | **Status:** ✅ Complete
+
+### What Was Built
+
+Added personalized career intelligence to the Career Recon page via Claude Haiku 4.5.
+When a veteran clicks a career card, the frontend fires two parallel requests:
+O*NET career detail (existing) + Haiku enrichment (new). Both are resolved via
+`Promise.allSettled`, so Haiku failure gracefully degrades to O*NET-only view.
+
+### Architecture
+
+**Backend — `onet_app/recon_enrich_service.py`**
+- Shared Anthropic client from `translate_app.services._get_client()`
+- Profile-aware cache key: `recon_enrich:{code}:{sha256(branch|mos|sector|skills)[:16]}`
+- Incr-first ceiling check prevents TOCTOU over-count across gunicorn workers
+- `strip_tags` on all LLM string outputs (stored-XSS defense)
+- `CareerEnrichment` Pydantic schema with `max_length` constraints
+
+**Five cost controls (defense in depth):**
+1. Auth + profile gate
+2. Per-user tiered throttle (15/day free, 25/day pro)
+3. DB-backed result cache (7-day TTL)
+4. 15s hard API timeout
+5. Global 500/day ceiling
+
+**Frontend — `CareerRecon.jsx`**
+- `latestClickRef` ref prevents mismatched detail+enrichment on rapid card clicks
+- Enrichment panel: match score badge, personalized description, transferable skills,
+  skill gaps, education recommendation
+- Nullish-coalesce on all enrichment fields guards against partial LLM responses
+
+### Deliberate Exclusions
+
+- **No resume bullets** — LLM-fabricated XYZ metrics on Recon is a liability.
+  Veterans draft bullets with their real numbers in the resume builder.
+- **No grounding.py changes** — Enrichment has no source-of-truth to ground against.
+- **No bullet_flags/summary_flags** — Not applicable to Recon flow.
+
+### Test Coverage
+
+- 7 endpoint tests: auth, profile gate, invalid code, O*NET 404, Haiku failure (503), happy path, unauthenticated
+- 3 cost-control tests: cache hit skips LLM, profile change invalidates cache, global ceiling blocks call
+- Final: 163 → 173 passing
+
+### Cost Model
+
+| Tier | Max/day | Max cost/day |
+|------|---------|-------------|
+| Free | 15 calls | $0.04 |
+| Pro  | 25 calls | $0.065 |
+| Global ceiling | 500 calls | $1.30 |
+
+Expected monthly spend at 100 pro users / 10 sessions: ~$3/month (60-75% cache hit rate).
+
+---
+
+Project log maintained: github.com/cjoewono/ranktorole
+Last updated: April 17, 2026 — Session 13 (Career Recon Enrichment), 173 tests passing

@@ -220,7 +220,10 @@ def _normalize_career_data(
                 knowledge.append({"name": name, "description": ""})
 
     technology = []
-    for cat in (technology_data if isinstance(technology_data, list) else technology_data.get("category", [])):
+    _tech_list = technology_data if isinstance(technology_data, list) else (
+        technology_data.get("category", []) if isinstance(technology_data, dict) else []
+    )
+    for cat in _tech_list:
         raw_title = cat.get("title", "")
         cat_title = raw_title if isinstance(raw_title, str) else raw_title.get("name", "")
         examples = []
@@ -233,13 +236,16 @@ def _normalize_career_data(
             technology.append({"category": cat_title, "examples": examples})
 
     outlook = {}
-    if outlook_data:
+    if outlook_data and isinstance(outlook_data, dict):
+        outlook_section = outlook_data.get("outlook") or {}
+        if not isinstance(outlook_section, dict):
+            outlook_section = {}
         outlook = {
-            "category": outlook_data.get("outlook", {}).get("category", ""),
-            "description": outlook_data.get("outlook", {}).get("description", ""),
+            "category": outlook_section.get("category", ""),
+            "description": outlook_section.get("description", ""),
         }
-        salary = outlook_data.get("salary", {})
-        if salary:
+        salary = outlook_data.get("salary") or {}
+        if salary and isinstance(salary, dict):
             outlook["salary"] = {
                 "annual_median": salary.get("annual_median", ""),
                 "annual_10th": salary.get("annual_10th_percentile", ""),
@@ -322,7 +328,7 @@ class ReconEnrichView(APIView):
     ONET_CODE_PATTERN = re_module.compile(r'^\d{2}-\d{4}\.\d{2}$')
 
     def post(self, request):
-        onet_code = request.data.get("onet_code", "").strip()
+        onet_code = str(request.data.get("onet_code", "")).strip()
         if not onet_code:
             return Response(
                 {"error": "onet_code is required."},

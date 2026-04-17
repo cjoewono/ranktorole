@@ -55,19 +55,18 @@ def _check_and_increment_global_ceiling() -> bool:
     ceiling = settings.RECON_ENRICH_DAILY_CEILING
 
     cache.add(key, 0, 86400)
-    count = cache.get(key, 0)
+    try:
+        count = cache.incr(key)
+    except (ValueError, NotImplementedError):
+        count = cache.get(key, 0) + 1
+        cache.set(key, count, 86400)
 
-    if count >= ceiling:
+    if count > ceiling:
         logger.warning(
             "Recon enrichment daily ceiling hit: %d/%d — returning 503 until tomorrow",
             count, ceiling,
         )
         return False
-
-    try:
-        cache.incr(key)
-    except (ValueError, NotImplementedError):
-        cache.set(key, count + 1, 86400)
 
     return True
 

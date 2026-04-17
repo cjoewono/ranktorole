@@ -7,6 +7,7 @@ export default function FinalizingEditor({
   aiInitialDraft,
   aiSuggestions,
   bulletFlags,
+  summaryFlags = [],
   resumeId,
   dispatch,
 }) {
@@ -43,6 +44,17 @@ export default function FinalizingEditor({
 
   function isVerified(roleIdx, bulletIdx) {
     return verifiedFlags.has(`${roleIdx}-${bulletIdx}`);
+  }
+
+  const SUMMARY_KEY = "__summary__";
+
+  function toggleSummaryVerified() {
+    setVerifiedFlags((prev) => {
+      const next = new Set(prev);
+      if (next.has(SUMMARY_KEY)) next.delete(SUMMARY_KEY);
+      else next.add(SUMMARY_KEY);
+      return next;
+    });
   }
 
   function hasFlags(roleIdx, bulletIdx) {
@@ -127,10 +139,15 @@ export default function FinalizingEditor({
       .map((_, bulletIdx) => ({ roleIdx, bulletIdx }))
       .filter(({ roleIdx: r, bulletIdx: b }) => hasFlags(r, b)),
   );
-  const totalFlagged = flaggedBullets.length;
-  const verifiedCount = flaggedBullets.filter(({ roleIdx, bulletIdx }) =>
-    isVerified(roleIdx, bulletIdx),
-  ).length;
+
+  const summaryIsFlagged = (summaryFlags || []).length > 0;
+  const summaryVerified = verifiedFlags.has(SUMMARY_KEY);
+
+  const totalFlagged = flaggedBullets.length + (summaryIsFlagged ? 1 : 0);
+  const verifiedCount =
+    flaggedBullets.filter(({ roleIdx, bulletIdx }) =>
+      isVerified(roleIdx, bulletIdx),
+    ).length + (summaryIsFlagged && summaryVerified ? 1 : 0);
   const allFlagsResolved = totalFlagged === 0 || verifiedCount === totalFlagged;
 
   return (
@@ -163,9 +180,46 @@ export default function FinalizingEditor({
           <textarea
             rows={5}
             value={editSummary}
-            onChange={(e) => setEditSummary(e.target.value)}
+            onChange={(e) => {
+              setEditSummary(e.target.value);
+              setVerifiedFlags((prev) => {
+                const next = new Set(prev);
+                next.delete(SUMMARY_KEY);
+                return next;
+              });
+            }}
             className="tactical-input resize-y"
           />
+          {summaryIsFlagged && (
+            <>
+              <div className="bg-surface-container px-3 py-2 space-y-1 border-l-2 border-amber-400 mt-2">
+                <p className="font-label text-xs tracking-widest uppercase text-amber-400 mb-1">
+                  Grounding Check — Summary
+                </p>
+                <ul className="space-y-1">
+                  {summaryFlags.map((flag, i) => (
+                    <li
+                      key={i}
+                      className="font-body text-xs text-on-surface-variant leading-relaxed"
+                    >
+                      • {flag}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <label className="flex items-start gap-2 pt-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={summaryVerified}
+                  onChange={toggleSummaryVerified}
+                  className="mt-0.5 shrink-0 accent-secondary"
+                />
+                <span className="font-body text-xs text-on-surface leading-relaxed">
+                  I verified the summary's claims against my actual experience.
+                </span>
+              </label>
+            </>
+          )}
         </div>
 
         {/* Roles */}
@@ -225,12 +279,12 @@ export default function FinalizingEditor({
         {totalFlagged > 0 && (
           <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant text-center pb-2">
             {verifiedCount} of {totalFlagged} flagged{" "}
-            {totalFlagged === 1 ? "bullet" : "bullets"} verified
+            {totalFlagged === 1 ? "item" : "items"} verified
           </p>
         )}
         {totalFlagged === 0 && (
           <p className="font-label text-xs tracking-widest uppercase text-secondary text-center pb-2">
-            ✓ All bullets passed grounding checks
+            ✓ All claims passed grounding checks
           </p>
         )}
         <button

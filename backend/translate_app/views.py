@@ -14,7 +14,7 @@ from user_app.permissions import ChatTurnLimit, IsProOrUnderLimit, bump_counter
 from .throttles import ChatThrottle, DraftThrottle, FinalizeThrottle, UploadThrottle
 from .models import Resume
 from .serializers import DraftInputSerializer, FinalizeInputSerializer, ResumeSerializer
-from .grounding import flag_translation
+from .grounding import flag_translation, flag_summary
 from .services import (
     call_claude_chat,
     call_claude_draft,
@@ -209,6 +209,11 @@ class ResumeDraftView(APIView):
             source_text=resume.military_text or "",
         )
 
+        summary_flags = flag_summary(
+            summary=translation.summary or "",
+            source_text=resume.military_text or "",
+        )
+
         return Response(
             {
                 "civilian_title": translation.civilian_title,
@@ -217,6 +222,7 @@ class ResumeDraftView(APIView):
                 "clarifying_question": translation.clarifying_question,
                 "assistant_reply": translation.assistant_reply,
                 "bullet_flags": bullet_flags,
+                "summary_flags": summary_flags,
             },
             status=status.HTTP_200_OK,
         )
@@ -285,6 +291,11 @@ class ResumeChatView(APIView):
             source_text=resume.military_text or "",
         )
 
+        summary_flags = flag_summary(
+            summary=result.translation.summary or "",
+            source_text=resume.military_text or "",
+        )
+
         return Response(
             {
                 "roles": roles_data,
@@ -292,6 +303,7 @@ class ResumeChatView(APIView):
                 "civilian_title": result.translation.civilian_title,
                 "summary": result.translation.summary,
                 "bullet_flags": bullet_flags,
+                "summary_flags": summary_flags,
             },
             status=status.HTTP_200_OK,
         )

@@ -118,3 +118,18 @@ def flag_translation(roles: list[dict], source_text: str) -> list[dict]:
                     "flags": flags,
                 })
     return results
+
+
+def flag_summary(summary: str, source_text: str) -> list[str]:
+    """
+    Run flag_bullet against the summary text. Returns a flat list of flag
+    strings. Empty list means the summary passed grounding checks.
+
+    Summary-specific concern: aggregate fabrications. The prompt forbids them,
+    but the validator catches any numeric claim that doesn't trace to source —
+    which includes aggregates (since '$1.2M total' won't appear in source if
+    the source lists individual amounts).
+    """
+    if not summary or not source_text:
+        return []
+    return flag_bullet(summary, source_text)

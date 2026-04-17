@@ -77,13 +77,18 @@ Content-Type: application/json
       "bullet_index": 1,
       "flags": ["string"]
     }
-  ]
+  ],
+  "summary_flags": ["string"]
 }
 ```
 
 `bullet_flags`: list of flagged bullets — each entry has `{role_index: int,
 bullet_index: int, flags: list[str]}`. Only bullets with at least one flag
 are included. Empty list means all bullets passed grounding checks.
+
+`summary_flags`: list of flag strings for the executive summary. Empty list
+means the summary passed grounding checks. Each string is a human-readable
+warning about an ungrounded numeric claim or scope-inflation verb.
 
 **Behavior**
 
@@ -150,13 +155,18 @@ Content-Type: application/json
       "bullet_index": 1,
       "flags": ["string"]
     }
-  ]
+  ],
+  "summary_flags": ["string"]
 }
 ```
 
 `bullet_flags`: list of flagged bullets — each entry has `{role_index: int,
 bullet_index: int, flags: list[str]}`. Only bullets with at least one flag
 are included. Empty list means all bullets passed grounding checks.
+
+`summary_flags`: list of flag strings for the executive summary. Empty list
+means the summary passed grounding checks. Each string is a human-readable
+warning about an ungrounded numeric claim or scope-inflation verb.
 
 **Behavior**
 

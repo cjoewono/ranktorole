@@ -9,8 +9,14 @@ import useResumeMachine from "../hooks/useResumeMachine";
 import { useAuth } from "../context/AuthContext";
 
 export default function ResumeBuilder({ setFullscreen }) {
-  const { state, dispatch, handleGenerateDraft, handleChatSend, bulletFlags } =
-    useResumeMachine();
+  const {
+    state,
+    dispatch,
+    handleGenerateDraft,
+    handleChatSend,
+    bulletFlags,
+    summaryFlags,
+  } = useResumeMachine();
   const { user } = useAuth();
 
   const isSplitPhase =
@@ -31,6 +37,7 @@ export default function ResumeBuilder({ setFullscreen }) {
             aiInitialDraft={state.aiInitialDraft}
             aiSuggestions={state.aiSuggestions}
             bulletFlags={bulletFlags}
+            summaryFlags={summaryFlags}
             phase={state.phase}
             dispatch={dispatch}
             resumeId={state.resumeId}

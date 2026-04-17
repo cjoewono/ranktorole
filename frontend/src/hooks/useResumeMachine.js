@@ -12,6 +12,7 @@ const initialState = {
   chatHistory: [], // display-only — [{ role, content }] — NOT sent to backend
   aiSuggestions: null, // roles[] from chat response when phase === FINALIZING
   bulletFlags: [], // [{ role_index, bullet_index, flags[] }] from backend grounding validator
+  summaryFlags: [],
   isSending: false,
   chatTurnCount: 0,
   isFinalized: false,
@@ -35,6 +36,7 @@ function reducer(state, action) {
         aiInitialDraft: action.draft.roles, // frozen snapshot — never updated by chat
         chatHistory: action.initialMessages,
         bulletFlags: action.bulletFlags || [],
+        summaryFlags: action.summaryFlags || [],
       };
     case "DRAFT_FAILED":
       return { ...state, phase: "UPLOADED", error: action.message };
@@ -66,6 +68,7 @@ function reducer(state, action) {
           summary: action.summary,
         },
         bulletFlags: action.bulletFlags ?? state.bulletFlags,
+        summaryFlags: action.summaryFlags ?? state.summaryFlags,
       };
     case "CHAT_FAILED":
       // Pop the optimistically-added user message and set error
@@ -79,6 +82,7 @@ function reducer(state, action) {
         ...state,
         aiSuggestions: action.roles,
         bulletFlags: action.bulletFlags ?? state.bulletFlags,
+        summaryFlags: action.summaryFlags ?? state.summaryFlags,
       };
     case "AI_SUGGESTIONS_CLEARED":
       return { ...state, aiSuggestions: null };
@@ -109,6 +113,7 @@ function reducer(state, action) {
         chatHistory: action.chatHistory,
         chatTurnCount: action.chatTurnCount || 0,
         isFinalized: action.isFinalized || false,
+        summaryFlags: action.summaryFlags || [],
         error: null,
       };
     case "CHAT_SENDING":
@@ -235,6 +240,7 @@ export default function useResumeMachine() {
             ? [{ role: "assistant", content: response.clarifying_question }]
             : [],
           bulletFlags: response.bullet_flags || [],
+          summaryFlags: response.summary_flags || [],
         });
       } catch (err) {
         if (err.status === 403 && err.data?.code === "TAILOR_LIMIT_REACHED") {
@@ -264,6 +270,7 @@ export default function useResumeMachine() {
             type: "AI_SUGGESTIONS_RECEIVED",
             roles: response.roles,
             bulletFlags: response.bullet_flags,
+            summaryFlags: response.summary_flags,
           });
         } else {
           dispatch({
@@ -272,6 +279,7 @@ export default function useResumeMachine() {
             civilian_title: response.civilian_title,
             summary: response.summary,
             bulletFlags: response.bullet_flags,
+            summaryFlags: response.summary_flags,
           });
         }
       } catch (err) {
@@ -299,5 +307,6 @@ export default function useResumeMachine() {
     handleGenerateDraft,
     handleChatSend,
     bulletFlags: state.bulletFlags,
+    summaryFlags: state.summaryFlags,
   };
 }

@@ -460,6 +460,19 @@ class TestResumeDraftView:
         assert "bullet_flags" in response.data
         assert isinstance(response.data["bullet_flags"], list)
 
+    @patch("translate_app.views.call_claude_draft")
+    def test_draft_response_includes_summary_flags_key(self, mock_draft, auth_client, user, db):
+        mock_draft.return_value = _make_mock_translation(_DRAFT_PAYLOAD)
+        resume = _create_resume(user, session_anchor=None)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/draft/",
+            {"job_description": "We need a supply chain manager with 5+ years of experience."},
+            format="json",
+        )
+        assert response.status_code == 200
+        assert "summary_flags" in response.data
+        assert isinstance(response.data["summary_flags"], list)
+
 
 # ---------------------------------------------------------------------------
 # views.py — POST /api/v1/resumes/{id}/chat/
@@ -624,6 +637,19 @@ class TestResumeChatView:
         assert response.status_code == 200
         resume.refresh_from_db()
         assert resume.chat_turn_count == 1
+
+    @patch("translate_app.views.call_claude_chat")
+    def test_chat_response_includes_summary_flags_key(self, mock_chat, auth_client, user, db):
+        mock_chat.return_value = _make_chat_result(_CHAT_PAYLOAD)
+        resume = _create_resume(user)
+        response = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/chat/",
+            {"message": "Make the summary more concise."},
+            format="json",
+        )
+        assert response.status_code == 200
+        assert "summary_flags" in response.data
+        assert isinstance(response.data["summary_flags"], list)
 
 
 # ---------------------------------------------------------------------------
@@ -877,7 +903,7 @@ class TestAnthropicSafetyNet:
 
 
 class TestSystemPromptGrounding:
-    """Verify the system prompt contains preservation + non-invention rules."""
+    """Verify the system prompt contains preservation + non-invention + identity rules."""
 
     def test_system_prompt_contains_preservation_rules(self):
         from translate_app.services import _SYSTEM_PROMPT
@@ -895,19 +921,56 @@ class TestSystemPromptGrounding:
         assert "never add" in lowered or "do not invent" in lowered
         assert "invent" in lowered
 
+    def test_system_prompt_prohibits_aggregates(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "sum" in lowered or "aggregate" in lowered
+        assert "total" in lowered
+
     def test_system_prompt_prohibits_scope_inflation(self):
         from translate_app.services import _SYSTEM_PROMPT
         lowered = _SYSTEM_PROMPT.lower()
         assert "inflate" in lowered or "seniority" in lowered
 
-    def test_system_prompt_requires_role_preservation(self):
+    def test_system_prompt_preserves_proper_nouns(self):
         from translate_app.services import _SYSTEM_PROMPT
-        assert "Preserve every role" in _SYSTEM_PROMPT
+        assert "PRESERVE ALL PROPER NOUNS" in _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        # Explicit examples should be present
+        assert "psyop" in lowered
+        assert "ukraine" in lowered
+        assert "red-team" in lowered
+
+    def test_system_prompt_preserves_summary_fidelity(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "summary fidelity" in lowered
+        assert "multi-domain" in lowered
+        assert "boilerplate" in lowered
+
+    def test_system_prompt_preserves_parent_organization(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "employer/command context" in lowered or "parent organization" in lowered
+        assert "org" in lowered
+
+    def test_system_prompt_requires_role_preservation(self):
+        # Roles (title, org, dates) are preserved via rule 5 now covering
+        # employer/command continuity; verify the rule still exists.
+        from translate_app.services import _SYSTEM_PROMPT
+        assert "Preserve every role's employer/command context" in _SYSTEM_PROMPT
 
     def test_system_prompt_returns_json_only(self):
         from translate_app.services import _SYSTEM_PROMPT
         assert "valid JSON" in _SYSTEM_PROMPT
         assert "no markdown fences" in _SYSTEM_PROMPT.lower()
+
+    def test_system_prompt_distinguishes_jargon_from_identity(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        # Must mention translating jargon BUT not identity markers
+        assert "bluf" in lowered or "s-4" in lowered
+        assert "do not translate" in lowered
 
 
 # ---------------------------------------------------------------------------
@@ -986,3 +1049,22 @@ class TestGroundingValidator:
         from translate_app.grounding import flag_translation
         assert flag_translation([], "source") == []
         assert flag_translation(None, "source") == []
+
+    def test_flag_summary_catches_ungrounded_aggregate(self):
+        from translate_app.grounding import flag_summary
+        source = "Managed $275K equipment. Oversaw $240K campaigns. Secured $25K grant."
+        summary = "Proven track record managing $1.2M+ in program budgets."
+        flags = flag_summary(summary, source)
+        assert any("1.2M" in f or "$1.2M" in f for f in flags)
+
+    def test_flag_summary_passes_preserved_number(self):
+        from translate_app.grounding import flag_summary
+        source = "Managed $275K+ in equipment during deployments."
+        summary = "Operations leader with $275K+ in equipment under direct management."
+        flags = flag_summary(summary, source)
+        assert not any("275K" in f for f in flags)
+
+    def test_flag_summary_empty_inputs_return_empty(self):
+        from translate_app.grounding import flag_summary
+        assert flag_summary("", "source") == []
+        assert flag_summary("summary", "") == []

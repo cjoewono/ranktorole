@@ -197,3 +197,264 @@ class TestOnetCareerDetailView:
             assert call_args is not None
             headers = call_args[1].get("headers", {})
             assert "X-API-Key" in headers
+
+
+class TestReconEnrichView:
+    """POST /api/v1/onet/enrich/ — Claude Haiku enrichment endpoint."""
+
+    def test_missing_onet_code_returns_400(self, auth_client):
+        resp = auth_client.post("/api/v1/onet/enrich/", {}, format="json")
+        assert resp.status_code == 400
+
+    def test_invalid_onet_code_format_returns_400(self, auth_client):
+        resp = auth_client.post(
+            "/api/v1/onet/enrich/", {"onet_code": "invalid"}, format="json"
+        )
+        assert resp.status_code == 400
+
+    def test_no_profile_context_returns_400(self, auth_client):
+        resp = auth_client.post(
+            "/api/v1/onet/enrich/", {"onet_code": "47-2061.00"}, format="json"
+        )
+        assert resp.status_code == 400
+        assert "profile" in resp.data["error"].lower()
+
+    def test_successful_enrichment(self, db):
+        from onet_app.schemas import CareerEnrichment
+
+        user = User.objects.create_user(
+            username="enrichuser",
+            email="enrich@test.com",
+            password="testpass123",
+            profile_context={
+                "branch": "Army",
+                "mos": "11B",
+                "skills": ["Leadership", "Logistics"],
+            },
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        mock_enrichment = CareerEnrichment(
+            match_score=72,
+            personalized_description="As an Army 11B Infantryman, your leadership "
+            "experience translates directly to construction site supervision roles.",
+            skill_gaps=["OSHA 30-Hour Card", "PMP certification"],
+            education_recommendation="Consider a BS in Construction Management via GI Bill.",
+            transferable_skills=[
+                "Team leadership",
+                "Risk assessment",
+                "Equipment operation",
+                "Safety protocols",
+            ],
+        )
+
+        with patch("onet_app.views.http_requests.get") as mock_onet:
+            def onet_side_effect(url, **kwargs):
+                mock = MagicMock()
+                mock.ok = True
+                mock.status_code = 200
+                if "/skills" in url:
+                    mock.json.return_value = [{"element": [{"name": "Active Listening"}]}]
+                elif "/knowledge" in url:
+                    mock.json.return_value = [{"element": [{"name": "Building and Construction"}]}]
+                elif "/technology" in url:
+                    mock.json.return_value = []
+                elif "/job_outlook" in url:
+                    mock.json.return_value = {
+                        "salary": {
+                            "annual_median": "40000",
+                            "annual_10th_percentile": "30000",
+                            "annual_90th_percentile": "55000",
+                        }
+                    }
+                else:
+                    mock.json.return_value = {
+                        "title": "Construction Laborers",
+                        "what_they_do": "Perform tasks at construction sites.",
+                    }
+                return mock
+            mock_onet.side_effect = onet_side_effect
+
+            with patch("onet_app.views.enrich_career") as mock_enrich:
+                mock_enrich.return_value = mock_enrichment
+
+                resp = client.post(
+                    "/api/v1/onet/enrich/",
+                    {"onet_code": "47-2061.00"},
+                    format="json",
+                )
+
+                assert resp.status_code == 200
+                assert resp.data["onet_code"] == "47-2061.00"
+                assert resp.data["career_title"] == "Construction Laborers"
+                assert resp.data["enrichment"]["match_score"] == 72
+                assert len(resp.data["enrichment"]["transferable_skills"]) == 4
+                assert "OSHA 30-Hour Card" in resp.data["enrichment"]["skill_gaps"]
+
+    def test_onet_404_returns_404(self, db):
+        user = User.objects.create_user(
+            username="enrich404",
+            email="enrich404@test.com",
+            password="testpass123",
+            profile_context={"branch": "Navy", "mos": "IT"},
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        with patch("onet_app.views.http_requests.get") as mock_onet:
+            mock_resp = MagicMock()
+            mock_resp.ok = False
+            mock_resp.status_code = 404
+            mock_onet.return_value = mock_resp
+
+            resp = client.post(
+                "/api/v1/onet/enrich/",
+                {"onet_code": "99-9999.99"},
+                format="json",
+            )
+            assert resp.status_code == 404
+
+    def test_haiku_failure_returns_503(self, db):
+        user = User.objects.create_user(
+            username="enrichfail",
+            email="enrichfail@test.com",
+            password="testpass123",
+            profile_context={"branch": "Navy", "mos": "IT"},
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        with patch("onet_app.views.http_requests.get") as mock_onet:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {"title": "Test", "what_they_do": "Test"}
+            mock_onet.return_value = mock_resp
+
+            with patch("onet_app.views.enrich_career") as mock_enrich:
+                mock_enrich.return_value = None
+
+                resp = client.post(
+                    "/api/v1/onet/enrich/",
+                    {"onet_code": "47-2061.00"},
+                    format="json",
+                )
+                assert resp.status_code == 503
+
+    def test_unauthenticated_returns_401(self):
+        client = APIClient()
+        resp = client.post(
+            "/api/v1/onet/enrich/", {"onet_code": "47-2061.00"}, format="json"
+        )
+        assert resp.status_code == 401
+
+
+class TestReconEnrichCacheAndCeiling:
+    """Cost-control tests: caching + global daily ceiling."""
+
+    def test_cache_hit_skips_llm_call(self, db):
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import enrich_career
+        from onet_app.schemas import CareerEnrichment
+
+        cache.clear()
+
+        career_data = {
+            "code": "47-2061.00",
+            "title": "Construction Laborers",
+            "description": "Test",
+            "skills": [],
+            "knowledge": [],
+            "outlook": {},
+        }
+        profile_context = {"branch": "Army", "mos": "11B", "skills": ["Leadership"]}
+
+        mock_result = CareerEnrichment(
+            match_score=72,
+            personalized_description="Test description.",
+            skill_gaps=["Test gap"],
+            education_recommendation="Test edu.",
+            transferable_skills=["Test skill 1", "Test skill 2", "Test skill 3", "Test skill 4"],
+        )
+
+        with patch("onet_app.recon_enrich_service._call_haiku_typed") as mock_haiku:
+            mock_haiku.return_value = mock_result
+
+            result1 = enrich_career(career_data, profile_context)
+            assert result1 is not None
+            assert mock_haiku.call_count == 1
+
+            result2 = enrich_career(career_data, profile_context)
+            assert result2 is not None
+            assert result2.match_score == 72
+            assert mock_haiku.call_count == 1  # still 1, no new call
+
+        cache.clear()
+
+    def test_different_profile_invalidates_cache(self, db):
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import enrich_career
+        from onet_app.schemas import CareerEnrichment
+
+        cache.clear()
+
+        career_data = {
+            "code": "47-2061.00", "title": "Test", "description": "",
+            "skills": [], "knowledge": [], "outlook": {},
+        }
+        profile_a = {"branch": "Army", "mos": "11B", "skills": ["Leadership"]}
+        profile_b = {"branch": "Navy", "mos": "IT", "skills": ["Networking"]}
+
+        mock_result = CareerEnrichment(
+            match_score=72,
+            personalized_description="Test.",
+            skill_gaps=["Gap"],
+            education_recommendation="Edu.",
+            transferable_skills=["s1", "s2", "s3", "s4"],
+        )
+
+        with patch("onet_app.recon_enrich_service._call_haiku_typed") as mock_haiku:
+            mock_haiku.return_value = mock_result
+
+            enrich_career(career_data, profile_a)
+            enrich_career(career_data, profile_b)
+
+            assert mock_haiku.call_count == 2
+
+        cache.clear()
+
+    def test_global_ceiling_returns_none(self, db, settings):
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import enrich_career
+
+        cache.clear()
+
+        settings.RECON_ENRICH_DAILY_CEILING = 1
+
+        career_data = {
+            "code": "47-2061.00", "title": "Test", "description": "",
+            "skills": [], "knowledge": [], "outlook": {},
+        }
+        profile_a = {"branch": "Army", "mos": "11B", "skills": ["A"]}
+        profile_b = {"branch": "Navy", "mos": "IT", "skills": ["B"]}
+
+        from onet_app.schemas import CareerEnrichment
+        mock_result = CareerEnrichment(
+            match_score=50, personalized_description="T.",
+            skill_gaps=["g"], education_recommendation="e.",
+            transferable_skills=["1", "2", "3", "4"],
+        )
+
+        with patch("onet_app.recon_enrich_service._call_haiku_typed") as mock_haiku:
+            mock_haiku.return_value = mock_result
+
+            result1 = enrich_career(career_data, profile_a)
+            assert result1 is not None
+            assert mock_haiku.call_count == 1
+
+            result2 = enrich_career(career_data, profile_b)
+            assert result2 is None
+            assert mock_haiku.call_count == 1
+
+        cache.clear()

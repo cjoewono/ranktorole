@@ -90,3 +90,7 @@ class FinalizeThrottle(TieredThrottle):
 
 class OnetThrottle(TieredThrottle):
     scope = 'user_onet'
+
+
+class ReconEnrichThrottle(TieredThrottle):
+    scope = 'user_recon_enrich'

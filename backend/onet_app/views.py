@@ -8,7 +8,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from translate_app.throttles import OnetThrottle
+from translate_app.throttles import OnetThrottle, ReconEnrichThrottle
+from .recon_enrich_service import enrich_career
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +197,66 @@ class OnetMilitarySearchView(APIView):
             )
 
 
+def _normalize_career_data(
+    overview_data: dict,
+    skills_data,
+    knowledge_data,
+    technology_data,
+    outlook_data: dict,
+) -> dict:
+    """Normalize raw O*NET v2 responses into a consistent career_data dict."""
+    skills = []
+    for category in (skills_data if isinstance(skills_data, list) else []):
+        for elem in category.get("element", []):
+            name = elem.get("name", "")
+            if name:
+                skills.append({"name": name, "description": ""})
+
+    knowledge = []
+    for category in (knowledge_data if isinstance(knowledge_data, list) else []):
+        for elem in category.get("element", []):
+            name = elem.get("name", "")
+            if name:
+                knowledge.append({"name": name, "description": ""})
+
+    technology = []
+    for cat in (technology_data if isinstance(technology_data, list) else technology_data.get("category", [])):
+        raw_title = cat.get("title", "")
+        cat_title = raw_title if isinstance(raw_title, str) else raw_title.get("name", "")
+        examples = []
+        for ex in cat.get("example", []):
+            ex_name = ex.get("title", ex.get("name", ""))
+            hot = ex.get("hot_technology", False)
+            if ex_name:
+                examples.append({"name": ex_name, "hot": hot})
+        if cat_title:
+            technology.append({"category": cat_title, "examples": examples})
+
+    outlook = {}
+    if outlook_data:
+        outlook = {
+            "category": outlook_data.get("outlook", {}).get("category", ""),
+            "description": outlook_data.get("outlook", {}).get("description", ""),
+        }
+        salary = outlook_data.get("salary", {})
+        if salary:
+            outlook["salary"] = {
+                "annual_median": salary.get("annual_median", ""),
+                "annual_10th": salary.get("annual_10th_percentile", ""),
+                "annual_90th": salary.get("annual_90th_percentile", ""),
+            }
+
+    return {
+        "title": overview_data.get("title", ""),
+        "description": overview_data.get("what_they_do", overview_data.get("description", "")),
+        "tags": overview_data.get("tags", {}),
+        "skills": skills,
+        "knowledge": knowledge,
+        "technology": technology,
+        "outlook": outlook,
+    }
+
+
 class OnetCareerDetailView(APIView):
     """GET /api/v1/onet/career/{onet_code}/
 
@@ -233,7 +294,6 @@ class OnetCareerDetailView(APIView):
 
         base = f"{ONET_BASE}/veterans/careers/{onet_code}"
 
-        # Fetch overview (career report root)
         overview_data = self._fetch_json(f"{base}/")
         if not overview_data:
             return Response(
@@ -241,64 +301,104 @@ class OnetCareerDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Fetch supplementary data
         skills_data = self._fetch_json(f"{base}/skills")
         knowledge_data = self._fetch_json(f"{base}/knowledge")
         technology_data = self._fetch_json(f"{base}/technology")
         outlook_data = self._fetch_json(f"{base}/job_outlook")
 
-        # Extract skills list — v2 returns a list of categories, each with sub-elements
-        skills = []
-        for category in (skills_data if isinstance(skills_data, list) else []):
-            for elem in category.get("element", []):
-                name = elem.get("name", "")
-                if name:
-                    skills.append({"name": name, "description": ""})
+        normalized = _normalize_career_data(
+            overview_data, skills_data, knowledge_data, technology_data, outlook_data
+        )
+        normalized["code"] = onet_code
+        return Response(normalized)
 
-        # Extract knowledge list — same v2 shape as skills
-        knowledge = []
-        for category in (knowledge_data if isinstance(knowledge_data, list) else []):
-            for elem in category.get("element", []):
-                name = elem.get("name", "")
-                if name:
-                    knowledge.append({"name": name, "description": ""})
 
-        # Extract technology items — v2 returns list directly; title is a string; examples use "title" key
-        technology = []
-        for cat in (technology_data if isinstance(technology_data, list) else technology_data.get("category", [])):
-            raw_title = cat.get("title", "")
-            cat_title = raw_title if isinstance(raw_title, str) else raw_title.get("name", "")
-            examples = []
-            for ex in cat.get("example", []):
-                ex_name = ex.get("title", ex.get("name", ""))
-                hot = ex.get("hot_technology", False)
-                if ex_name:
-                    examples.append({"name": ex_name, "hot": hot})
-            if cat_title:
-                technology.append({"category": cat_title, "examples": examples})
+class ReconEnrichView(APIView):
+    """POST /api/v1/onet/enrich/"""
 
-        # Extract outlook
-        outlook = {}
-        if outlook_data:
-            outlook = {
-                "category": outlook_data.get("outlook", {}).get("category", ""),
-                "description": outlook_data.get("outlook", {}).get("description", ""),
-            }
-            salary = outlook_data.get("salary", {})
-            if salary:
-                outlook["salary"] = {
-                    "annual_median": salary.get("annual_median", ""),
-                    "annual_10th": salary.get("annual_10th_percentile", ""),
-                    "annual_90th": salary.get("annual_90th_percentile", ""),
-                }
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ReconEnrichThrottle]
+
+    ONET_CODE_PATTERN = re_module.compile(r'^\d{2}-\d{4}\.\d{2}$')
+
+    def post(self, request):
+        onet_code = request.data.get("onet_code", "").strip()
+        if not onet_code:
+            return Response(
+                {"error": "onet_code is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not self.ONET_CODE_PATTERN.match(onet_code):
+            return Response(
+                {"error": "Invalid O*NET-SOC code format. Expected XX-XXXX.XX"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile_context = getattr(request.user, "profile_context", None) or {}
+        if not profile_context:
+            return Response(
+                {"error": "Complete your profile in The Forge before using enrichment."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        base = f"{ONET_BASE}/veterans/careers/{onet_code}"
+        headers = _onet_headers()
+        auth = _onet_auth()
+
+        try:
+            overview_resp = http_requests.get(
+                f"{base}/", headers=headers, auth=auth, timeout=15
+            )
+        except http_requests.RequestException:
+            logger.error("O*NET overview fetch failed for enrichment")
+            return Response(
+                {"error": "Failed to fetch career data from O*NET."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if overview_resp.status_code == 404:
+            return Response(
+                {"error": "Career not found in O*NET."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not overview_resp.ok:
+            return Response(
+                {"error": "Failed to fetch career data from O*NET."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        overview_data = overview_resp.json()
+
+        supplementary = {}
+        for slug in ("skills", "knowledge", "technology", "job_outlook"):
+            try:
+                r = http_requests.get(
+                    f"{base}/{slug}", headers=headers, auth=auth, timeout=10
+                )
+                supplementary[slug] = r.json() if r.ok else {}
+            except http_requests.RequestException:
+                supplementary[slug] = {}
+
+        career_data = _normalize_career_data(
+            overview_data,
+            supplementary.get("skills", {}),
+            supplementary.get("knowledge", {}),
+            supplementary.get("technology", {}),
+            supplementary.get("job_outlook", {}),
+        )
+        career_data["code"] = onet_code
+
+        enrichment = enrich_career(career_data, profile_context)
+
+        if enrichment is None:
+            return Response(
+                {"error": "Career enrichment unavailable. Try again later."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         return Response({
-            "code": onet_code,
-            "title": overview_data.get("title", ""),
-            "description": overview_data.get("what_they_do", overview_data.get("description", "")),
-            "tags": overview_data.get("tags", {}),
-            "skills": skills,
-            "knowledge": knowledge,
-            "technology": technology,
-            "outlook": outlook,
+            "onet_code": onet_code,
+            "career_title": career_data["title"],
+            "enrichment": enrichment.model_dump(),
         })

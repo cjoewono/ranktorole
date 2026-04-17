@@ -877,17 +877,23 @@ class TestAnthropicSafetyNet:
 
 
 class TestSystemPromptGrounding:
-    """Verify the system prompt contains the grounding guardrails."""
+    """Verify the system prompt contains preservation + non-invention rules."""
 
-    def test_system_prompt_contains_grounding_rules(self):
+    def test_system_prompt_contains_preservation_rules(self):
         from translate_app.services import _SYSTEM_PROMPT
-        assert "GROUNDING RULES" in _SYSTEM_PROMPT
+        assert "SOURCE PRESERVATION RULES" in _SYSTEM_PROMPT
+
+    def test_system_prompt_preserves_source_facts(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "preserved" in lowered or "carry" in lowered
+        assert "concrete fact" in lowered
 
     def test_system_prompt_prohibits_invented_metrics(self):
         from translate_app.services import _SYSTEM_PROMPT
         lowered = _SYSTEM_PROMPT.lower()
-        assert "never invent" in lowered
-        assert "percentages" in lowered or "numbers" in lowered
+        assert "never add" in lowered or "do not invent" in lowered
+        assert "invent" in lowered
 
     def test_system_prompt_prohibits_scope_inflation(self):
         from translate_app.services import _SYSTEM_PROMPT

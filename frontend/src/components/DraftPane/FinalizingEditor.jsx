@@ -22,7 +22,7 @@ export default function FinalizingEditor({
   const [expandedKey, setExpandedKey] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [confirmedBullets, setConfirmedBullets] = useState(new Set());
+  const [verifiedFlags, setVerifiedFlags] = useState(new Set());
 
   function getFlagsFor(roleIdx, bulletIdx) {
     const entry = (bulletFlags || []).find(
@@ -31,9 +31,9 @@ export default function FinalizingEditor({
     return entry ? entry.flags : [];
   }
 
-  function toggleConfirmed(roleIdx, bulletIdx) {
+  function toggleVerified(roleIdx, bulletIdx) {
     const key = `${roleIdx}-${bulletIdx}`;
-    setConfirmedBullets((prev) => {
+    setVerifiedFlags((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -41,8 +41,12 @@ export default function FinalizingEditor({
     });
   }
 
-  function isConfirmed(roleIdx, bulletIdx) {
-    return confirmedBullets.has(`${roleIdx}-${bulletIdx}`);
+  function isVerified(roleIdx, bulletIdx) {
+    return verifiedFlags.has(`${roleIdx}-${bulletIdx}`);
+  }
+
+  function hasFlags(roleIdx, bulletIdx) {
+    return getFlagsFor(roleIdx, bulletIdx).length > 0;
   }
 
   // Auto-apply AI chat suggestions to the editable state when they arrive
@@ -61,11 +65,11 @@ export default function FinalizingEditor({
 
   function handleAcceptSuggestion(roleIdx, bulletIdx, val) {
     handleBulletChange(roleIdx, bulletIdx, val);
-    // confirmation cleared inside handleBulletChange
+    // verification cleared inside handleBulletChange
   }
 
   function handleDismissSuggestion(roleIdx, bulletIdx) {
-    setConfirmedBullets((prev) => {
+    setVerifiedFlags((prev) => {
       const next = new Set(prev);
       next.delete(`${roleIdx}-${bulletIdx}`);
       return next;
@@ -81,7 +85,8 @@ export default function FinalizingEditor({
         return { ...role, bullets };
       }),
     );
-    setConfirmedBullets((prev) => {
+    // If bullet was verified, clear it — edited bullets must be re-verified
+    setVerifiedFlags((prev) => {
       const next = new Set(prev);
       next.delete(`${roleIdx}-${bulletIdx}`);
       return next;
@@ -117,12 +122,16 @@ export default function FinalizingEditor({
     }
   }
 
-  const totalBullets = (editRoles || []).reduce(
-    (sum, r) => sum + (r.bullets?.length || 0),
-    0,
+  const flaggedBullets = (editRoles || []).flatMap((role, roleIdx) =>
+    (role.bullets || [])
+      .map((_, bulletIdx) => ({ roleIdx, bulletIdx }))
+      .filter(({ roleIdx: r, bulletIdx: b }) => hasFlags(r, b)),
   );
-  const allConfirmed =
-    totalBullets > 0 && confirmedBullets.size === totalBullets;
+  const totalFlagged = flaggedBullets.length;
+  const verifiedCount = flaggedBullets.filter(({ roleIdx, bulletIdx }) =>
+    isVerified(roleIdx, bulletIdx),
+  ).length;
+  const allFlagsResolved = totalFlagged === 0 || verifiedCount === totalFlagged;
 
   return (
     <div className="flex flex-col h-full">
@@ -195,10 +204,8 @@ export default function FinalizingEditor({
                       handleDismissSuggestion(roleIdx, bulletIdx)
                     }
                     flags={getFlagsFor(roleIdx, bulletIdx)}
-                    confirmed={isConfirmed(roleIdx, bulletIdx)}
-                    onToggleConfirmed={() =>
-                      toggleConfirmed(roleIdx, bulletIdx)
-                    }
+                    verified={isVerified(roleIdx, bulletIdx)}
+                    onToggleVerified={() => toggleVerified(roleIdx, bulletIdx)}
                   />
                 ))}
               </div>
@@ -215,13 +222,21 @@ export default function FinalizingEditor({
 
       {/* Pinned footer — never scrolls */}
       <div className="border-t border-outline-variant/20 bg-surface-container-low p-4">
-        <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant text-center pb-2">
-          {confirmedBullets.size} of {totalBullets} bullets confirmed
-        </p>
+        {totalFlagged > 0 && (
+          <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant text-center pb-2">
+            {verifiedCount} of {totalFlagged} flagged{" "}
+            {totalFlagged === 1 ? "bullet" : "bullets"} verified
+          </p>
+        )}
+        {totalFlagged === 0 && (
+          <p className="font-label text-xs tracking-widest uppercase text-secondary text-center pb-2">
+            ✓ All bullets passed grounding checks
+          </p>
+        )}
         <button
           type="button"
           onClick={handleConfirm}
-          disabled={saving || editRoles.length === 0 || !allConfirmed}
+          disabled={saving || editRoles.length === 0 || !allFlagsResolved}
           className="mission-gradient w-full text-on-primary font-label font-semibold tracking-widest uppercase text-sm py-3 rounded-md disabled:opacity-50 transition-opacity"
         >
           {saving ? "SAVING..." : "CONFIRM FINAL"}

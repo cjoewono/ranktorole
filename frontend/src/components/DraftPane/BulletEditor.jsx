@@ -10,8 +10,8 @@ export default function BulletEditor({
   onAccept,
   onDismiss,
   flags = [],
-  confirmed = false,
-  onToggleConfirmed,
+  verified = false,
+  onToggleVerified,
 }) {
   return (
     <div className="bg-surface-container overflow-hidden">
@@ -22,9 +22,15 @@ export default function BulletEditor({
         className="w-full flex items-start gap-2 px-3 py-2.5 text-left hover:bg-surface-container-high transition-colors"
       >
         <span
-          className={`shrink-0 mt-0.5 ${confirmed ? "text-secondary" : "text-on-surface-variant"}`}
+          className={`shrink-0 mt-0.5 ${
+            flags.length === 0
+              ? "text-on-surface-variant"
+              : verified
+                ? "text-secondary"
+                : "text-amber-400"
+          }`}
         >
-          {confirmed ? "✓" : "•"}
+          {flags.length === 0 ? "•" : verified ? "✓" : "•"}
         </span>
         <span className="flex-1 font-body text-sm text-on-surface leading-relaxed">
           {value}
@@ -101,18 +107,21 @@ export default function BulletEditor({
             </div>
           )}
 
-          {/* Honesty confirmation */}
-          <label className="flex items-start gap-2 pt-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={onToggleConfirmed}
-              className="mt-0.5 shrink-0 accent-secondary"
-            />
-            <span className="font-body text-xs text-on-surface leading-relaxed">
-              I did this exact work. The claims in this bullet are accurate.
-            </span>
-          </label>
+          {/* Honesty confirmation — only for flagged bullets */}
+          {flags.length > 0 && (
+            <label className="flex items-start gap-2 pt-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={verified}
+                onChange={onToggleVerified}
+                className="mt-0.5 shrink-0 accent-secondary"
+              />
+              <span className="font-body text-xs text-on-surface leading-relaxed">
+                I verified this bullet&apos;s claims against my actual
+                experience.
+              </span>
+            </label>
+          )}
         </div>
       )}
     </div>

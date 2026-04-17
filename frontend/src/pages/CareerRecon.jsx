@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
 import {
@@ -94,6 +94,7 @@ export default function CareerRecon() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [enrichment, setEnrichment] = useState(null);
   const [enrichError, setEnrichError] = useState(null);
+  const latestClickRef = useRef(null);
 
   const phase = detail ? "DETAIL" : results ? "RESULTS" : "SEARCH";
 
@@ -124,6 +125,7 @@ export default function CareerRecon() {
   }
 
   async function handleCareerClick(onetCode) {
+    latestClickRef.current = onetCode;
     setSelectedCode(onetCode);
     setLoadingDetail(true);
     setEnrichment(null);
@@ -135,6 +137,9 @@ export default function CareerRecon() {
       enrichCareer(onetCode),
     ]);
 
+    // Ignore if user clicked a different career while this fetch was in flight
+    if (latestClickRef.current !== onetCode) return;
+
     if (careerResult.status === "fulfilled") {
       setDetail(careerResult.value);
     } else {
@@ -144,7 +149,7 @@ export default function CareerRecon() {
     }
 
     if (enrichResult.status === "fulfilled") {
-      setEnrichment(enrichResult.value.enrichment);
+      setEnrichment(enrichResult.value?.enrichment ?? null);
     } else {
       setEnrichError("Personalized analysis unavailable.");
     }
@@ -449,7 +454,7 @@ export default function CareerRecon() {
                       PERSONALIZED CAREER INTELLIGENCE
                     </span>
                   </div>
-                  <MatchScoreBadge score={enrichment.match_score} />
+                  <MatchScoreBadge score={enrichment.match_score ?? 0} />
                 </div>
 
                 <p className="font-body text-sm text-on-surface-variant leading-relaxed">
@@ -463,7 +468,7 @@ export default function CareerRecon() {
                       TRANSFERABLE SKILLS
                     </p>
                     <div className="space-y-1">
-                      {enrichment.transferable_skills.map((skill, i) => (
+                      {(enrichment.transferable_skills ?? []).map((skill, i) => (
                         <div key={i} className="flex items-start gap-2">
                           <span className="text-secondary shrink-0 mt-0.5 text-xs">✓</span>
                           <span className="font-body text-sm text-on-surface">{skill}</span>
@@ -478,7 +483,7 @@ export default function CareerRecon() {
                       SKILL GAPS TO BRIDGE
                     </p>
                     <div className="space-y-1">
-                      {enrichment.skill_gaps.map((gap, i) => (
+                      {(enrichment.skill_gaps ?? []).map((gap, i) => (
                         <div key={i} className="flex items-start gap-2">
                           <span className="text-error shrink-0 mt-0.5 text-xs">△</span>
                           <span className="font-body text-sm text-on-surface">{gap}</span>

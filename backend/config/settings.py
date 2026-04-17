@@ -222,6 +222,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'onet_app': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 

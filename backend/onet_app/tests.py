@@ -378,7 +378,9 @@ class TestReconEnrichCacheAndCeiling:
             transferable_skills=["Test skill 1", "Test skill 2", "Test skill 3", "Test skill 4"],
         )
 
-        with patch("onet_app.recon_enrich_service._call_haiku_typed") as mock_haiku:
+        with patch("onet_app.recon_enrich_service._resolve_mos_title") as mock_resolve, \
+             patch("onet_app.recon_enrich_service._call_haiku_typed") as mock_haiku:
+            mock_resolve.return_value = "Infantryman (Army - Enlisted)"
             mock_haiku.return_value = mock_result
 
             result1 = enrich_career(career_data, profile_context)
@@ -414,7 +416,9 @@ class TestReconEnrichCacheAndCeiling:
             transferable_skills=["s1", "s2", "s3", "s4"],
         )
 
-        with patch("onet_app.recon_enrich_service._call_haiku_typed") as mock_haiku:
+        with patch("onet_app.recon_enrich_service._resolve_mos_title") as mock_resolve, \
+             patch("onet_app.recon_enrich_service._call_haiku_typed") as mock_haiku:
+            mock_resolve.return_value = "Test Title (Army - Enlisted)"
             mock_haiku.return_value = mock_result
 
             enrich_career(career_data, profile_a)
@@ -446,7 +450,9 @@ class TestReconEnrichCacheAndCeiling:
             transferable_skills=["1", "2", "3", "4"],
         )
 
-        with patch("onet_app.recon_enrich_service._call_haiku_typed") as mock_haiku:
+        with patch("onet_app.recon_enrich_service._resolve_mos_title") as mock_resolve, \
+             patch("onet_app.recon_enrich_service._call_haiku_typed") as mock_haiku:
+            mock_resolve.return_value = "Test Title (Army - Enlisted)"
             mock_haiku.return_value = mock_result
 
             result1 = enrich_career(career_data, profile_a)
@@ -456,5 +462,79 @@ class TestReconEnrichCacheAndCeiling:
             result2 = enrich_career(career_data, profile_b)
             assert result2 is None
             assert mock_haiku.call_count == 1
+
+        cache.clear()
+
+
+class TestResolveMosTitle:
+    """Tests for the MOS title resolver (O*NET veterans/military lookup)."""
+
+    def test_returns_title_on_exact_match(self, db):
+        """Successful O*NET response with matching code returns title."""
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import _resolve_mos_title
+
+        cache.clear()
+
+        with patch("onet_app.recon_enrich_service.http_requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.json.return_value = {
+                "military_match": [
+                    {"code": "11B", "title": "Infantryman (Army - Enlisted)", "branch": "army"},
+                ],
+            }
+            mock_get.return_value = mock_resp
+
+            title = _resolve_mos_title("Army", "11B")
+            assert title == "Infantryman (Army - Enlisted)"
+
+        cache.clear()
+
+    def test_returns_empty_on_no_match(self, db):
+        """O*NET returns matches but none are exact code — empty string."""
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import _resolve_mos_title
+
+        cache.clear()
+
+        with patch("onet_app.recon_enrich_service.http_requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.json.return_value = {
+                "military_match": [
+                    {"code": "99Z", "title": "Something Else", "branch": "army"},
+                ],
+            }
+            mock_get.return_value = mock_resp
+
+            title = _resolve_mos_title("Army", "11B")
+            assert title == ""
+
+        cache.clear()
+
+    def test_returns_cached_result_on_second_call(self, db):
+        """Second call with same (branch, mos) hits cache, not O*NET."""
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import _resolve_mos_title
+
+        cache.clear()
+
+        with patch("onet_app.recon_enrich_service.http_requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.json.return_value = {
+                "military_match": [
+                    {"code": "1110", "title": "Surface Warfare Officer (Navy - Officer)", "branch": "navy"},
+                ],
+            }
+            mock_get.return_value = mock_resp
+
+            t1 = _resolve_mos_title("Navy", "1110")
+            t2 = _resolve_mos_title("Navy", "1110")
+
+            assert t1 == "Surface Warfare Officer (Navy - Officer)"
+            assert t2 == t1
+            assert mock_get.call_count == 1  # Second call cached
 
         cache.clear()

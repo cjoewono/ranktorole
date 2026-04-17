@@ -9,6 +9,7 @@ import re
 from datetime import date
 
 import anthropic
+import requests as http_requests
 from django.conf import settings
 from django.core.cache import cache
 from pydantic import ValidationError
@@ -20,6 +21,8 @@ from .schemas import CareerEnrichment
 logger = logging.getLogger(__name__)
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
+MOS_TITLE_CACHE_TTL = 30 * 24 * 60 * 60  # 30 days — MOS titles don't change
+ONET_V2_BASE = "https://api-v2.onetcenter.org"
 
 _ENRICH_SYSTEM_PROMPT = (
     "You are a military-to-civilian career transition expert. You analyze "
@@ -71,7 +74,60 @@ def _check_and_increment_global_ceiling() -> bool:
     return True
 
 
-def _build_enrichment_prompt(career_data: dict, profile_context: dict) -> str:
+def _resolve_mos_title(branch: str, mos: str) -> str:
+    """Look up the canonical military title for a (branch, mos) pair from O*NET.
+
+    Returns the title string on success, or empty string on miss.
+    Cached 30 days per (branch, mos) key. Empty string is a deliberate sentinel
+    — the prompt uses it as a 'known unknown' so Haiku won't invent a title.
+    """
+    if not branch or not mos:
+        return ""
+
+    cache_key = f"mos_title:{branch.lower()}:{mos.upper()}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached  # May be empty string (cached miss)
+
+    try:
+        resp = http_requests.get(
+            f"{ONET_V2_BASE}/veterans/military/",
+            params={"keyword": mos, "branch": branch.lower()},
+            headers={
+                "Accept": "application/json",
+                "X-API-Key": settings.ONET_API_KEY,
+            },
+            timeout=10,
+        )
+    except http_requests.RequestException:
+        logger.warning("O*NET title lookup network error for %s/%s", branch, mos)
+        return ""  # Don't cache transient network errors
+
+    if not resp.ok:
+        cache.set(cache_key, "", MOS_TITLE_CACHE_TTL)
+        return ""
+
+    try:
+        data = resp.json()
+    except ValueError:
+        return ""
+
+    target_code = mos.upper()
+    for match in data.get("military_match", []):
+        if match.get("code", "").upper() == target_code:
+            title = match.get("title", "")
+            cache.set(cache_key, title, MOS_TITLE_CACHE_TTL)
+            return title
+
+    cache.set(cache_key, "", MOS_TITLE_CACHE_TTL)
+    return ""
+
+
+def _build_enrichment_prompt(
+    career_data: dict,
+    profile_context: dict,
+    mos_title: str = "",
+) -> str:
     career_title = career_data.get("title", "Unknown")
     career_desc = career_data.get("description", "")
     career_skills = [s.get("name", "") for s in career_data.get("skills", [])][:10]
@@ -87,13 +143,18 @@ def _build_enrichment_prompt(career_data: dict, profile_context: dict) -> str:
     user_skills = profile_context.get("skills", [])
     user_skills_str = ", ".join(user_skills) if user_skills else "Not specified"
 
+    if mos_title:
+        mos_line = f"- MOS/Rating/AFSC: {mos} — {mos_title}"
+    else:
+        mos_line = f"- MOS/Rating/AFSC: {mos} (specific duties not verified — do not invent)"
+
     schema = CareerEnrichment.model_json_schema()
 
     return (
         "Analyze how this veteran's background maps to the target civilian career.\n\n"
         "VETERAN PROFILE:\n"
         f"- Service Branch: {branch}\n"
-        f"- MOS/Rating/AFSC: {mos}\n"
+        f"{mos_line}\n"
         f"- Target Sector: {target_sector}\n"
         f"- Self-Reported Skills: {user_skills_str}\n\n"
         "CIVILIAN CAREER:\n"
@@ -102,15 +163,32 @@ def _build_enrichment_prompt(career_data: dict, profile_context: dict) -> str:
         f"- Key Required Skills: {', '.join(career_skills)}\n"
         f"- Key Required Knowledge: {', '.join(career_knowledge)}\n"
         f"- Salary Range: ${salary_low} - ${salary_high} (Median: ${salary_median})\n\n"
+        "CRITICAL RULES:\n"
+        "- The MOS/Rating/AFSC title above is authoritative when provided. "
+        "Use it verbatim. Do not invent or rename the military role.\n"
+        "- If the MOS line says 'specific duties not verified', describe the "
+        "veteran's background at branch level only (e.g., 'your Army service') "
+        "and do not speculate about specific military duties.\n"
+        "- Never invent a military job title, rating, or specialty description. "
+        "If uncertain about the code's specific duties, speak to transferable "
+        "branch-level skills rather than fabricating specifics.\n\n"
         "Guidance:\n"
-        "- match_score: 90+ means MOS duties directly overlap. 60-80 means transferable "
-        "skills apply but technical gaps exist. Below 50 means significant retraining. "
-        "Be honest — do not inflate.\n"
-        "- personalized_description: 2-3 sentences referencing THIS veteran's branch, MOS, skills.\n"
-        "- skill_gaps: 2-4 specific certifications or skills needed.\n"
-        "- education_recommendation: 1-2 sentences on a realistic degree/cert path. GI Bill where appropriate.\n"
-        "- transferable_skills: 4-6 skills from military background that directly apply.\n\n"
-        "DO NOT generate resume bullets, XYZ-format accomplishments, or fabricated metrics.\n\n"
+        "- match_score: 90+ means MOS duties directly overlap with the role. "
+        "60-80 means transferable leadership/soft skills apply but technical "
+        "gaps exist. Below 50 means significant retraining needed. Be honest — "
+        "do not inflate scores to be encouraging.\n"
+        "- personalized_description: 2-3 sentences referencing THIS veteran's "
+        "specific branch and authoritative MOS title (when provided). Not generic.\n"
+        "- skill_gaps: 2-4 specific certifications, skills, or experiences the "
+        "veteran likely needs to bridge (e.g., 'OSHA 30-Hour Card', "
+        "'PMP certification', 'cloud infrastructure experience').\n"
+        "- education_recommendation: 1-2 sentences on a realistic degree or "
+        "certification path. Reference GI Bill options where appropriate.\n"
+        "- transferable_skills: 4-6 skills from their military background that "
+        "directly apply to this civilian role.\n\n"
+        "DO NOT generate resume bullets, XYZ-format accomplishments, or "
+        "fabricated metrics. The veteran will build their own bullets in the "
+        "resume builder with their real numbers.\n\n"
         f"Return ONLY valid JSON matching this schema: {json.dumps(schema)}"
     )
 
@@ -168,8 +246,14 @@ def enrich_career(career_data: dict, profile_context: dict) -> CareerEnrichment 
 
     logger.info("enrich_career cache_miss onet_code=%s", onet_code)
 
+    # Resolve canonical MOS title from O*NET — prevents Haiku hallucinating job titles
+    mos_title = _resolve_mos_title(
+        profile_context.get("branch", ""),
+        profile_context.get("mos", ""),
+    )
+
     try:
-        prompt = _build_enrichment_prompt(career_data, profile_context)
+        prompt = _build_enrichment_prompt(career_data, profile_context, mos_title)
         result = _call_haiku_typed(
             [{"role": "user", "content": prompt}],
             CareerEnrichment,

@@ -187,6 +187,23 @@ call. Five cost controls defend the feature (defense in depth):
 **Deliberately excluded:** resume bullets. Resume builder is where veterans draft bullets
 with their real numbers. LLM-fabricated XYZ metrics on Recon is a liability not taken on.
 
+### MOS Title Resolution
+
+O\*NET has uneven coverage of military codes:
+
+- Navy officer designators are entirely unindexed
+- Air Force / Space Force officer AFSCs are only indexed at full-specialty
+  granularity (11F1B, not 11F)
+- Coast Guard is entirely unindexed
+- Army, Marine Corps, and enlisted Navy/AF resolve cleanly
+
+`_resolve_mos_title()` handles these gaps with layered priority: local dicts
+first (Navy officers, CG ratings), then O\*NET exact match, then O\*NET prefix
+match (AF/USSF only, with sub-specialty stripping). Titles cached 30 days.
+
+The resolver returns empty string on miss — an intentional sentinel the
+enrichment prompt recognizes as "known unknown" and will not fabricate around.
+
 ### State Machine Hook
 
 All resume builder logic lives in `frontend/src/hooks/useResumeMachine.js`:

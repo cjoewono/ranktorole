@@ -884,6 +884,7 @@ O*NET career detail (existing) + Haiku enrichment (new). Both are resolved via
 ### Architecture
 
 **Backend — `onet_app/recon_enrich_service.py`**
+
 - Shared Anthropic client from `translate_app.services._get_client()`
 - Profile-aware cache key: `recon_enrich:{code}:{sha256(branch|mos|sector|skills)[:16]}`
 - Incr-first ceiling check prevents TOCTOU over-count across gunicorn workers
@@ -891,6 +892,7 @@ O*NET career detail (existing) + Haiku enrichment (new). Both are resolved via
 - `CareerEnrichment` Pydantic schema with `max_length` constraints
 
 **Five cost controls (defense in depth):**
+
 1. Auth + profile gate
 2. Per-user tiered throttle (15/day free, 25/day pro)
 3. DB-backed result cache (7-day TTL)
@@ -898,6 +900,7 @@ O*NET career detail (existing) + Haiku enrichment (new). Both are resolved via
 5. Global 500/day ceiling
 
 **Frontend — `CareerRecon.jsx`**
+
 - `latestClickRef` ref prevents mismatched detail+enrichment on rapid card clicks
 - Enrichment panel: match score badge, personalized description, transferable skills,
   skill gaps, education recommendation
@@ -912,21 +915,73 @@ O*NET career detail (existing) + Haiku enrichment (new). Both are resolved via
 
 ### Test Coverage
 
-- 7 endpoint tests: auth, profile gate, invalid code, O*NET 404, Haiku failure (503), happy path, unauthenticated
+- 7 endpoint tests: auth, profile gate, invalid code, O\*NET 404, Haiku failure (503), happy path, unauthenticated
 - 3 cost-control tests: cache hit skips LLM, profile change invalidates cache, global ceiling blocks call
 - Final: 163 → 173 passing
 
 ### Cost Model
 
-| Tier | Max/day | Max cost/day |
-|------|---------|-------------|
-| Free | 15 calls | $0.04 |
-| Pro  | 25 calls | $0.065 |
-| Global ceiling | 500 calls | $1.30 |
+| Tier           | Max/day   | Max cost/day |
+| -------------- | --------- | ------------ |
+| Free           | 15 calls  | $0.04        |
+| Pro            | 25 calls  | $0.065       |
+| Global ceiling | 500 calls | $1.30        |
 
 Expected monthly spend at 100 pro users / 10 sessions: ~$3/month (60-75% cache hit rate).
 
 ---
 
+### Follow-up: MOS Title Resolver Arc (April 17–20)
+
+Smoke testing after initial Session 13 merge surfaced a trust-critical
+hallucination: Haiku described a Navy 1110 (Surface Warfare Officer) as
+"Administrative Yeoman." Three coordinated fixes over one session closed the
+gap across 5 of 6 service branches.
+
+| Task | Finding                                                                                                                                                                                                        | Fix                                                                                                                                                                                                                                                                                                             |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Haiku given raw MOS codes fabricated titles — training data has weak coverage of military codes and no self-awareness to admit uncertainty.                                                                    | Added `_resolve_mos_title()` that hits O\*NET `/veterans/military/` for authoritative title. 30-day cache per `(branch, mos)` key. Prompt rewritten to use resolved title verbatim, with explicit "do not invent" fallback when miss. +3 tests (173 → 176).                                                     |
+| 2    | Diagnostic revealed O\*NET has zero coverage of Navy officer designators (1110, 1120, 1310, etc.) — not indexed by code or by title search. All other branches' officers resolve fine (Army 17A, Marine 0302). | Added `NAVY_OFFICER_DESIGNATORS` dict — ~30 codes covering URL, RL, Staff Corps, LDO, CWO communities. Resolver checks local dict before O\*NET fallback. +2 tests (176 → 178).                                                                                                                                 |
+| 3    | Follow-up diagnostic surfaced two more gaps: AF/USSF officer AFSCs (11F, 14N) only indexed at full-specialty level (11F1B, 14N1M), and Coast Guard had zero O\*NET coverage entirely.                          | Added prefix-match to resolver: when exact match fails for AF/USSF, accept first entry whose code starts with user's input, and strip sub-specialty from title ("Fighter Pilot, A-10" → "Fighter Pilot") to avoid misrepresenting aircraft. Added `COAST_GUARD_RATINGS` dict (~21 codes). +5 tests (178 → 183). |
+
+### Coverage Matrix (Post-Arc)
+
+| Branch       | Enlisted              | Officer     | Source                                            |
+| ------------ | --------------------- | ----------- | ------------------------------------------------- |
+| Army         | ✅                    | ✅          | O\*NET exact match                                |
+| Navy         | ✅ (2-letter ratings) | ✅          | O\*NET (enlisted) + local dict (officers)         |
+| Air Force    | ✅                    | ✅          | O\*NET exact (enlisted) + prefix match (officers) |
+| Marine Corps | ✅                    | ✅          | O\*NET exact match                                |
+| Coast Guard  | ✅                    | ⏳ deferred | Local dict (enlisted only)                        |
+| Space Force  | ✅                    | ✅          | O\*NET prefix match (shared with AF)              |
+
+Known gaps carried to post-launch backlog:
+
+- Coast Guard officer designators (smaller user population, idiosyncratic system)
+- Navy rating with pay grade suffix (IT2 doesn't resolve; IT does)
+- Qualitative aggregate refinement in resume translator (unrelated)
+
+### Key Learnings
+
+- **Real-data smoke testing catches what tests don't.** The 176 passing tests
+  validated code paths but couldn't surface the hallucination — only a real
+  Navy officer profile + real career click did. Mocked tests never reached the
+  prompt-content level. This is the same lesson from the honesty stack
+  sessions: veterans using real profiles expose failures synthetic data misses.
+- **Haiku confidently invents when lacking ground truth.** The "do not invent"
+  prompt rule alone would not have been sufficient — Haiku doesn't have
+  accurate self-awareness of its own knowledge gaps for niche domains like
+  military codes. The structural fix (ground truth injection) is what works.
+- **O\*NET coverage is uneven across branches and enlisted/officer lines.**
+  Navy officers missing entirely, AF officer codes indexed at wrong
+  granularity, CG missing wholesale. Building a product on O\*NET requires
+  mapping these gaps and filling them with local data.
+- **Split the fix into sequenced commits.** Three commits (resolver + Navy dict
+  - AF/CG) is more reviewable and revertable than one sprawling commit.
+    Standard hygiene but especially valuable when the scope kept growing during
+    the session.
+
+---
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 17, 2026 — Session 13 (Career Recon Enrichment), 173 tests passing
+Last updated: April 20, 2026 — Session 13 MOS resolver arc, 183 tests passing

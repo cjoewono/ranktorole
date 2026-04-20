@@ -121,7 +121,7 @@ Do **not** upgrade without explicit go-ahead:
 
 2. **Per-user tiered throttle** — `ReconEnrichThrottle` enforces 15/day (free) / 25/day (pro) via `TIERED_THROTTLE_RATES`. Cache hits do not consume throttle quota.
 
-3. **DB-backed result cache** — Profile-aware SHA256 cache key means MOS/branch changes get fresh enrichment (correctness), not stale output. Two users with identical profile fields share a cache entry (no PII in enrichment response — output is derived solely from O*NET public data + profile tier/branch/mos/skills). 7-day TTL.
+3. **DB-backed result cache** — Profile-aware SHA256 cache key means MOS/branch changes get fresh enrichment (correctness), not stale output. Two users with identical profile fields share a cache entry (no PII in enrichment response — output is derived solely from O\*NET public data + profile tier/branch/mos/skills). 7-day TTL.
 
 4. **Hard API timeout** — `RECON_ENRICH_TIMEOUT_SECONDS = 15.0` prevents backend thread pile-up on Anthropic partial outages. Haiku P95 is ~3s; 15s is a generous backstop.
 
@@ -133,4 +133,20 @@ Do **not** upgrade without explicit go-ahead:
 
 **No bullet fabrication** — Haiku prompt explicitly instructs: "DO NOT generate resume bullets, XYZ-format accomplishments, or fabricated metrics." Enforced by schema design (no bullets field) and explicit prompt instruction.
 
-**O*NET data trust** — O*NET career data is fetched server-side; client never passes career payload. Profile context is read from `request.user`, never from request body.
+**O\*NET data trust** — O\*NET career data is fetched server-side; client never passes career payload. Profile context is read from `request.user`, never from request body.
+
+### MOS Title Grounding
+
+Enrichment prompts always include a validated military title (or explicit
+"not verified" sentinel). This prevents Haiku from fabricating military job
+duties when given only a numeric code. Titles come from:
+
+1. Local dicts (`NAVY_OFFICER_DESIGNATORS`, `COAST_GUARD_RATINGS`) for branches
+   where O\*NET has no coverage
+2. O\*NET `/veterans/military/` endpoint for all other branches
+3. Prefix-match fallback for AF/USSF hierarchical codes
+
+Resolved titles cached 30 days per `(branch, mos)` key. On miss, the prompt
+explicitly instructs Haiku to speak at branch level only and not invent
+specifics. This is a trust-critical control — veterans detect fabricated
+military titles immediately and lose product confidence.

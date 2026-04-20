@@ -665,26 +665,32 @@ No PAN, no CVV, no payment methods — ever.
     "personalized_description": "2-3 sentences referencing veteran's branch/MOS/skills.",
     "skill_gaps": ["OSHA 30-Hour Card", "PMP certification"],
     "education_recommendation": "1-2 sentences with GI Bill path where applicable.",
-    "transferable_skills": ["Team leadership", "Risk assessment", "Equipment operation", "Safety protocols"]
+    "transferable_skills": [
+      "Team leadership",
+      "Risk assessment",
+      "Equipment operation",
+      "Safety protocols"
+    ]
   }
 }
 ```
 
 ### Error responses
 
-| Status | When |
-|--------|------|
-| 400 | `onet_code` missing, malformed, or user has no `profile_context` |
-| 401 | Unauthenticated |
-| 404 | O*NET career code not found |
-| 429 | Per-user throttle exceeded |
-| 502 | O*NET API unreachable |
-| 503 | Global daily ceiling hit or Haiku API failure |
+| Status | When                                                             |
+| ------ | ---------------------------------------------------------------- |
+| 400    | `onet_code` missing, malformed, or user has no `profile_context` |
+| 401    | Unauthenticated                                                  |
+| 404    | O\*NET career code not found                                     |
+| 429    | Per-user throttle exceeded                                       |
+| 502    | O\*NET API unreachable                                           |
+| 503    | Global daily ceiling hit or Haiku API failure                    |
 
-### Storage rules
+### Internal behavior
 
-- Enrichment result is NEVER persisted to the Resume model or any DB table
-- `profile_context` is read from `request.user` — never from request body
-- Cache key: `recon_enrich:{onet_code}:{profile_fingerprint[:16]}`
+- `profile_context` is read from `request.user.profile_context` (never from client)
+- Canonical MOS title resolved via `_resolve_mos_title()` before Haiku call; empty string on miss — prompt handles as "known unknown" and will not fabricate
+- Result cached in `django_cache` under key `recon_enrich:{onet_code}:{profile_fingerprint[:16]}` for 7 days
 - Profile fingerprint: SHA256 of `branch|mos|target_sector|sorted(skills)`
-- Cached dict expires after `RECON_ENRICH_CACHE_TTL` seconds (default: 604800)
+- Global daily ceiling: `RECON_ENRICH_DAILY_CEILING` (default 500) — returns 503 when exceeded
+- Enrichment result is NEVER persisted to the Resume model or any DB table

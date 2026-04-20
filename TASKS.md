@@ -346,26 +346,50 @@ None.
 - [x] DB-backed result cache (profile-aware SHA256 keys, 7-day TTL)
 - [x] Global 500/day ceiling with incr-first atomic pattern
 - [x] 15s hard timeout on Haiku API call
-- [x] _normalize_career_data() helper extracted and shared
+- [x] \_normalize_career_data() helper extracted and shared
 - [x] ReconEnrichView: POST /api/v1/onet/enrich/
 - [x] enrichCareer() frontend API function
-- [x] Parallel O*NET + Haiku fetch via Promise.allSettled (graceful degradation)
+- [x] Parallel O\*NET + Haiku fetch via Promise.allSettled (graceful degradation)
 - [x] MatchScoreBadge — 4-tier color coding
 - [x] Enrichment panel in DETAIL phase
 - [x] Stale-click race guard (latestClickRef pattern)
 - [x] strip_tags on all LLM string outputs
 - [x] 10 new tests (163 → 173 passing)
 
+## Completed — April 17–20, 2026 (MOS Title Resolver Arc)
+
+- [x] \_resolve_mos_title() — O\*NET title lookup + 30-day cache per (branch, mos) key
+- [x] Enrichment prompt rewritten to use resolved title verbatim, "do not invent" fallback on miss
+- [x] NAVY_OFFICER_DESIGNATORS local dict (~30 codes) — Navy officers not indexed in O\*NET
+- [x] AF/USSF prefix-match — exact match fails → first sub-code accepted, sub-specialty stripped
+- [x] COAST_GUARD_RATINGS local dict (~21 enlisted codes) — CG has zero O\*NET coverage
+- [x] 4-priority lookup chain: Navy officer dict → CG dict → O*NET exact → O*NET prefix
+- [x] Verified in browser: Navy 1110 profile now correctly references Surface Warfare Officer
+- [x] Test count: 173 → 183 passing (10 new tests across 3 commits)
+
 ## Start Next Session With
 
-> "Let's tackle the remaining deploy blockers before EC2. Confirm 173 backend
-> tests pass locally, then work through in order: (1) decide the `ResumeChatView`
-> `is_finalized` contract — DATA_CONTRACT says 409, code returns 200, test
-> asserts 200, need a design decision not just a code change. (2) Throttle UX
-> audit — review `DEFAULT_THROTTLE_RATES` for prod values, add a global 429
-> handler in `apiFetch` (current DRF default 'throttled in X seconds' message
-> is user-hostile). (3) Secret rotation — generate fresh `SECRET_KEY`, DB
-> password, Stripe webhook signing secret before they touch EC2. (4) Only then
-> walk Phase 5 EC2 deployment. Stop at any step that requires AWS console,
-> DNS, Google Cloud Console, or Stripe dashboard changes and wait for explicit
-> go-ahead."
+Pre-launch deploy blockers for April 24 (remaining after Session 13):
+
+1. **ResumeChatView `is_finalized` contract decision (~30 min)** — DATA_CONTRACT
+   says 409, code returns 200, active test asserts 200. Pick one, update the
+   other two to match. Smallest blocker, tackle first.
+2. **Throttle UX audit + global 429 handler in `apiFetch` (1-2 hr)** — review
+   `DEFAULT_THROTTLE_RATES` for production; add user-facing 429 handling
+   (DRF default "throttled in X seconds" message is user-hostile).
+3. **Secret rotation (~15 min)** — ANTHROPIC_API_KEY, Google OAuth client
+   secret, O\*NET API key, `SECRET_KEY`. All potentially exposed via prior
+   `docker compose config` terminal output. Run before EC2 deploy.
+4. **Manual EC2 deploy** — DNS A records → `cjoewono.com`, security group
+   (80/443 only), Docker + Certbot install, prod `.env`, `certbot --standalone`,
+   gunicorn override, Google OAuth redirect URI update, auto-renewal cron.
+
+### Recently Completed (Session 13)
+
+- ✅ Career Recon enrichment (Claude Haiku 4.5) with cost controls
+- ✅ MOS title resolver (O\*NET lookup + 30-day cache)
+- ✅ Navy officer designator local dict (~30 codes)
+- ✅ AF/USSF prefix-match with sub-specialty stripping
+- ✅ Coast Guard enlisted rating dict (~21 codes)
+- ✅ Verified in browser: Navy 1110 profile now correctly references
+  Surface Warfare Officer, not fabricated Yeoman

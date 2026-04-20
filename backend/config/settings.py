@@ -154,12 +154,37 @@ REST_FRAMEWORK = {
     },
 }
 
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-        "LOCATION": "django_cache",
+# ---------------------------------------------------------------------------
+# Cache — Redis when REDIS_URL is set, LocMemCache fallback otherwise.
+# Shared across gunicorn workers via Redis. Tests override to LocMemCache
+# via root conftest autouse fixture.
+# ---------------------------------------------------------------------------
+REDIS_URL = os.environ.get('REDIS_URL', '')
+
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'SOCKET_CONNECT_TIMEOUT': 5,
+                'SOCKET_TIMEOUT': 5,
+                # Fail loud on Redis outages so healthcheck catches them
+                # instead of silently bypassing throttles. Do not flip to True
+                # without adding view-level graceful degradation first.
+                'IGNORE_EXCEPTIONS': False,
+            },
+            'KEY_PREFIX': 'rtr',
+        }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'ranktorole-cache',
+        }
+    }
 
 # ---------------------------------------------------------------------------
 # Tiered Throttle Rates

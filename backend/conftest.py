@@ -22,3 +22,23 @@ def block_real_anthropic_api():
 
     with patch("translate_app.services.anthropic.Anthropic", return_value=mock_client):
         yield mock_client
+
+
+@pytest.fixture(autouse=True)
+def force_local_memory_cache(settings):
+    """SAFETY NET: Force LocMemCache in all tests regardless of REDIS_URL.
+
+    Keeps CI portable — no Redis dependency for pytest. Tests that assert
+    cache behavior use django.core.cache.cache normally; they hit
+    the in-memory backend transparently.
+    """
+    settings.CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'test-cache',
+        }
+    }
+    from django.core.cache import cache
+    cache.clear()
+    yield
+    cache.clear()

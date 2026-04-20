@@ -11,11 +11,29 @@ from django.urls import include, path
 
 
 def health_check(request):
+    """Probe DB and cache. Returns 503 if either fails.
+
+    Cache probe uses set/get round-trip so a broken Redis connection
+    surfaces immediately rather than being silently absorbed.
+    """
+    checks = {"database": False, "cache": False}
+
     try:
         get_user_model().objects.exists()
-        return JsonResponse({"status": "ok"}, status=200)
+        checks["database"] = True
     except Exception:
-        return JsonResponse({"status": "error"}, status=503)
+        pass
+
+    try:
+        from django.core.cache import cache
+        cache.set("health_probe", "ok", 10)
+        checks["cache"] = cache.get("health_probe") == "ok"
+    except Exception:
+        pass
+
+    if all(checks.values()):
+        return JsonResponse({"status": "ok", "checks": checks}, status=200)
+    return JsonResponse({"status": "error", "checks": checks}, status=503)
 
 
 urlpatterns = [

@@ -192,11 +192,16 @@ else:
 # TieredThrottle subclasses look up rates here by scope + user.tier.
 # Falls back to DEFAULT_THROTTLE_RATES if tier not found.
 TIERED_THROTTLE_RATES = {
-    'user_upload':   {'free': '3/day',  'pro': '15/day'},
-    'user_draft':    {'free': '1/day',  'pro': '5/day'},
-    'user_chat':     {'free': '10/day', 'pro': '50/day'},
-    'user_finalize': {'free': '3/day',  'pro': '15/day'},
-    'user_onet':     {'free': '10/day', 'pro': '30/day'},
+    # Per-user daily caps by tier. Rebalanced for launch based on
+    # per-draft cost (~$0.057 Sonnet 4) and realistic pro usage patterns
+    # (~10-15 drafts across an active job search, burst days of 3-5).
+    # Global 500/day ceiling in RECON_ENRICH_DAILY_CEILING caps total
+    # spend regardless of these values.
+    'user_upload':       {'free': '3/day',  'pro': '20/day'},
+    'user_draft':        {'free': '1/day',  'pro': '15/day'},
+    'user_chat':         {'free': '10/day', 'pro': '75/day'},
+    'user_finalize':     {'free': '3/day',  'pro': '20/day'},
+    'user_onet':         {'free': '10/day', 'pro': '30/day'},
     'user_recon_enrich': {'free': '15/day', 'pro': '25/day'},
 }
 

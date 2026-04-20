@@ -1170,5 +1170,27 @@ Option 1 is the simpler fix and preserves throttle integrity. Deferred to Sessio
 
 ---
 
+## April 20, 2026 (evening) | Throttle rebalance for launch
+
+**Status:** ✅ Shipped.
+
+Pro-tier draft cap was 5/day — too tight for realistic burst-day usage
+(3-5 applications in a day) and for own-testing. Rebalanced to launch
+values based on per-draft cost (~$0.057 Sonnet 4) and realistic usage
+patterns.
+
+New pro caps: user_upload 20/day, user_draft 15/day, user_chat 75/day,
+user_finalize 20/day. Free tier unchanged. Global 500/day ceiling
+unchanged — caps absolute worst-case spend at ~$30/day regardless of
+per-user values.
+
+Free→pro conversion driver (1/day free draft cap) is deliberately
+preserved at 1/day. The conversion ask is "unlock unlimited tailoring
+for real job search" — not "unlock a bigger free tier."
+
+Settings change only. No test changes needed. 210 tests still passing.
+
+---
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 20, 2026 — Session 15 Redis-enabled optimizations, 198 tests passing
+Last updated: April 20, 2026 — Throttle rebalance for launch, 210 tests passing

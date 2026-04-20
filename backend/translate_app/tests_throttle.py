@@ -91,7 +91,7 @@ class TestTieredThrottleUnit:
         throttle = UploadThrottle()
         throttle._tier = 'pro'
         rate = throttle.get_rate()
-        assert rate == '15/day'
+        assert rate == '20/day'
 
     def test_get_rate_unknown_tier_falls_back(self):
         """Unknown tier falls back to DEFAULT_THROTTLE_RATES."""
@@ -148,21 +148,21 @@ class TestTieredThrottleUnit:
         throttle._tier = 'free'
         assert throttle.get_rate() == '1/day'
         throttle._tier = 'pro'
-        assert throttle.get_rate() == '5/day'
+        assert throttle.get_rate() == '15/day'
 
     def test_chat_throttle_rates(self):
         throttle = ChatThrottle()
         throttle._tier = 'free'
         assert throttle.get_rate() == '10/day'
         throttle._tier = 'pro'
-        assert throttle.get_rate() == '50/day'
+        assert throttle.get_rate() == '75/day'
 
     def test_finalize_throttle_rates(self):
         throttle = FinalizeThrottle()
         throttle._tier = 'free'
         assert throttle.get_rate() == '3/day'
         throttle._tier = 'pro'
-        assert throttle.get_rate() == '15/day'
+        assert throttle.get_rate() == '20/day'
 
     def test_onet_throttle_rates(self):
         throttle = OnetThrottle()

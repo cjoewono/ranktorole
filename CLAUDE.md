@@ -135,6 +135,10 @@ Raw `military_text` and `job_description` are NEVER passed after call 1.
 - Thin views; all logic in `services.py`
 - Serializers for all data transformations
 - All models use UUIDv4 primary keys
+- **Cache-aside pattern for new read endpoints.** New read-heavy endpoints SHOULD use the cache-aside pattern: build a cache key in the app's `cache_utils.py` module, check cache first, populate on miss. Use `django.core.cache.cache` only — never import `redis-py` directly. TTL choice: 6h for external API responses, 1h for DB-derived per-user data, 24h for slowly-changing reference data.
+- **Invalidation is non-negotiable for write paths.** Any cached read endpoint backed by a model MUST have its cache invalidated by every write path on that model. Add an `invalidate_*_cache()` helper in the app's `cache_utils.py` and call it after every `save()` / `delete()` / `bulk_update()`. Per-user caches are keyed by `user.pk` (UUID); never key by email or username (mutable).
+- **Don't cache failures.** Empty upstream responses, 404s, 5xx mocks, and validation failures must NOT be cached. The standard pattern is `if data: cache.set(...)` — do NOT use `cache.set(key, payload)` unconditionally on the success branch.
+- **Cache utilities live in `<app>/cache_utils.py`.** Each Django app that uses caching has its own `cache_utils.py` module containing key-builder functions, TTL constants, and invalidation helpers. Views import from this module — never inline cache key strings or TTL literals in views.
 
 ### React
 

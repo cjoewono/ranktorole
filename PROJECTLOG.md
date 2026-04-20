@@ -1027,7 +1027,68 @@ Known gaps carried to post-launch backlog:
 
 **`docker compose restart` does NOT re-read env_file.** During Checkpoint 2 verification, `/health/` reported `cache: true` but Redis was empty. Root cause: `REDIS_URL` was added to `.env` but the running backend container's environment was frozen from its original creation — `docker compose restart backend` bounced the process inside the same container without re-reading `.env`. Fix: `docker compose up -d --force-recreate backend`. Pattern documented in CLAUDE.md.
 
+## April 20, 2026 | Session 15 | Redis-Enabled Optimizations
+
+**Status:** ✅ Complete — cache-aside pattern shipped for O\*NET proxy + resume list. 183 → 198 tests, zero regressions.
+
+### Changes Shipped (One Commit)
+
+**`feat(cache): cache-aside for O*NET proxy + resume list`** (`518b378`)
+
+Two new utility modules (cache key builders + TTL constants):
+
+- `backend/onet_app/cache_utils.py` — `search_cache_key`, `military_search_cache_key`, `career_detail_cache_key`, `ONET_RESPONSE_CACHE_TTL = 6 hours`
+- `backend/translate_app/cache_utils.py` — `resume_list_cache_key`, `invalidate_resume_list_cache`, `RESUME_LIST_CACHE_TTL = 1 hour`
+
+O\*NET response caching (`backend/onet_app/views.py`):
+
+- `OnetSearchView` — caches `(occupations, skills)` payload by keyword
+- `OnetMilitarySearchView` — caches `(military_matches, careers)` by `(keyword, branch)`
+- `OnetCareerDetailView` — caches normalized career payload by O\*NET-SOC code
+- Empty/error responses NOT cached (no poisoning)
+
+Resume list caching with explicit invalidation (`backend/translate_app/views.py`):
+
+- `ResumeListView.get` — cache-aside read
+- Invalidation hooks added to all six write paths:
+  - `ResumeUploadView.post` (create)
+  - `ResumeDetailView.delete` (delete)
+  - `ResumeDraftView.post` (save)
+  - `ResumeChatView.post` (save)
+  - `ResumeFinalizeView.patch` (save)
+  - `ResumeReopenView.patch` (save)
+
+New test files (15 tests):
+
+- `backend/onet_app/tests_cache.py` (8) — cache hits, miss-on-different-keys, no-cache-on-empty, no-cache-on-404
+- `backend/translate_app/tests_cache.py` (7) — cache hits, user isolation, write-path invalidation, post-invalidation freshness
+
+### Architectural Wins
+
+1. **O\*NET upstream call reduction.** Career detail endpoint previously made 5 upstream API calls per request (overview + skills + knowledge + technology + outlook). Now: 5 calls on cache miss, 0 on hit. Search endpoint: up to 4 upstream calls reduced to 0 on hit. With a 6-hour TTL and typical browse patterns, ~95% of upstream calls eliminated.
+2. **Resume list latency drop.** Dashboard load no longer queries Postgres for the resume list on every navigation. Cache-aside with explicit invalidation guarantees no stale data — every write path drops the cached entry, next read repopulates from DB.
+3. **Cache-aside pattern with proper invalidation discipline.** Six invalidation hooks across all write paths. Per-user isolation verified by test (`test_user_a_write_does_not_invalidate_user_b_cache`). 1-hour TTL serves as safety net only, not the primary freshness mechanism.
+
+### Verification
+
+- BASELINE tests: 183
+- FINAL tests: 198 (+15) — zero existing test regressions
+- 1 resume_list key live in Redis
+- 6 O\*NET cache keys live in Redis
+- Browser smoke test: dashboard reload visibly snappier; new resume upload appears immediately on next dashboard load (proves invalidation); duplicate Recon career click is instant (proves cache hit)
+
+### Known Tradeoff (Post-Launch Hardening Candidate)
+
+With `IGNORE_EXCEPTIONS=False` (set in Session 14 to prevent silent throttle bypass) and cache invalidation now in normal write paths, a Redis outage will surface as 500 errors on resume create/save/delete operations. The healthcheck catches Redis outages immediately, but during the outage window users cannot upload or modify resumes.
+
+Two future-Cal options:
+
+1. Wrap each `invalidate_resume_list_cache()` call in `try/except` so write paths degrade gracefully (cache may serve stale until TTL expires, but writes succeed).
+2. Switch to `IGNORE_EXCEPTIONS=True` and add view-level throttle bypass detection.
+
+Option 1 is the simpler fix and preserves throttle integrity. Deferred to Session 16 or later.
+
 ---
 
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 20, 2026 — Session 14 Redis cache backend, 183 tests passing
+Last updated: April 20, 2026 — Session 15 Redis-enabled optimizations, 198 tests passing

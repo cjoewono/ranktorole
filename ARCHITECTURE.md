@@ -334,25 +334,37 @@ Pro users (`subscription_status ∈ {active, trialing, past_due}` and `tier == '
 
 ## Cache Strategy
 
-Backend uses `django.core.cache` throughout — callers never import `redis-py` directly. The backend is selected via `REDIS_URL` env var:
+Redis is the cache backend for all `django.core.cache.cache` operations.
+Key prefix `rtr` (set in `CACHES.OPTIONS.KEY_PREFIX`) namespaces all entries.
+Tier-aware throttle keys, response caches, and global counters share one
+Redis instance with 256mb LRU eviction.
 
-| Environment               | Backend                                         | Notes                                                                                             |
-| ------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Docker Compose (dev/prod) | `django_redis.cache.RedisCache`                 | `REDIS_URL=redis://redis:6379/0` in `.env`                                                        |
-| CI / local without Docker | `django.core.cache.backends.locmem.LocMemCache` | `REDIS_URL` unset → auto fallback                                                                 |
-| pytest                    | `locmem.LocMemCache`                            | `force_local_memory_cache` autouse fixture in `conftest.py` forces this regardless of `REDIS_URL` |
+| Key pattern                   | Purpose                                                                                                 | TTL               | Invalidation                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------ |
+| `rtr:1:throttle_*`            | DRF tiered throttle counters (upload, draft, chat, finalize, onet, recon_enrich)                        | 24h (rate window) | TTL-only                                   |
+| `rtr:1:health_probe`          | Health endpoint set/get round-trip                                                                      | 10s               | TTL-only                                   |
+| `rtr:1:mos_title:*`           | O\*NET veteran MOS title lookup (NAVY_OFFICER_DESIGNATORS, COAST_GUARD_RATINGS, O\*NET prefix matching) | 30 days           | TTL-only                                   |
+| `rtr:1:recon_enrich:*`        | Per-career Haiku enrichment payload, profile-fingerprinted                                              | 7 days            | TTL-only                                   |
+| `rtr:1:recon_enrich_global:*` | Daily global ceiling counter (atomic INCR)                                                              | 24h               | TTL-only                                   |
+| `rtr:1:onet_search:*`         | OnetSearchView response payload                                                                         | 6h                | TTL-only; not cached if empty              |
+| `rtr:1:onet_military:*`       | OnetMilitarySearchView response payload                                                                 | 6h                | TTL-only; not cached if empty              |
+| `rtr:1:onet_career:*`         | OnetCareerDetailView normalized career data                                                             | 6h                | TTL-only; not cached on 404                |
+| `rtr:1:resume_list:*`         | Per-user resume list endpoint response                                                                  | 1h (safety net)   | **Explicit** — cleared by every write path |
 
-### What lives in Redis
+**Cache-aside pattern.** All response caches use the cache-aside (lazy-load)
+pattern: read from cache, fall back to DB or upstream on miss, populate cache
+on success. This pattern is correct for read-heavy data with infrequent writes.
 
-| Key pattern                                 | TTL     | Owner                                   |
-| ------------------------------------------- | ------- | --------------------------------------- |
-| `rtr:1:throttle_user_<scope>_<tier>_<uuid>` | 24h     | `TieredThrottle` subclasses             |
-| `rtr:1:recon_enrich:<onet_code>:<sha256>`   | 7 days  | `ReconEnrichView`                       |
-| `rtr:1:recon_enrich_global:<date>`          | 24h     | `_check_and_increment_global_ceiling()` |
-| `rtr:1:mos_title:<mos_code>`                | 30 days | `_resolve_mos_title()`                  |
-| `rtr:1:health_probe`                        | 10s     | `/health/` endpoint probe               |
+**Invalidation discipline.** The resume list cache is the only entry with
+explicit invalidation — TTL is a safety net, not the primary freshness
+mechanism. All six Resume write paths call `invalidate_resume_list_cache(user)`
+immediately after `resume.save()` or `resume.delete()`. Per-user isolation
+guaranteed by user PK in the cache key.
 
-`IGNORE_EXCEPTIONS=False` means Redis outages surface immediately through the `/health/` check rather than being silently absorbed.
+**Failure mode.** `IGNORE_EXCEPTIONS=False` means Redis outages surface as
+500 errors on cache-touching requests rather than silent throttle bypass.
+Healthcheck catches outages within 5 seconds. Tradeoff documented in
+PROJECTLOG.md Session 15.
 
 ## Tiered Throttling
 

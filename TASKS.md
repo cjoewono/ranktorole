@@ -369,26 +369,25 @@ None.
 
 ## Start Next Session With
 
-Session 15 — Redis-enabled optimizations (Prompt B):
+Remaining deploy blockers for April 24 launch (priority order):
 
-- Cache O\*NET `/search/` and `/career/` proxy responses (6-hour TTL, query-param keyed)
-- Cache resume list endpoint per-user with explicit invalidation on create/update/delete
-- Demonstrable cache-aside pattern with proper invalidation (portfolio signal)
+1. ResumeChatView is_finalized contract (DATA_CONTRACT says 409, code returns 200, test asserts 200)
+2. Throttle UX audit (review prod DEFAULT_THROTTLE_RATES; add global 429 handler in apiFetch — DRF default message is user-hostile)
+3. Secret rotation before EC2 (Anthropic API key, Google OAuth client secret, O\*NET API key, Django SECRET_KEY)
+4. EC2 manual deploy steps:
+   - DNS A records → cjoewono.com
+   - Security group (80/443 only)
+   - Docker + Certbot install
+   - Production .env (REDIS_URL=redis://redis:6379/0 alongside other vars)
+   - certbot --standalone for SSL
+   - Gunicorn override
+   - Google OAuth redirect URI for https://cjoewono.com
+   - Auto-renewal cron
+5. Navy officer designator gap (decision pending: ship local lookup table of ~30 codes vs. defer)
 
-Remaining deploy blockers for April 24 launch:
+Post-launch backlog (not blocking April 24):
 
-- ResumeChatView is_finalized contract (409 vs 200)
-- Throttle UX audit (global 429 handler in apiFetch)
-- Secret rotation
-- EC2 manual deploy steps (DNS, SSL, OAuth redirect URI)
-- Navy officer designator gap (decision pending)
-
-### Recently Completed (Session 13)
-
-- ✅ Career Recon enrichment (Claude Haiku 4.5) with cost controls
-- ✅ MOS title resolver (O\*NET lookup + 30-day cache)
-- ✅ Navy officer designator local dict (~30 codes)
-- ✅ AF/USSF prefix-match with sub-specialty stripping
-- ✅ Coast Guard enlisted rating dict (~21 codes)
-- ✅ Verified in browser: Navy 1110 profile now correctly references
-  Surface Warfare Officer, not fabricated Yeoman
+- Wrap `invalidate_*_cache()` calls in try/except to degrade gracefully on Redis outage (Session 15 tradeoff documented)
+- Qualitative-aggregate refinement (prompt tweak for "multi-million dollar programs" claims)
+- LLM-as-judge semantic fidelity pass for scope inflation beyond regex
+- Extend `grounding.py` validator to scan `civilian_title` field

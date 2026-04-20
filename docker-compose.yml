@@ -15,6 +15,24 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --save 3600 1 300 100 60 10000
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly no
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -26,6 +44,8 @@ services:
       - .env
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - internal
@@ -60,6 +80,7 @@ volumes:
   postgres_data:
   frontend_dist:
   backend_static:
+  redis_data:
 
 networks:
   internal:

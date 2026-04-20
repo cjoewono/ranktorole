@@ -3,6 +3,7 @@ import re as re_module
 
 import requests as http_requests
 from django.conf import settings
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -10,6 +11,12 @@ from rest_framework.views import APIView
 
 from translate_app.throttles import OnetThrottle, ReconEnrichThrottle
 from .recon_enrich_service import enrich_career
+from .cache_utils import (
+    ONET_RESPONSE_CACHE_TTL,
+    career_detail_cache_key,
+    military_search_cache_key,
+    search_cache_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +55,12 @@ class OnetSearchView(APIView):
                 {"error": "keyword query parameter is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        cache_key = search_cache_key(keyword)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.info("OnetSearchView cache_hit keyword=%s", keyword)
+            return Response(cached)
 
         try:
             # Search for matching occupations
@@ -92,12 +105,15 @@ class OnetSearchView(APIView):
                             if skill_name:
                                 all_skills.add(skill_name)
 
-            return Response(
-                {
-                    "occupations": occupations,
-                    "skills": sorted(all_skills),
-                }
-            )
+            payload = {
+                "occupations": occupations,
+                "skills": sorted(all_skills),
+            }
+            # Only cache when we got real data — don't poison cache with empty failures
+            if occupations:
+                cache.set(cache_key, payload, ONET_RESPONSE_CACHE_TTL)
+                logger.info("OnetSearchView cache_set keyword=%s", keyword)
+            return Response(payload)
 
         except http_requests.RequestException:
             logger.error("O*NET API request failed")
@@ -135,6 +151,12 @@ class OnetMilitarySearchView(APIView):
         branch = request.query_params.get("branch", "all").strip().lower()
         if branch not in self.VALID_BRANCHES:
             branch = "all"
+
+        cache_key = military_search_cache_key(keyword, branch)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.info("OnetMilitarySearchView cache_hit keyword=%s branch=%s", keyword, branch)
+            return Response(cached)
 
         try:
             params = {"keyword": keyword}
@@ -182,12 +204,16 @@ class OnetMilitarySearchView(APIView):
                     "pay_grade": career.get("pay_grade", ""),
                 })
 
-            return Response({
+            payload = {
                 "keyword": keyword,
                 "branch": branch,
                 "military_matches": military_matches,
                 "careers": careers,
-            })
+            }
+            if military_matches or careers:
+                cache.set(cache_key, payload, ONET_RESPONSE_CACHE_TTL)
+                logger.info("OnetMilitarySearchView cache_set keyword=%s branch=%s", keyword, branch)
+            return Response(payload)
 
         except http_requests.RequestException:
             logger.error("O*NET Veterans military search failed")
@@ -298,6 +324,12 @@ class OnetCareerDetailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        cache_key = career_detail_cache_key(onet_code)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.info("OnetCareerDetailView cache_hit onet_code=%s", onet_code)
+            return Response(cached)
+
         base = f"{ONET_BASE}/veterans/careers/{onet_code}"
 
         overview_data = self._fetch_json(f"{base}/")
@@ -316,6 +348,8 @@ class OnetCareerDetailView(APIView):
             overview_data, skills_data, knowledge_data, technology_data, outlook_data
         )
         normalized["code"] = onet_code
+        cache.set(cache_key, normalized, ONET_RESPONSE_CACHE_TTL)
+        logger.info("OnetCareerDetailView cache_set onet_code=%s", onet_code)
         return Response(normalized)
 
 

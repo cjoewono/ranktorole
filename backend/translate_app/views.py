@@ -7,7 +7,14 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from django.core.cache import cache
 from django.db.models import F
+
+from .cache_utils import (
+    RESUME_LIST_CACHE_TTL,
+    invalidate_resume_list_cache,
+    resume_list_cache_key,
+)
 
 from user_app.permissions import ChatTurnLimit, IsProOrUnderLimit, bump_counter
 
@@ -33,13 +40,27 @@ def get_user_resume(pk, user) -> Resume | None:
 
 
 class ResumeListView(APIView):
-    """GET /api/v1/resumes/ — list all resumes for authenticated user."""
+    """GET /api/v1/resumes/ — list all resumes for authenticated user.
+
+    Cached per-user with 1-hour TTL. Cache is invalidated by every
+    write path (upload, draft, chat, finalize, reopen, delete) via
+    invalidate_resume_list_cache(). TTL is a safety net only.
+    """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
+        cache_key = resume_list_cache_key(request.user)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.info("ResumeListView cache_hit user=%s", request.user.pk)
+            return Response(cached)
+
         resumes = Resume.objects.filter(user=request.user)
-        return Response(ResumeSerializer(resumes, many=True).data)
+        payload = ResumeSerializer(resumes, many=True).data
+        cache.set(cache_key, payload, RESUME_LIST_CACHE_TTL)
+        logger.info("ResumeListView cache_set user=%s count=%d", request.user.pk, len(payload))
+        return Response(payload)
 
 
 class ResumeDetailView(APIView):
@@ -58,6 +79,7 @@ class ResumeDetailView(APIView):
         if resume is None:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         resume.delete()
+        invalidate_resume_list_cache(request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -120,6 +142,8 @@ class ResumeUploadView(APIView):
             summary="",
             is_finalized=False,
         )
+
+        invalidate_resume_list_cache(request.user)
 
         return Response(
             {"id": str(resume.id), "created_at": resume.created_at},
@@ -202,6 +226,7 @@ class ResumeDraftView(APIView):
         resume.chat_history = []
         resume.save()
 
+        invalidate_resume_list_cache(request.user)
         bump_counter(request.user, 'resume_tailor_count')
 
         bullet_flags = flag_translation(
@@ -283,6 +308,7 @@ class ResumeChatView(APIView):
         resume.summary = result.translation.summary
         resume.save()
 
+        invalidate_resume_list_cache(request.user)
         Resume.objects.filter(pk=resume.pk).update(chat_turn_count=F('chat_turn_count') + 1)
         resume.chat_turn_count = (resume.chat_turn_count or 0) + 1
 
@@ -335,6 +361,7 @@ class ResumeFinalizeView(APIView):
 
         resume.is_finalized = True
         resume.save()
+        invalidate_resume_list_cache(request.user)
 
         return Response(ResumeSerializer(resume).data, status=status.HTTP_200_OK)
 
@@ -364,6 +391,7 @@ class ResumeReopenView(APIView):
 
         resume.is_finalized = False
         resume.save(update_fields=["is_finalized", "updated_at"])
+        invalidate_resume_list_cache(request.user)
 
         return Response(
             {

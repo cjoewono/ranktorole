@@ -101,7 +101,7 @@ export default function ChatPane({
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[80%] px-4 py-2 text-sm leading-relaxed ${
+              className={`max-w-[80%] px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === "user"
                   ? "mission-gradient text-on-primary rounded-2xl rounded-br-sm"
                   : "bg-surface-container-high text-on-surface rounded-2xl rounded-bl-sm"

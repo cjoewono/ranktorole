@@ -2,6 +2,40 @@ RankToRole — Project Log
 
 ---
 
+## April 20, 2026 | JD Tailoring + ATS Assessment
+
+**Status:** ✅ Shipped.
+
+Two coupled prompt changes on top of the existing honesty stack:
+
+- Added TAILORING RULES (T1–T5) to `_SYSTEM_PROMPT`, sitting alongside
+  the 8 SOURCE PRESERVATION rules. Explicit instructions to analyse JD
+  priorities first, reframe bullets through that lens, mirror JD
+  vocabulary where factually accurate, reorder within-role bullets to
+  lead with the JD-relevant accomplishment. Bullet count per role is
+  still preserved (honesty).
+- Restructured `call_claude_draft` user_message into a two-stage
+  chain-of-thought: Stage 1 silent JD analysis, Stage 2 tailored
+  translation through that lens. JD now appears before military
+  background in the prompt.
+- Changed the `clarifying_question` field's content contract — it now
+  carries a structured ATS FIT ASSESSMENT (Strong matches / Gaps /
+  Risk) followed by exactly ONE targeted question. No schema change;
+  the field is still `str`.
+- Frontend: added `whitespace-pre-wrap` to chat bubbles so the
+  multi-line ATS assessment renders correctly. No reducer, hook, or
+  API changes.
+
+The grounding validator and flag-gated UX are the safety net. Pushing
+the tailoring harder with defensive rules still holding means any
+overreach (fabricated metric, scope inflation) surfaces as a bullet
+flag for the user to verify or reject. Pressure-test flag rate on real
+resumes; adjust if the rate creeps above ~20% of bullets.
+
+Test count: 198 → 204 passing. +6 tests for new prompt sections.
+
+---
+
 ## April 6, 2026 | Sessions 01 + 02 | Phase 1 → Phase 3 Complete
 
 ### Session 01 — Phase 1: Project Setup & Claude Code Configuration

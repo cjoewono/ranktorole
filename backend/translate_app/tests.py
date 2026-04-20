@@ -972,6 +972,39 @@ class TestSystemPromptGrounding:
         assert "bluf" in lowered or "s-4" in lowered
         assert "do not translate" in lowered
 
+    def test_system_prompt_contains_tailoring_rules(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        assert "TAILORING RULES" in _SYSTEM_PROMPT
+
+    def test_system_prompt_tailoring_mentions_jd_priorities(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "priorities" in lowered
+        assert "job description" in lowered or "jd" in lowered
+
+    def test_system_prompt_tailoring_allows_reorder_forbids_drop(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "reorder" in lowered
+        assert "bullet count" in lowered or "preserve" in lowered
+
+    def test_system_prompt_tailoring_forbids_fabricating_skills(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "do not fabricate" in lowered or "not fabricate" in lowered
+
+    def test_system_prompt_ats_assessment_format_defined(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        assert "ATS FIT ASSESSMENT" in _SYSTEM_PROMPT
+        assert "Strong matches" in _SYSTEM_PROMPT
+        assert "Gaps" in _SYSTEM_PROMPT
+        assert "To close the biggest gap" in _SYSTEM_PROMPT
+
+    def test_system_prompt_ats_assessment_forbids_angle_brackets(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "angle bracket" in lowered
+
 
 # ---------------------------------------------------------------------------
 # grounding.py — TestGroundingValidator

@@ -322,7 +322,7 @@ Pro users (`subscription_status ∈ {active, trialing, past_due}` and `tier == '
 
 ## Known Lessons
 
-- `docker compose restart` does NOT load new env vars; must use `down && up`
+- `docker compose restart` does NOT re-read `env_file` — environment is frozen at container creation. To pick up `.env` changes: `docker compose up -d --force-recreate backend`. Symptom: app appears healthy but no keys land in Redis (Django silently fell back to LocMemCache because `REDIS_URL` was missing from env).
 - Use `PersistentClient` pattern for any local storage services
 - Relative paths only — hardcoded IPs break in Docker networking
 - `chat_history` IS persisted to DB — backend owns it; never pass it in request body
@@ -331,6 +331,28 @@ Pro users (`subscription_status ∈ {active, trialing, past_due}` and `tier == '
 - Vite resolves directory imports to `index.jsx` — use this for component subfolders
 - Custom hooks (`useResumeMachine`) keep page components as pure JSX; easier to test and reason about
 - Stale Docker containers cause phantom bugs — always check for orphaned containers (`docker ps -a`) when behavior doesn't match code
+
+## Cache Strategy
+
+Backend uses `django.core.cache` throughout — callers never import `redis-py` directly. The backend is selected via `REDIS_URL` env var:
+
+| Environment               | Backend                                         | Notes                                                                                             |
+| ------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Docker Compose (dev/prod) | `django_redis.cache.RedisCache`                 | `REDIS_URL=redis://redis:6379/0` in `.env`                                                        |
+| CI / local without Docker | `django.core.cache.backends.locmem.LocMemCache` | `REDIS_URL` unset → auto fallback                                                                 |
+| pytest                    | `locmem.LocMemCache`                            | `force_local_memory_cache` autouse fixture in `conftest.py` forces this regardless of `REDIS_URL` |
+
+### What lives in Redis
+
+| Key pattern                                 | TTL     | Owner                                   |
+| ------------------------------------------- | ------- | --------------------------------------- |
+| `rtr:1:throttle_user_<scope>_<tier>_<uuid>` | 24h     | `TieredThrottle` subclasses             |
+| `rtr:1:recon_enrich:<onet_code>:<sha256>`   | 7 days  | `ReconEnrichView`                       |
+| `rtr:1:recon_enrich_global:<date>`          | 24h     | `_check_and_increment_global_ceiling()` |
+| `rtr:1:mos_title:<mos_code>`                | 30 days | `_resolve_mos_title()`                  |
+| `rtr:1:health_probe`                        | 10s     | `/health/` endpoint probe               |
+
+`IGNORE_EXCEPTIONS=False` means Redis outages surface immediately through the `/health/` check rather than being silently absorbed.
 
 ## Tiered Throttling
 
@@ -350,12 +372,25 @@ All tiered throttle classes live in `translate_app/throttles.py`. The
 includes tier so upgrade/downgrade immediately takes effect. Falls back to
 `DEFAULT_THROTTLE_RATES` for unknown tiers.
 
+## Service Map
+
+| Service  | Image          | Role                                                      | Network                                                 |
+| -------- | -------------- | --------------------------------------------------------- | ------------------------------------------------------- |
+| db       | postgres:16    | Primary datastore (users, resumes, audit log)             | internal only                                           |
+| redis    | redis:7-alpine | Cache backend — throttles, enrichment results, MOS titles | internal only; 6379 exposed to host in dev via override |
+| backend  | ./backend      | Django/gunicorn API server                                | internal only                                           |
+| frontend | node:20-alpine | Vite build → static dist                                  | internal only                                           |
+| nginx    | nginx:alpine   | Public edge: :80/:443, proxies /api/ → backend, / → dist  | internal + host ports 80/443                            |
+
+- **redis** — Redis 7 in-memory cache. Stores throttle counters (24h TTL, tier-namespaced), MOS title cache (30-day TTL), Recon enrichment results (7-day TTL, profile-fingerprinted), global daily ceiling counter (atomic INCR). 256mb LRU cap, RDB snapshots only (cache data, not source-of-truth). Internal network; host port 6379 exposed in dev via override.
+
 ## Dev vs Production
 
 ### Development
 
 - Frontend: `npm run dev` on host (`localhost:5173`, HMR enabled)
 - Backend: `docker compose up` (`localhost:8000`)
+- Redis: `docker compose up` starts it alongside db + backend
 - Vite proxies `/api/` to `localhost:8000` via `vite.config.js`
 - No Nginx needed in dev
 

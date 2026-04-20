@@ -369,20 +369,19 @@ None.
 
 ## Start Next Session With
 
-Pre-launch deploy blockers for April 24 (remaining after Session 13):
+Session 15 — Redis-enabled optimizations (Prompt B):
 
-1. **ResumeChatView `is_finalized` contract decision (~30 min)** — DATA_CONTRACT
-   says 409, code returns 200, active test asserts 200. Pick one, update the
-   other two to match. Smallest blocker, tackle first.
-2. **Throttle UX audit + global 429 handler in `apiFetch` (1-2 hr)** — review
-   `DEFAULT_THROTTLE_RATES` for production; add user-facing 429 handling
-   (DRF default "throttled in X seconds" message is user-hostile).
-3. **Secret rotation (~15 min)** — ANTHROPIC_API_KEY, Google OAuth client
-   secret, O\*NET API key, `SECRET_KEY`. All potentially exposed via prior
-   `docker compose config` terminal output. Run before EC2 deploy.
-4. **Manual EC2 deploy** — DNS A records → `cjoewono.com`, security group
-   (80/443 only), Docker + Certbot install, prod `.env`, `certbot --standalone`,
-   gunicorn override, Google OAuth redirect URI update, auto-renewal cron.
+- Cache O\*NET `/search/` and `/career/` proxy responses (6-hour TTL, query-param keyed)
+- Cache resume list endpoint per-user with explicit invalidation on create/update/delete
+- Demonstrable cache-aside pattern with proper invalidation (portfolio signal)
+
+Remaining deploy blockers for April 24 launch:
+
+- ResumeChatView is_finalized contract (409 vs 200)
+- Throttle UX audit (global 429 handler in apiFetch)
+- Secret rotation
+- EC2 manual deploy steps (DNS, SSL, OAuth redirect URI)
+- Navy officer designator gap (decision pending)
 
 ### Recently Completed (Session 13)
 

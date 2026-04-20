@@ -983,5 +983,51 @@ Known gaps carried to post-launch backlog:
 
 ---
 
+## April 20, 2026 | Session 14 | Redis Cache Backend
+
+**Status:** ✅ Complete — Redis infrastructure swap, zero test regressions, all smoke tests passed
+
+### Changes Shipped (Two Commits)
+
+**Commit 1 — `feat(infra): provision Redis container`**
+
+- `docker-compose.yml` — `redis:7-alpine` service with healthcheck, RDB persistence (`save 3600 1 300 100 60 10000`), 256mb LRU cap, `redis_data` named volume. `backend.depends_on` waits for Redis healthy.
+- `docker-compose.override.yml` — Redis port 6379 exposed to host for dev `redis-cli` debugging.
+- `backend/requirements.txt` — `django-redis==5.4.0`.
+
+**Commit 2 — `feat(cache): activate Redis backend`**
+
+- `backend/config/settings.py` — `CACHES` swapped to `django_redis.cache.RedisCache` gated on `REDIS_URL`. LocMemCache fallback when env unset (CI, local-without-docker). `IGNORE_EXCEPTIONS=False`, `KEY_PREFIX='rtr'`.
+- `backend/conftest.py` — `force_local_memory_cache` autouse fixture keeps test suite Redis-free.
+- `backend/config/urls.py` — `/health/` now probes cache backend via set/get round-trip.
+- `.env.example` — documented `REDIS_URL`.
+
+### Architectural Wins
+
+1. **Atomic global daily ceiling counter.** `_check_and_increment_global_ceiling()` was using `cache.incr()` with a `get-then-set` fallback under `DatabaseCache` — a TOCTOU race across gunicorn workers that could under-count rejections. Redis `INCR` is atomic. Verified live: `rtr:1:recon_enrich_global:2026-04-20` key landed during Checkpoint 2.
+2. **Throttle latency reduction.** Per-request throttle lookups drop from ~2-5ms (DB query) to ~0.2ms (Redis hit).
+3. **Foundation for Session 15.** Response caching for O\*NET proxy + resume list endpoint.
+
+### Dev Workflow Impact
+
+`docker compose up -d` now starts Redis alongside db + backend. No code changes in cache consumers — `django.core.cache` API is backend-agnostic, so all existing cache touchpoints in `onet_app/views.py`, `translate_app/throttles.py` work unchanged.
+
+### Verification
+
+- BASELINE tests: 183
+- FINAL tests: 183 — zero regressions
+- `/health/` returns 200 with both DB and cache green
+- 6 live keys in Redis after smoke test traffic
+- Confirmed key shapes: `rtr:1:throttle_user_<scope>_<tier>_<uuid>`, `rtr:1:recon_enrich:<onet_code>:<sha256>`, `rtr:1:recon_enrich_global:<date>`
+- Recon enrichment payload TTL verified at ~604800s (7 days)
+- Fail-loud behavior confirmed: Redis stop → 503, start → 200
+- RDB persistence confirmed: DBSIZE survives `docker compose restart redis`
+
+### Lessons Learned
+
+**`docker compose restart` does NOT re-read env_file.** During Checkpoint 2 verification, `/health/` reported `cache: true` but Redis was empty. Root cause: `REDIS_URL` was added to `.env` but the running backend container's environment was frozen from its original creation — `docker compose restart backend` bounced the process inside the same container without re-reading `.env`. Fix: `docker compose up -d --force-recreate backend`. Pattern documented in CLAUDE.md.
+
+---
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 20, 2026 — Session 13 MOS resolver arc, 183 tests passing
+Last updated: April 20, 2026 — Session 14 Redis cache backend, 183 tests passing

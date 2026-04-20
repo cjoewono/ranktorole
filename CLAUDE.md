@@ -15,6 +15,7 @@ April 24, 2026
 - Frontend: Vite on host at `:5173` (HMR enabled), proxies `/api/` to `localhost:8000`
 - Backend: Django in Docker at `:8000` (runserver, hot-reload via bind mount in docker-compose.override.yml)
 - Database: PostgreSQL in Docker, service name `db`, port never exposed to host
+- **Redis:** `redis:7-alpine` on internal network. `REDIS_URL=redis://redis:6379/0`. All cache ops use `django.core.cache.cache` — never import `redis-py` directly. Inspect with `docker compose exec redis redis-cli` then `KEYS rtr:*`. Tests always use LocMemCache via root conftest autouse fixture.
 - Nginx: not started in dev
 
 **Production (full Docker + TLS)**
@@ -172,6 +173,10 @@ Raw `military_text` and `job_description` are NEVER passed after call 1.
 - `stripe_customer_id` is the only Stripe reference persisted
 - Audit log: every status transition writes a `SubscriptionAuditLog` row (append-only, unique `stripe_event_id` for idempotency)
 - Env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `STRIPE_CHECKOUT_SUCCESS_URL`, `STRIPE_CHECKOUT_CANCEL_URL`
+
+## Common Pitfalls
+
+- **Env changes require `--force-recreate`.** `docker compose restart backend` bounces the process inside the existing container without re-reading `.env` — environment variables are frozen at container creation time. To pick up `.env` changes: `docker compose up -d --force-recreate backend`. Symptom of the bug: app reports cache/db as healthy but no keys land in Redis (because Django falls back to LocMemCache when `REDIS_URL` is missing from env).
 
 ## Hard Rules
 

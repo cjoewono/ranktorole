@@ -2,6 +2,52 @@ RankToRole — Project Log
 
 ---
 
+## April 20, 2026 (evening) | Tailoring v2: authority rebalance + per-role identity
+
+**Status:** ✅ Shipped.
+
+v1 shipped in the morning pushed test count 198 → 204 and added
+TAILORING RULES alongside the 8 preservation rules. Smoke test against
+Brandon's PSYOP resume + Unstructured Fort Bragg JD showed a specific
+failure: ATS FIT ASSESSMENT was working well (JD vocabulary pulled
+through correctly, real gaps named, specific question) but bullet-level
+tailoring was near-zero. The preservation rules structurally outweighed
+the tailoring rules — Claude interpreted "preserve every concrete fact"
+as "preserve every sentence."
+
+v2 rebalances in three substantive ways:
+
+1. **Authority gradient inverted.** REWRITE is now the primary task;
+   PRESERVATION is the constraint. Same rules; different framing. The
+   prompt now explicitly calls a near-identical bullet a FAILED rewrite.
+
+2. **Per-role identity model (P3).** Identity markers (PSYOP, SIGINT,
+   Ukraine, ION, COR, etc.) must appear at least ONCE per role — in
+   the org field, summary, or at least one bullet. Individual bullets
+   can reframe in JD vocabulary without repeating the marker. This
+   gives tailoring real room to operate without erasing career
+   identity. Safer for cross-JD use (non-defense JDs no longer force
+   PSYOP into every bullet of a defense role).
+
+3. **R3 three-case rule.** Word-swap-on-match (required), reframe-
+   accurate-activity-in-JD-vocabulary (required), fabricate-skill-not-
+   in-source (forbidden). v1 conflated the first two with the third.
+
+4. **Three demonstrated transformations** (Example 1/2/3) embedded in
+   the prompt with Source / JD priorities / Tailored / What changed
+   commentary. Sonnet 4 does substantially better style transfer with
+   demonstrated patterns than with rule text alone.
+
+The grounding validator remains untouched and remains the safety net.
+Expected flag rate under v2: 10–25% of bullets on a well-grounded
+source. If the rate climbs above ~40%, the rewrite rules are pulling
+past the preservation line and need tightening.
+
+Test count: 204 → 210 (6 new tests; 2 existing tests renamed or
+language-updated).
+
+---
+
 ## April 20, 2026 | JD Tailoring + ATS Assessment
 
 **Status:** ✅ Shipped.

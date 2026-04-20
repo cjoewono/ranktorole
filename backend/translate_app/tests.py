@@ -907,7 +907,7 @@ class TestSystemPromptGrounding:
 
     def test_system_prompt_contains_preservation_rules(self):
         from translate_app.services import _SYSTEM_PROMPT
-        assert "SOURCE PRESERVATION RULES" in _SYSTEM_PROMPT
+        assert "PRESERVATION RULES" in _SYSTEM_PROMPT
 
     def test_system_prompt_preserves_source_facts(self):
         from translate_app.services import _SYSTEM_PROMPT
@@ -934,7 +934,8 @@ class TestSystemPromptGrounding:
 
     def test_system_prompt_preserves_proper_nouns(self):
         from translate_app.services import _SYSTEM_PROMPT
-        assert "PRESERVE ALL PROPER NOUNS" in _SYSTEM_PROMPT
+        # v2 uses per-role identity model (P3) instead of "preserve all proper nouns verbatim"
+        assert "PER-ROLE IDENTITY PRESERVATION" in _SYSTEM_PROMPT
         lowered = _SYSTEM_PROMPT.lower()
         # Explicit examples should be present
         assert "psyop" in lowered
@@ -943,8 +944,8 @@ class TestSystemPromptGrounding:
 
     def test_system_prompt_preserves_summary_fidelity(self):
         from translate_app.services import _SYSTEM_PROMPT
+        # v2 renames to R5; "summary fidelity" label dropped but intent preserved
         lowered = _SYSTEM_PROMPT.lower()
-        assert "summary fidelity" in lowered
         assert "multi-domain" in lowered
         assert "boilerplate" in lowered
 
@@ -972,9 +973,9 @@ class TestSystemPromptGrounding:
         assert "bluf" in lowered or "s-4" in lowered
         assert "do not translate" in lowered
 
-    def test_system_prompt_contains_tailoring_rules(self):
+    def test_system_prompt_contains_rewrite_rules(self):
         from translate_app.services import _SYSTEM_PROMPT
-        assert "TAILORING RULES" in _SYSTEM_PROMPT
+        assert "REWRITE RULES" in _SYSTEM_PROMPT
 
     def test_system_prompt_tailoring_mentions_jd_priorities(self):
         from translate_app.services import _SYSTEM_PROMPT
@@ -990,8 +991,9 @@ class TestSystemPromptGrounding:
 
     def test_system_prompt_tailoring_forbids_fabricating_skills(self):
         from translate_app.services import _SYSTEM_PROMPT
+        # v2 R3(c) labels the case "FABRICATE ... (forbidden)" instead of "do not fabricate"
         lowered = _SYSTEM_PROMPT.lower()
-        assert "do not fabricate" in lowered or "not fabricate" in lowered
+        assert "fabricate" in lowered
 
     def test_system_prompt_ats_assessment_format_defined(self):
         from translate_app.services import _SYSTEM_PROMPT
@@ -1004,6 +1006,42 @@ class TestSystemPromptGrounding:
         from translate_app.services import _SYSTEM_PROMPT
         lowered = _SYSTEM_PROMPT.lower()
         assert "angle bracket" in lowered
+
+    def test_system_prompt_primary_task_is_rewrite(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "primary task" in lowered
+        assert "rewrite" in lowered
+
+    def test_system_prompt_flags_failed_rewrite(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "failed rewrite" in lowered
+
+    def test_system_prompt_per_role_identity_preservation(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "at least once per role" in lowered or "at least once" in lowered
+        assert "per-role identity" in lowered or "role level" in lowered
+
+    def test_system_prompt_r3_three_cases_explicit(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        assert "WORD SWAP" in _SYSTEM_PROMPT
+        assert "REFRAME" in _SYSTEM_PROMPT
+        assert "FABRICATE" in _SYSTEM_PROMPT
+
+    def test_system_prompt_contains_demonstrated_transformations(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        assert "Example 1:" in _SYSTEM_PROMPT
+        assert "Example 2:" in _SYSTEM_PROMPT
+        assert "Example 3:" in _SYSTEM_PROMPT
+        assert "Source:" in _SYSTEM_PROMPT
+        assert "Tailored:" in _SYSTEM_PROMPT
+
+    def test_system_prompt_verb_rewrite_directive(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "rewrite the verb" in lowered
 
 
 # ---------------------------------------------------------------------------

@@ -17,6 +17,8 @@ const initialState = {
   chatTurnCount: 0,
   isFinalized: false,
   tailorLimitHit: false, // true when backend returns 403 TAILOR_LIMIT_REACHED — survives phase transitions
+  dailyLimitHit: false,
+  dailyLimitRetryAfter: null,
   error: null,
 };
 
@@ -42,6 +44,19 @@ function reducer(state, action) {
       return { ...state, phase: "UPLOADED", error: action.message };
     case "TAILOR_LIMIT_HIT":
       return { ...state, phase: "UPLOADED", tailorLimitHit: true, error: "" };
+    case "DAILY_LIMIT_HIT":
+      return {
+        ...state,
+        phase: state.phase === "DRAFTING" ? "UPLOADED" : state.phase,
+        dailyLimitHit: true,
+        dailyLimitRetryAfter: action.retryAfterSeconds ?? null,
+      };
+    case "DAILY_LIMIT_DISMISS":
+      return {
+        ...state,
+        dailyLimitHit: false,
+        dailyLimitRetryAfter: null,
+      };
     case "CHAT_SENT":
       return {
         ...state,
@@ -265,6 +280,13 @@ export default function useResumeMachine() {
           summaryFlags: response.summary_flags || [],
         });
       } catch (err) {
+        if (err.status === 429 && err.data?.code === "DAILY_LIMIT_REACHED") {
+          dispatch({
+            type: "DAILY_LIMIT_HIT",
+            retryAfterSeconds: err.data?.retry_after_seconds,
+          });
+          return;
+        }
         if (err.status === 403 && err.data?.code === "TAILOR_LIMIT_REACHED") {
           // Set a persistent flag on the machine instead of re-throwing.
           // The re-throw approach fails here because DRAFT_FAILED would
@@ -305,6 +327,14 @@ export default function useResumeMachine() {
           });
         }
       } catch (err) {
+        if (err.status === 429 && err.data?.code === "DAILY_LIMIT_REACHED") {
+          dispatch({
+            type: "DAILY_LIMIT_HIT",
+            retryAfterSeconds: err.data?.retry_after_seconds,
+          });
+          dispatch({ type: "CHAT_FAILED", message: null });
+          return;
+        }
         if (err.status === 409) {
           dispatch({ type: "CHAT_FAILED", message: "" });
           throw err;

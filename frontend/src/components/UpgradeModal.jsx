@@ -2,28 +2,47 @@ import { useState } from "react";
 import { createCheckoutSession } from "../api/billing";
 
 /**
- * Upgrade gate — redirects to Stripe Hosted Checkout.
+ * Upgrade gate + daily-limit notice.
  *
- * PCI scope: no card fields are rendered here. We call our backend, which
- * creates a Checkout Session server-side (SAQ A). We then window.location
- * the user onto Stripe's hosted page.
+ * Two variants:
+ *   variant="upgrade"  (default) — free-tier limit hit. Shows Stripe
+ *                      checkout CTA. PCI scope: no card fields here;
+ *                      backend creates a Checkout Session and we
+ *                      redirect (SAQ A).
+ *   variant="wait"     — pro-tier daily cap hit. No checkout CTA.
+ *                      Shows reset time (from retryAfterSeconds) and
+ *                      a dismiss button.
  *
  * Props:
- *   open        – boolean
- *   onClose     – () => void
- *   title       – heading override (e.g. "Chat limit reached")
- *   description – body copy override
+ *   open              – boolean
+ *   onClose           – () => void
+ *   variant           – "upgrade" | "wait" (default: "upgrade")
+ *   title             – heading override
+ *   description       – body copy override
+ *   retryAfterSeconds – number | null (used only by variant="wait")
  */
 export default function UpgradeModal({
   open,
   onClose,
-  title = "Upgrade to Pro",
-  description = "You've hit the Free plan daily limit. Upgrade to Pro for expanded access — $10/month, cancel anytime.",
+  variant = "upgrade",
+  title,
+  description,
+  retryAfterSeconds = null,
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   if (!open) return null;
+
+  const defaultTitle =
+    variant === "wait" ? "Daily limit reached" : "Upgrade to Pro";
+  const defaultDescription =
+    variant === "wait"
+      ? "You've reached your daily limit on Pro. Your quota resets automatically."
+      : "You've hit the Free plan daily limit. Upgrade to Pro for expanded access — $10/month, cancel anytime.";
+
+  const effectiveTitle = title || defaultTitle;
+  const effectiveDescription = description || defaultDescription;
 
   async function handleUpgrade() {
     setError("");
@@ -54,46 +73,50 @@ export default function UpgradeModal({
           id="upgrade-modal-title"
           className="text-xl font-semibold text-gray-900"
         >
-          {title}
+          {effectiveTitle}
         </h2>
-        <p className="mt-2 text-sm text-gray-600">{description}</p>
+        <p className="mt-2 text-sm text-gray-600">{effectiveDescription}</p>
 
-        <ul className="mt-4 space-y-1 text-sm text-gray-700">
-          <li>- Unlimited resume tailoring</li>
-          <li>- Unlimited refinement chat</li>
-          <li>- Priority AI processing</li>
-        </ul>
-
-        {error && (
-          <p className="mt-3 text-sm text-red-600" role="alert">
-            {error}
+        {variant === "wait" && retryAfterSeconds != null && (
+          <p className="mt-3 text-sm text-gray-500">
+            Resets in {formatDuration(retryAfterSeconds)}.
           </p>
         )}
 
-        <div className="mt-6 flex justify-end gap-3">
+        {variant === "upgrade" && error && (
+          <p className="mt-3 text-sm text-red-600">{error}</p>
+        )}
+
+        <div className="mt-6 flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
           >
-            Not now
+            {variant === "wait" ? "Got it" : "Maybe later"}
           </button>
-          <button
-            type="button"
-            onClick={handleUpgrade}
-            disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
-          >
-            {loading ? "Redirecting..." : "Upgrade for $10/mo"}
-          </button>
+          {variant === "upgrade" && (
+            <button
+              type="button"
+              onClick={handleUpgrade}
+              disabled={loading}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "Redirecting..." : "Upgrade — $10/month"}
+            </button>
+          )}
         </div>
-
-        <p className="mt-4 text-xs text-gray-400">
-          Payment handled securely by Stripe. We never see or store your card
-          details.
-        </p>
       </div>
     </div>
   );
+}
+
+function formatDuration(seconds) {
+  if (seconds < 60) return "less than a minute";
+  if (seconds < 3600) {
+    const mins = Math.round(seconds / 60);
+    return `${mins} minute${mins === 1 ? "" : "s"}`;
+  }
+  const hours = Math.round(seconds / 3600);
+  return `${hours} hour${hours === 1 ? "" : "s"}`;
 }

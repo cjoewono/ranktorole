@@ -17,7 +17,15 @@ async function handleResponse(res) {
     // non-JSON or empty body (e.g. 204 No Content)
   }
   if (!res.ok) {
-    const message = data.error || data.detail || "An unexpected error occurred";
+    let message = data.error || data.detail || "An unexpected error occurred";
+
+    // Friendlier generic message for any 429 not specifically routed
+    // by the caller. Callers that WANT to handle 429 specifically
+    // should still check err.status === 429 and err.data?.code.
+    if (res.status === 429 && !data.code) {
+      message = "You've hit a daily limit. Try again later.";
+    }
+
     throw new APIError(message, data, res.status);
   }
   return data;

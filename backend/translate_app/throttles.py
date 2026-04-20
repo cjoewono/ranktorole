@@ -94,3 +94,27 @@ class OnetThrottle(TieredThrottle):
 
 class ReconEnrichThrottle(TieredThrottle):
     scope = 'user_recon_enrich'
+
+
+from rest_framework.views import exception_handler
+from rest_framework.exceptions import Throttled
+
+
+def tiered_throttle_exception_handler(exc, context):
+    """
+    Replaces DRF's default 429 payload with a structured body so the
+    frontend can route to a tier-aware daily-limit modal.
+
+    Falls back to DRF's default handler for all other exceptions.
+    """
+    response = exception_handler(exc, context)
+
+    if isinstance(exc, Throttled) and response is not None:
+        wait_seconds = int(exc.wait) if exc.wait is not None else None
+        response.data = {
+            'code': 'DAILY_LIMIT_REACHED',
+            'detail': str(exc.detail) if hasattr(exc, 'detail') else 'Daily limit reached.',
+            'retry_after_seconds': wait_seconds,
+        }
+
+    return response

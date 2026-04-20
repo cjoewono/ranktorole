@@ -475,6 +475,64 @@ class TestResumeDraftView:
 
 
 # ---------------------------------------------------------------------------
+# throttles.py — structured 429 response shape
+# ---------------------------------------------------------------------------
+
+class TestThrottleResponseShape:
+    """Verify 429 responses include structured code + retry_after_seconds."""
+
+    def test_throttled_response_has_daily_limit_code(self, auth_client, user, db, monkeypatch):
+        """Hitting the draft throttle returns 429 with structured payload."""
+        monkeypatch.setattr(
+            'translate_app.throttles.DraftThrottle.allow_request',
+            lambda self, request, view: False,
+        )
+        monkeypatch.setattr(
+            'translate_app.throttles.DraftThrottle.wait',
+            lambda self: 3600,
+        )
+
+        user.tier = 'pro'
+        user.save()
+        resume = _create_resume(user)
+
+        resp = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/draft/",
+            {"job_description": "x" * 500},
+            format="json",
+        )
+        assert resp.status_code == 429
+        assert resp.data.get('code') == 'DAILY_LIMIT_REACHED'
+        assert resp.data.get('retry_after_seconds') == 3600
+        assert 'detail' in resp.data
+
+    def test_throttled_response_handles_none_wait(self, auth_client, user, db, monkeypatch):
+        """When throttle.wait() returns None, retry_after_seconds is None."""
+        monkeypatch.setattr(
+            'translate_app.throttles.DraftThrottle.allow_request',
+            lambda self, request, view: False,
+        )
+        monkeypatch.setattr(
+            'translate_app.throttles.DraftThrottle.wait',
+            lambda self: None,
+        )
+
+        user.tier = 'pro'
+        user.save()
+        resume = _create_resume(user)
+
+        resp = auth_client.post(
+            f"/api/v1/resumes/{resume.id}/draft/",
+            {"job_description": "x" * 500},
+            format="json",
+        )
+        assert resp.status_code == 429
+        assert resp.data.get('code') == 'DAILY_LIMIT_REACHED'
+        assert resp.data.get('retry_after_seconds') is None
+        assert 'detail' in resp.data
+
+
+# ---------------------------------------------------------------------------
 # views.py — POST /api/v1/resumes/{id}/chat/
 # ---------------------------------------------------------------------------
 

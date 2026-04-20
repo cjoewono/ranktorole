@@ -1192,5 +1192,47 @@ Settings change only. No test changes needed. 210 tests still passing.
 
 ---
 
+---
+
+## April 20, 2026 (evening) | 429 daily-limit UX
+
+**Status:** ✅ Shipped.
+
+Closed the known pre-launch backlog item: pro-tier 429 responses now
+carry a structured `DAILY_LIMIT_REACHED` code and `retry_after_seconds`,
+matching the existing pattern for free-tier 403 `TAILOR_LIMIT_REACHED`.
+
+Frontend changes:
+
+- UpgradeModal gained a `variant` prop. "upgrade" (default) keeps the
+  existing Stripe checkout CTA for free-tier quota. "wait" renders a
+  dismiss-only modal for pro-tier daily caps with a human-readable
+  reset time ("Resets in 12 hours").
+- useResumeMachine routes 429 DAILY_LIMIT_REACHED from draft and chat
+  endpoints into the "wait" modal. Phase reset is built into
+  DAILY_LIMIT_HIT: DRAFTING resets to UPLOADED; REVIEWING/FINALIZING
+  stays put.
+- apiFetch generic fallback: any 429 without a specific code is
+  surfaced as "You've hit a daily limit. Try again later." instead of
+  DRF's default "Expected available in 75635 seconds."
+- Daily-limit modal rendered at ResumeBuilder level (not per-component)
+  so it appears on top of both split and upload views.
+
+Backend changes:
+
+- Custom DRF exception handler (`tiered_throttle_exception_handler`)
+  in `translate_app/throttles.py`, wired globally via
+  `REST_FRAMEWORK['EXCEPTION_HANDLER']`.
+- Only intercepts `Throttled` exceptions; all other errors use DRF's
+  default handler.
+
+Scope: draft + chat routed to modal. Upload, finalize, ONET, Recon
+covered by apiFetch generic fallback. Login/register/anon throttles
+(anti-enumeration) unchanged — they are not user-tier daily caps.
+
+Test count: 210 → 212 (+2 tests for throttle response shape).
+
+---
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 20, 2026 — Throttle rebalance for launch, 210 tests passing
+Last updated: April 20, 2026 — 429 daily-limit UX, 212 tests passing

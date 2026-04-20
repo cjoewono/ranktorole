@@ -384,6 +384,13 @@ All tiered throttle classes live in `translate_app/throttles.py`. The
 includes tier so upgrade/downgrade immediately takes effect. Falls back to
 `DEFAULT_THROTTLE_RATES` for unknown tiers.
 
+**429 response contract** — Throttled requests return a structured body with
+`code: "DAILY_LIMIT_REACHED"`, `detail` (DRF's message), and `retry_after_seconds`
+(integer or null). Emitted by `tiered_throttle_exception_handler` in
+`translate_app/throttles.py`, wired globally via `REST_FRAMEWORK['EXCEPTION_HANDLER']`.
+Frontend routes this to the pro-tier "wait" modal; free-tier daily quota is handled
+separately by `IsProOrUnderLimit` as a 403 with `code: "TAILOR_LIMIT_REACHED"`.
+
 ## Service Map
 
 | Service  | Image          | Role                                                      | Network                                                 |

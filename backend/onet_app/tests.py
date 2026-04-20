@@ -525,16 +525,56 @@ class TestResolveMosTitle:
             mock_resp.ok = True
             mock_resp.json.return_value = {
                 "military_match": [
-                    {"code": "1110", "title": "Surface Warfare Officer (Navy - Officer)", "branch": "navy"},
+                    {"code": "11B", "title": "Infantryman (Army - Enlisted)", "branch": "army"},
                 ],
             }
             mock_get.return_value = mock_resp
 
-            t1 = _resolve_mos_title("Navy", "1110")
-            t2 = _resolve_mos_title("Navy", "1110")
+            t1 = _resolve_mos_title("Army", "11B")
+            t2 = _resolve_mos_title("Army", "11B")
 
-            assert t1 == "Surface Warfare Officer (Navy - Officer)"
+            assert t1 == "Infantryman (Army - Enlisted)"
             assert t2 == t1
             assert mock_get.call_count == 1  # Second call cached
+
+        cache.clear()
+
+    def test_navy_officer_designator_uses_local_lookup(self, db):
+        """Navy 1110 resolves via local dict without hitting O*NET."""
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import _resolve_mos_title
+
+        cache.clear()
+
+        with patch("onet_app.recon_enrich_service.http_requests.get") as mock_get:
+            title = _resolve_mos_title("Navy", "1110")
+
+        assert title == "Surface Warfare Officer (Navy - Officer)"
+        # O*NET should not have been called — local dict hit
+        assert mock_get.call_count == 0
+
+        cache.clear()
+
+    def test_navy_enlisted_falls_back_to_onet(self, db):
+        """Navy IT (enlisted) isn't in local dict — should hit O*NET."""
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import _resolve_mos_title
+
+        cache.clear()
+
+        with patch("onet_app.recon_enrich_service.http_requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.json.return_value = {
+                "military_match": [
+                    {"code": "IT", "title": "Information Systems Technician (Navy - Enlisted)", "branch": "navy"},
+                ],
+            }
+            mock_get.return_value = mock_resp
+
+            title = _resolve_mos_title("Navy", "IT")
+
+        assert title == "Information Systems Technician (Navy - Enlisted)"
+        assert mock_get.call_count == 1  # Did hit O*NET
 
         cache.clear()

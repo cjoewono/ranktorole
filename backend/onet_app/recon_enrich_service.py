@@ -74,12 +74,64 @@ def _check_and_increment_global_ceiling() -> bool:
     return True
 
 
-def _resolve_mos_title(branch: str, mos: str) -> str:
-    """Look up the canonical military title for a (branch, mos) pair from O*NET.
+# Navy officer designators are not indexed in O*NET's veterans database.
+# Source: https://en.wikipedia.org/wiki/List_of_United_States_Navy_officer_designators
+# https://www.mynavyhr.navy.mil/Career-Management/Community-Management/
+# Covers URL (Unrestricted Line), RL (Restricted Line), Staff Corps, Limited
+# Duty, and Chief Warrant Officer communities. Format matches O*NET return
+# shape: "Title (Navy - Officer)" — keeps downstream prompt consistent.
+NAVY_OFFICER_DESIGNATORS = {
+    # Unrestricted Line (URL) Officers — operational command track
+    "1110": "Surface Warfare Officer (Navy - Officer)",
+    "1120": "Submarine Officer (Navy - Officer)",
+    "1130": "Special Warfare Officer / SEAL (Navy - Officer)",
+    "1140": "Special Operations Officer / EOD (Navy - Officer)",
+    "1310": "Pilot (Navy - Officer)",
+    "1320": "Naval Flight Officer (Navy - Officer)",
+    "1390": "Aviation Maintenance Duty Officer (Navy - Officer)",
 
-    Returns the title string on success, or empty string on miss.
-    Cached 30 days per (branch, mos) key. Empty string is a deliberate sentinel
-    — the prompt uses it as a 'known unknown' so Haiku won't invent a title.
+    # Restricted Line (RL) Officers — specialty/technical track
+    "1440": "Engineering Duty Officer (Navy - Officer)",
+    "1460": "Aerospace Engineering Duty Officer (Navy - Officer)",
+    "1510": "Aerospace Engineering Duty Officer - Engineering (Navy - Officer)",
+    "1610": "Special Duty Officer - Intelligence (Navy - Officer)",
+    "1710": "Special Duty Officer - Public Affairs (Navy - Officer)",
+    "1720": "Special Duty Officer - Foreign Area Officer (Navy - Officer)",
+    "1810": "Information Warfare Officer (Navy - Officer)",
+    "1820": "Cryptologic Warfare Officer (Navy - Officer)",
+    "1830": "Intelligence Officer (Navy - Officer)",
+    "1840": "Cyber Warfare Engineer (Navy - Officer)",
+
+    # Staff Corps Officers — professional/support
+    "2100": "Medical Corps Officer (Navy - Officer)",
+    "2200": "Dental Corps Officer (Navy - Officer)",
+    "2300": "Medical Service Corps Officer (Navy - Officer)",
+    "2900": "Nurse Corps Officer (Navy - Officer)",
+    "2500": "Judge Advocate General's Corps Officer (Navy - Officer)",
+    "3100": "Supply Corps Officer (Navy - Officer)",
+    "4100": "Chaplain Corps Officer (Navy - Officer)",
+    "5100": "Civil Engineer Corps Officer (Navy - Officer)",
+
+    # Limited Duty Officers (LDO) — common specialties
+    "6110": "Limited Duty Officer - Deck (Navy - Officer)",
+    "6120": "Limited Duty Officer - Operations (Navy - Officer)",
+    "6130": "Limited Duty Officer - Engineering/Repair (Navy - Officer)",
+    "6160": "Limited Duty Officer - Aviation Operations (Navy - Officer)",
+    "6180": "Limited Duty Officer - Supply (Navy - Officer)",
+
+    # Chief Warrant Officers (CWO) — common specialties
+    "7110": "Chief Warrant Officer - Boatswain (Navy - Officer)",
+    "7130": "Chief Warrant Officer - Engineering Technician (Navy - Officer)",
+    "7180": "Chief Warrant Officer - Supply Corps (Navy - Officer)",
+}
+
+
+def _resolve_mos_title(branch: str, mos: str) -> str:
+    """Look up the canonical military title for a (branch, mos) pair.
+
+    Checks local NAVY_OFFICER_DESIGNATORS first (O*NET doesn't index these),
+    then falls back to O*NET's veterans/military/ endpoint. Returns title
+    string on success, empty string on miss. Cached for 30 days.
     """
     if not branch or not mos:
         return ""
@@ -87,8 +139,15 @@ def _resolve_mos_title(branch: str, mos: str) -> str:
     cache_key = f"mos_title:{branch.lower()}:{mos.upper()}"
     cached = cache.get(cache_key)
     if cached is not None:
-        return cached  # May be empty string (cached miss)
+        return cached
 
+    # Local lookup: Navy officer designators aren't in O*NET
+    if branch.lower() == "navy" and mos.upper() in NAVY_OFFICER_DESIGNATORS:
+        title = NAVY_OFFICER_DESIGNATORS[mos.upper()]
+        cache.set(cache_key, title, MOS_TITLE_CACHE_TTL)
+        return title
+
+    # Fall back to O*NET for enlisted ratings and other branches' officers
     try:
         resp = http_requests.get(
             f"{ONET_V2_BASE}/veterans/military/",
@@ -101,7 +160,7 @@ def _resolve_mos_title(branch: str, mos: str) -> str:
         )
     except http_requests.RequestException:
         logger.warning("O*NET title lookup network error for %s/%s", branch, mos)
-        return ""  # Don't cache transient network errors
+        return ""
 
     if not resp.ok:
         cache.set(cache_key, "", MOS_TITLE_CACHE_TTL)

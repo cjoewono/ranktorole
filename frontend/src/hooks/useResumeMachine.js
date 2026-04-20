@@ -136,17 +136,39 @@ export default function useResumeMachine() {
 
   const id = searchParams.get("id");
   const mode = searchParams.get("mode");
+  const isNew = searchParams.get("new") === "1";
 
-  // Resume re-entry from Dashboard — re-runs whenever ?id param changes
+  // Resume re-entry from Dashboard — re-runs whenever ?id or ?new changes.
+  // Handles three paths:
+  //   1. ?new=1              — explicit "start fresh" intent from + NEW RESUME.
+  //                            Reset state and strip the flag from URL.
+  //   2. no id, no new       — bare /resume-builder visit. Reset if any
+  //                            prior resume was loaded in this hook instance.
+  //   3. ?id=<uuid>          — load that resume from DB into the state machine.
   useEffect(() => {
-    if (!id) {
-      // Navigated to /resume-builder without params — reset to fresh state
-      if (loadedIdRef.current !== null) {
-        loadedIdRef.current = null;
-        dispatch({ type: "RESET" });
-      }
+    // Path 1: explicit new-resume intent
+    if (isNew) {
+      loadedIdRef.current = null;
+      dispatch({ type: "RESET" });
+      // Strip ?new=1 so browser refresh does not re-trigger and so the
+      // URL returns to the canonical /resume-builder form.
+      navigate("/resume-builder", { replace: true });
       return;
     }
+
+    // Path 2: bare /resume-builder with no id
+    if (!id) {
+      // Always reset when landing here without an id. RESET is a no-op
+      // when state is already initial, so this is safe. Dropping the
+      // prior `loadedIdRef.current !== null` guard prevents the stale-
+      // draft bug when AppShell keeps ResumeBuilder mounted across
+      // navigations.
+      loadedIdRef.current = null;
+      dispatch({ type: "RESET" });
+      return;
+    }
+
+    // Path 3: load an existing resume
     if (loadedIdRef.current === id) return; // already loaded this resume
 
     loadedIdRef.current = id;
@@ -193,7 +215,7 @@ export default function useResumeMachine() {
         loadedIdRef.current = null;
         navigate("/dashboard");
       });
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // Refresh Dashboard's cached resume list whenever a phase transition

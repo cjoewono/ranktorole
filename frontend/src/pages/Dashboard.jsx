@@ -75,7 +75,7 @@ export default function Dashboard() {
   }
 
   function handleNewResume() {
-    navigate("/resume-builder");
+    navigate("/resume-builder?new=1");
   }
 
   const finalized = resumes.filter((r) => r.is_finalized).length;

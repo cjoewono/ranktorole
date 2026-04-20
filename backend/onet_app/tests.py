@@ -578,3 +578,108 @@ class TestResolveMosTitle:
         assert mock_get.call_count == 1  # Did hit O*NET
 
         cache.clear()
+
+    def test_coast_guard_rating_uses_local_lookup(self, db):
+        """CG BM (Boatswain's Mate) resolves via local dict, no O*NET call."""
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import _resolve_mos_title
+
+        cache.clear()
+
+        with patch("onet_app.recon_enrich_service.http_requests.get") as mock_get:
+            title = _resolve_mos_title("Coast_Guard", "BM")
+
+        assert title == "Boatswain's Mate (Coast Guard - Enlisted)"
+        assert mock_get.call_count == 0
+
+        cache.clear()
+
+    def test_coast_guard_unknown_rating_returns_empty(self, db):
+        """CG rating not in dict falls through — O*NET returns empty → empty."""
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import _resolve_mos_title
+
+        cache.clear()
+
+        with patch("onet_app.recon_enrich_service.http_requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.json.return_value = {"military_match": []}
+            mock_get.return_value = mock_resp
+
+            title = _resolve_mos_title("Coast_Guard", "ZZ")
+
+        assert title == ""
+
+        cache.clear()
+
+    def test_air_force_prefix_match_strips_sub_specialty(self, db):
+        """AF 11F user input matches O*NET's 11F1B, returns generic title."""
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import _resolve_mos_title
+
+        cache.clear()
+
+        with patch("onet_app.recon_enrich_service.http_requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.json.return_value = {
+                "military_match": [
+                    {"code": "11F1B", "title": "Fighter Pilot, A-10 (Air Force - Commissioned Officer only)"},
+                    {"code": "11F1C", "title": "Fighter Pilot, F-15 (Air Force - Commissioned Officer only)"},
+                ],
+            }
+            mock_get.return_value = mock_resp
+
+            title = _resolve_mos_title("Air_Force", "11F")
+
+        assert title == "Fighter Pilot (Air Force - Commissioned Officer only)"
+
+        cache.clear()
+
+    def test_af_exact_match_wins_over_prefix(self, db):
+        """When O*NET returns exact code match, prefix-match doesn't run."""
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import _resolve_mos_title
+
+        cache.clear()
+
+        with patch("onet_app.recon_enrich_service.http_requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.json.return_value = {
+                "military_match": [
+                    {"code": "21A1", "title": "Aircraft Maintenance Sub-specialty (Air Force - Commissioned Officer only)"},
+                    {"code": "21A", "title": "Aircraft Maintenance (Air Force - Commissioned Officer only)"},
+                ],
+            }
+            mock_get.return_value = mock_resp
+
+            title = _resolve_mos_title("Air_Force", "21A")
+
+        assert title == "Aircraft Maintenance (Air Force - Commissioned Officer only)"
+
+        cache.clear()
+
+    def test_army_unchanged_behavior(self, db):
+        """Army uses O*NET exact match — verify no regression from new code paths."""
+        from django.core.cache import cache
+        from onet_app.recon_enrich_service import _resolve_mos_title
+
+        cache.clear()
+
+        with patch("onet_app.recon_enrich_service.http_requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.ok = True
+            mock_resp.json.return_value = {
+                "military_match": [
+                    {"code": "11B", "title": "Infantryman (Army - Enlisted)"},
+                ],
+            }
+            mock_get.return_value = mock_resp
+
+            title = _resolve_mos_title("Army", "11B")
+
+        assert title == "Infantryman (Army - Enlisted)"
+
+        cache.clear()

@@ -125,33 +125,85 @@ NAVY_OFFICER_DESIGNATORS = {
     "7180": "Chief Warrant Officer - Supply Corps (Navy - Officer)",
 }
 
+# Coast Guard ratings are not indexed in O*NET's veterans database.
+# Source: Official USCG rating list (gocoastguard.com/careers/enlisted) and
+# Wikipedia "List of United States Coast Guard ratings"
+# Format matches O*NET return shape: "Title (Coast Guard - Enlisted/Officer)"
+COAST_GUARD_RATINGS = {
+    # Aviation group
+    "AET": "Avionics Electrical Technician (Coast Guard - Enlisted)",
+    "AMT": "Aviation Maintenance Technician (Coast Guard - Enlisted)",
+    "AST": "Aviation Survival Technician (Coast Guard - Enlisted)",
+
+    # Administrative & scientific
+    "IS": "Intelligence Specialist (Coast Guard - Enlisted)",
+    "IT": "Information Systems Technician (Coast Guard - Enlisted)",
+    "PA": "Public Affairs Specialist (Coast Guard - Enlisted)",
+    "SK": "Storekeeper (Coast Guard - Enlisted)",
+    "YN": "Yeoman (Coast Guard - Enlisted)",
+
+    # Deck & weapons group
+    "BM": "Boatswain's Mate (Coast Guard - Enlisted)",
+    "GM": "Gunner's Mate (Coast Guard - Enlisted)",
+    "ME": "Maritime Enforcement Specialist (Coast Guard - Enlisted)",
+    "MST": "Marine Science Technician (Coast Guard - Enlisted)",
+    "OS": "Operations Specialist (Coast Guard - Enlisted)",
+
+    # Engineering & hull group
+    "DC": "Damage Controlman (Coast Guard - Enlisted)",
+    "EM": "Electrician's Mate (Coast Guard - Enlisted)",
+    "ET": "Electronics Technician (Coast Guard - Enlisted)",
+    "MK": "Machinery Technician (Coast Guard - Enlisted)",
+
+    # Medical & other
+    "HS": "Health Services Technician (Coast Guard - Enlisted)",
+    "CS": "Culinary Specialist (Coast Guard - Enlisted)",
+    "DV": "Diver (Coast Guard - Enlisted)",
+    "CMS": "Cyber Mission Specialist (Coast Guard - Enlisted)",
+}
+
 
 def _resolve_mos_title(branch: str, mos: str) -> str:
     """Look up the canonical military title for a (branch, mos) pair.
 
-    Checks local NAVY_OFFICER_DESIGNATORS first (O*NET doesn't index these),
-    then falls back to O*NET's veterans/military/ endpoint. Returns title
-    string on success, empty string on miss. Cached for 30 days.
+    Lookup priority:
+    1. NAVY_OFFICER_DESIGNATORS (Navy officer codes — not in O*NET)
+    2. COAST_GUARD_RATINGS (all CG codes — not in O*NET)
+    3. O*NET exact match (Army, Marine, enlisted Navy/AF)
+    4. O*NET prefix match (AF/USSF officer codes like 11F → 11F1B)
+
+    Returns title string on success, empty string on miss. Cached 30 days.
+    Empty string is a deliberate sentinel: prompt treats it as 'known unknown'
+    and tells Haiku not to fabricate.
     """
     if not branch or not mos:
         return ""
 
-    cache_key = f"mos_title:{branch.lower()}:{mos.upper()}"
+    branch_norm = branch.lower()
+    mos_norm = mos.upper()
+    cache_key = f"mos_title:{branch_norm}:{mos_norm}"
+
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
-    # Local lookup: Navy officer designators aren't in O*NET
-    if branch.lower() == "navy" and mos.upper() in NAVY_OFFICER_DESIGNATORS:
-        title = NAVY_OFFICER_DESIGNATORS[mos.upper()]
+    # Priority 1: Navy officer designators (not in O*NET)
+    if branch_norm == "navy" and mos_norm in NAVY_OFFICER_DESIGNATORS:
+        title = NAVY_OFFICER_DESIGNATORS[mos_norm]
         cache.set(cache_key, title, MOS_TITLE_CACHE_TTL)
         return title
 
-    # Fall back to O*NET for enlisted ratings and other branches' officers
+    # Priority 2: Coast Guard ratings (not in O*NET)
+    if branch_norm == "coast_guard" and mos_norm in COAST_GUARD_RATINGS:
+        title = COAST_GUARD_RATINGS[mos_norm]
+        cache.set(cache_key, title, MOS_TITLE_CACHE_TTL)
+        return title
+
+    # Priority 3 & 4: O*NET lookup
     try:
         resp = http_requests.get(
             f"{ONET_V2_BASE}/veterans/military/",
-            params={"keyword": mos, "branch": branch.lower()},
+            params={"keyword": mos, "branch": branch_norm},
             headers={
                 "Accept": "application/json",
                 "X-API-Key": settings.ONET_API_KEY,
@@ -171,13 +223,37 @@ def _resolve_mos_title(branch: str, mos: str) -> str:
     except ValueError:
         return ""
 
-    target_code = mos.upper()
-    for match in data.get("military_match", []):
-        if match.get("code", "").upper() == target_code:
+    matches = data.get("military_match", [])
+
+    # Priority 3: exact code match
+    for match in matches:
+        if match.get("code", "").upper() == mos_norm:
             title = match.get("title", "")
             cache.set(cache_key, title, MOS_TITLE_CACHE_TTL)
             return title
 
+    # Priority 4: prefix match (Air Force / Space Force hierarchical codes)
+    # User types "11F" — O*NET has 11F1B, 11F1C, 11F3A, etc.
+    # Use first prefix hit but strip the sub-specialty from the title
+    # (e.g. "Fighter Pilot, A-10" → "Fighter Pilot") to avoid over-specifying
+    # a user's actual role.
+    if branch_norm in {"air_force", "space_force"}:
+        for match in matches:
+            code = match.get("code", "").upper()
+            if code.startswith(mos_norm) and len(code) > len(mos_norm):
+                full_title = match.get("title", "")
+                # Strip sub-specialty qualifier after comma
+                # "Fighter Pilot, A-10 (Air Force - ...)" → "Fighter Pilot (Air Force - ...)"
+                if ", " in full_title and " (" in full_title:
+                    role, paren = full_title.split(" (", 1)
+                    role = role.split(", ")[0]  # Drop everything after first comma
+                    normalized = f"{role} ({paren}"
+                else:
+                    normalized = full_title
+                cache.set(cache_key, normalized, MOS_TITLE_CACHE_TTL)
+                return normalized
+
+    # No match found — cache the miss to avoid retry churn
     cache.set(cache_key, "", MOS_TITLE_CACHE_TTL)
     return ""
 

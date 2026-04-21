@@ -2,6 +2,26 @@ RankToRole — Project Log
 
 ---
 
+## April 21, 2026 | Stripe Frontend + Backend Hardening + Webhook E2E Verification
+
+**Status:** ✅ Complete
+
+Five commits: `26d1be2` (billing success/cancel routes + AuthContext.refreshUser polling), `de96400` (Subscription section on Profile — Manage Billing for Pro, Upgrade for Free), `79abda6` (throttle scoping fix), `8245214` (backend hardening + tier integrity + launch docs), `c622726` (.env.example production overrides).
+
+**Throttle scoping fix — real launch bug.** Anon 100/day throttle was being labeled `DAILY_LIMIT_REACHED`, blocking first-time visitor registration with a 75k-second retry-after. Fixed: scoped `DAILY_LIMIT_REACHED` to tiered user paths only; anon/login/register/billing_checkout 429s now pass through to DRF default. Caught during SSO regression investigation — would have killed acquisition on launch day.
+
+**Backend hardening (Prompt C):** `PortalSessionView` return_url allowlist (ranktorole.app + localhost only, 400 on other URLs, +5 tests), production security headers gated on `DEBUG=False` (HSTS preload, SSL redirect, secure cookies, X-Frame DENY, strict referrer), tier integrity sweep passing all 5 invariants (read-only serializer, no frontend tier writes, CheckoutThrottle on billing, PRO_STATUSES alignment, webhook auth-only).
+
+**Webhook E2E verification (real Stripe CLI forwarding).** Upgrade: checkout.session.completed + subscription.created/updated → AuditLog: inactive → active → incomplete → active. Cancel: subscription.deleted → active → canceled. Idempotent replay confirmed (3 duplicate .deleted events → no-ops). Free↔Pro UI state transitions verified in browser for both directions.
+
+**Outstanding decision:** `billing_views.py` has `logger.warning` lines added to webhook except blocks during live debugging. Commit vs. revert deferred to next session's code review pass.
+
+Test count: 226 → 233 (+7: 5 return_url allowlist tests, 1 throttle scoping test, 1 other).
+
+Remaining launch blockers: secret rotation, EC2 deploy, production smoke test.
+
+---
+
 ## April 21, 2026 | Global 429 daily-limit handler
 
 `apiFetch` in `client.js` now dispatches a `daily-limit` CustomEvent (with `retryAfterSeconds` in detail) whenever the backend returns `DAILY_LIMIT_REACHED`. `AppShell` in `App.jsx` listens for this event and renders `<UpgradeModal variant="wait" />` globally. Removed duplicate local 429 handling from `useResumeMachine` (`handleGenerateDraft` and `handleChatSend` catch blocks), cleaned up dead `DAILY_LIMIT_HIT`/`DAILY_LIMIT_DISMISS` reducer cases and state fields, and removed the now-dead local `<UpgradeModal>` from `ResumeBuilder.jsx`. Backend unchanged.

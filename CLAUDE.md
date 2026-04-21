@@ -184,6 +184,7 @@ Raw `military_text` and `job_description` are NEVER passed after call 1.
 - Profile page (`/profile`) hosts Manage Billing (Pro) and Upgrade to Pro (Free) buttons.
 - `PortalSessionView` enforces a `return_url` allowlist: `https://ranktorole.app/*` or `http://localhost:*`. Other URLs return 400.
 - Production security headers (HSTS, SSL redirect, secure cookies, X-Frame-Options DENY) are gated on `not DEBUG` in `settings.py`.
+- **Secret promotion for EC2:** swap `STRIPE_SECRET_KEY` (`sk_test_…` → `sk_live_…`), create a dashboard-registered webhook endpoint at `https://ranktorole.app/api/v1/billing/webhook/`, copy the signing secret into `.env` as `STRIPE_WEBHOOK_SECRET`. The Stripe CLI webhook secret (`whsec_…` from `stripe listen`) does not validate live events.
 
 ## Common Pitfalls
 

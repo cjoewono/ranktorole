@@ -45,6 +45,21 @@ export function AuthProvider({ children }) {
     setUser(userData);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    if (!token) return null;
+    try {
+      const res = await fetch("/api/v1/auth/profile/", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      const userData = await res.json();
+      setUser(userData);
+      return userData;
+    } catch {
+      return null;
+    }
+  }, [token]);
+
   // Silent rehydration on mount — reads httpOnly refresh cookie server-side
   // then fetches user profile to get profile_context
   useEffect(() => {
@@ -88,6 +103,7 @@ export function AuthProvider({ children }) {
         loginWithToken,
         logout,
         updateUser,
+        refreshUser,
       }}
     >
       {children}

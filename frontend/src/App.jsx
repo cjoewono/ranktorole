@@ -21,6 +21,8 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ResumeBuilder = lazy(() => import("./pages/ResumeBuilder"));
 const CareerRecon = lazy(() => import("./pages/CareerRecon"));
 const Contacts = lazy(() => import("./pages/Contacts"));
+const BillingSuccess = lazy(() => import("./pages/BillingSuccess"));
+const BillingCancel = lazy(() => import("./pages/BillingCancel"));
 
 function Spinner() {
   return (
@@ -53,7 +55,13 @@ function AppShell() {
   if (!token) return <Navigate to="/login" replace />;
 
   // Profile gate — require profile completion before accessing any page except /profile
-  if (user && !user.profile_context && path !== "/profile") {
+  if (
+    user &&
+    !user.profile_context &&
+    path !== "/profile" &&
+    path !== "/billing/success" &&
+    path !== "/billing/cancel"
+  ) {
     return <Navigate to="/profile" replace />;
   }
 
@@ -63,7 +71,9 @@ function AppShell() {
     path !== "/resume-builder" &&
     path !== "/profile" &&
     path !== "/recon" &&
-    path !== "/contacts"
+    path !== "/contacts" &&
+    path !== "/billing/success" &&
+    path !== "/billing/cancel"
   ) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -96,6 +106,16 @@ function AppShell() {
       <div className={path === "/contacts" ? "pb-20 md:pb-0" : "hidden"}>
         <Suspense fallback={<Spinner />}>
           <Contacts />
+        </Suspense>
+      </div>
+      <div className={path === "/billing/success" ? "" : "hidden"}>
+        <Suspense fallback={<Spinner />}>
+          <BillingSuccess />
+        </Suspense>
+      </div>
+      <div className={path === "/billing/cancel" ? "" : "hidden"}>
+        <Suspense fallback={<Spinner />}>
+          <BillingCancel />
         </Suspense>
       </div>
       <UpgradeModal
@@ -134,6 +154,8 @@ export default function App() {
                 <Route path="/resume-builder" element={<AppShell />} />
                 <Route path="/recon" element={<AppShell />} />
                 <Route path="/contacts" element={<AppShell />} />
+                <Route path="/billing/success" element={<AppShell />} />
+                <Route path="/billing/cancel" element={<AppShell />} />
                 <Route path="*" element={<DefaultRedirect />} />
               </Routes>
             </Suspense>

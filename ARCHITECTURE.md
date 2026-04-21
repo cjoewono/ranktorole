@@ -189,15 +189,15 @@ Form-driven career brainstorm at `/recon`. Single endpoint, fully ephemeral.
 
 O\*NET has uneven coverage of military codes:
 
-- Navy officer designators are entirely unindexed
+- Navy officer designators are not indexed in O\*NET — covered by `NAVY_OFFICER_DESIGNATORS` local dict (~30 codes)
 - Air Force / Space Force officer AFSCs are only indexed at full-specialty
-  granularity (11F1B, not 11F)
-- Coast Guard is entirely unindexed
-- Army, Marine Corps, and enlisted Navy/AF resolve cleanly
+  granularity (11F1B, not 11F) — resolved via prefix match with sub-specialty stripping
+- Coast Guard enlisted is not indexed in O\*NET — covered by `COAST_GUARD_RATINGS` local dict (~21 codes)
+- Army, Marine Corps, and enlisted Navy/AF resolve cleanly via O\*NET exact match
 
-`_resolve_mos_title()` handles these gaps with layered priority: local dicts
-first (Navy officers, CG ratings), then O\*NET exact match, then O\*NET prefix
-match (AF/USSF only, with sub-specialty stripping). Titles cached 30 days.
+`_resolve_mos_title()` uses a 4-priority lookup chain: `NAVY_OFFICER_DESIGNATORS` →
+`COAST_GUARD_RATINGS` → O\*NET exact match → O\*NET prefix match (AF/USSF only).
+Titles cached 30 days.
 
 The resolver returns empty string on miss — an intentional sentinel the
 enrichment prompt recognizes as "known unknown" and will not fabricate around.

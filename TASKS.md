@@ -386,10 +386,9 @@ None.
 
 Remaining deploy blockers for April 24 launch (priority order):
 
-1. **Navy officer designator gap.** Codes 1110, 1120, etc. return zero from O\*NET `/veterans/military/` endpoint. Ship local lookup table of ~30 codes following the same pattern as `_resolve_mos_title()`. Affects real users (Navy officers).
-2. **Design change** (TBD — Cal will bring spec to next session)
-3. **Secret rotation before EC2** (Anthropic API key, Google OAuth client secret, O\*NET API key, Django SECRET_KEY — all potentially exposed via earlier `docker compose config` terminal output)
-4. **EC2 manual deploy (Wednesday)**:
+1. **Design change** (TBD — Cal will bring spec to next session)
+2. **Secret rotation before EC2** (Anthropic API key, Google OAuth client secret, O\*NET API key, Django SECRET_KEY — all potentially exposed via earlier `docker compose config` terminal output)
+3. **EC2 manual deploy (Wednesday)**:
    - DNS A records → cjoewono.com
    - Security group (80/443 only)
    - Docker + Certbot install

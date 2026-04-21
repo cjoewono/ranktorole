@@ -1071,6 +1071,42 @@ class TestSystemPromptGrounding:
         assert "primary task" in lowered
         assert "rewrite" in lowered
 
+    def test_system_prompt_r3_includes_noun_mirroring(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        # R3(a) and R3(b) must now explicitly call for noun phrase
+        # mirroring, not just verb-level tailoring.
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "noun phrase" in lowered or "noun phrases" in lowered
+        assert "sweep the jd" in lowered
+
+    def test_system_prompt_r3c_forbids_unearned_responsibility(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        # R3(c) must now include the implied-responsibility guardrail,
+        # not just skill/tool fabrication.
+        lowered = _SYSTEM_PROMPT.lower()
+        # The guardrail must explicitly call out P&L as an example of
+        # a phrase that implies authority not in the source.
+        assert "p&l" in lowered
+        assert "unearned" in lowered or "implied" in lowered
+
+    def test_system_prompt_example_4_present(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        # Example 4 must exist and must demonstrate both noun mirroring
+        # and the guardrail ('What stayed limited:').
+        assert "Example 4" in _SYSTEM_PROMPT
+        assert "What stayed limited" in _SYSTEM_PROMPT
+
+    def test_system_prompt_example_4_uses_pnl_guardrail(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        # The Example 4 commentary must reference the P&L guardrail so
+        # the demonstration teaches the bright line explicitly.
+        # Search only within the demonstration section to avoid false
+        # positives from the R3(c) rule mention.
+        assert "budget management" in _SYSTEM_PROMPT.lower()
+        assert "false responsibility claim" in _SYSTEM_PROMPT.lower() \
+            or "false promotion" in _SYSTEM_PROMPT.lower() \
+            or "scope stretch" in _SYSTEM_PROMPT.lower()
+
     def test_system_prompt_flags_failed_rewrite(self):
         from translate_app.services import _SYSTEM_PROMPT
         lowered = _SYSTEM_PROMPT.lower()

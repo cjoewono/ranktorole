@@ -1234,5 +1234,48 @@ Test count: 210 → 212 (+2 tests for throttle response shape).
 
 ---
 
+## April 20, 2026 (evening) | Tailoring v2.1: mid-sentence noun mirroring
+
+**Status:** ✅ Shipped.
+
+Two smoke tests of v2 (defense JD and non-defense JD) showed v2
+tailors verbs reliably but consistently misses distinctive noun
+phrases in the JD. Both runs also showed zero flags and full
+identity preservation — the honesty guarantee is intact, but the
+tailoring floor on non-defense JDs has noun-phrase-shaped holes.
+
+v2.1 extensions:
+
+1. R3(a) and R3(b) now explicitly call for noun-phrase mirroring,
+   not just verb swaps. R3(a) instructs Claude to sweep the JD for
+   distinctive nouns and named responsibilities ('stakeholder
+   navigation', 'team orchestration', 'budget tracking', etc.) and
+   mirror them into bullets where the veteran's actual activity
+   supports each phrase.
+
+2. R3(c) expanded from "do not fabricate skills/tools" to also cover
+   "do not imply unearned responsibility". Budget management ≠ P&L
+   management. The rule now names P&L as the canonical example of a
+   JD phrase that implies authority the veteran doesn't hold, even
+   when the activity is adjacent.
+
+3. Example 4 added to DEMONSTRATED TRANSFORMATIONS: a worked example
+   using the veteran's $950K+ COR work, showing both (a) how to
+   mirror 'multi-stakeholder program delivery' from the JD and (b)
+   how to explicitly NOT mirror 'P&L management'. The 'What stayed
+   limited' commentary teaches the guardrail by demonstration, not
+   just by rule.
+
+Grounding validator unchanged — noun-phrase reframing does not
+introduce fabricated numerics or scope-inflation verbs. The
+implied-responsibility guardrail is prompt-level for now; Option A
+(unearned-claim validator, next task) is where this line gets
+enforced deterministically.
+
+Test count: 212 → 216 (+4 tests covering R3 extension, Example 4
+presence, and P&L guardrail enforcement).
+
+---
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 20, 2026 — 429 daily-limit UX, 212 tests passing
+Last updated: April 20, 2026 — Tailoring v2.1: noun-phrase mirroring, 216 tests passing

@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
 import PageHeader from "../components/PageHeader";
+import { createPortalSession } from "../api/billing";
+import UpgradeModal from "../components/UpgradeModal";
 
 const BRANCHES = [
   "Army",
@@ -83,6 +85,25 @@ export default function ForgeSetup() {
   const [passwordError, setPasswordError] = useState(null);
   const [passwordSuccess, setPasswordSuccess] = useState(null);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [portalError, setPortalError] = useState("");
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+  async function handleManageBilling() {
+    setPortalError("");
+    setPortalLoading(true);
+    try {
+      const returnUrl = `${window.location.origin}/profile`;
+      const { url } = await createPortalSession(returnUrl);
+      if (!url) throw new Error("Portal URL missing.");
+      window.location.assign(url);
+    } catch (err) {
+      setPortalError(
+        err?.message || "Could not open billing portal. Please try again.",
+      );
+      setPortalLoading(false);
+    }
+  }
 
   async function handleMosBlur() {
     if (!mos.trim()) return;
@@ -566,6 +587,52 @@ export default function ForgeSetup() {
               </form>
             </div>
 
+            {/* Subscription */}
+            <div className="bg-surface-container-low p-6">
+              <h2 className="font-headline font-bold text-lg uppercase text-on-surface mb-4">
+                Subscription
+              </h2>
+              <div className="mb-4">
+                <span className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
+                  Current Plan
+                </span>
+                <p className="font-headline font-bold text-xl text-on-surface mt-1">
+                  {user?.tier === "pro" ? "PRO" : "FREE"}
+                </p>
+              </div>
+
+              {portalError && (
+                <p className="mb-3 text-sm text-error" role="alert">
+                  {portalError}
+                </p>
+              )}
+
+              {user?.tier === "pro" ? (
+                <button
+                  type="button"
+                  onClick={handleManageBilling}
+                  disabled={portalLoading}
+                  className="w-full mission-gradient text-on-primary font-label font-semibold tracking-widest uppercase text-sm py-3 rounded-md disabled:opacity-50"
+                >
+                  {portalLoading ? "Opening..." : "Manage Billing"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setUpgradeOpen(true)}
+                  className="w-full mission-gradient text-on-primary font-label font-semibold tracking-widest uppercase text-sm py-3 rounded-md"
+                >
+                  Upgrade to Pro
+                </button>
+              )}
+
+              <p className="mt-3 text-xs text-on-surface-variant">
+                {user?.tier === "pro"
+                  ? "Opens Stripe's secure billing portal. Cancel, update card, or view invoices."
+                  : "Unlimited tailoring and chat — $10/month, cancel anytime."}
+              </p>
+            </div>
+
             {/* Sign Out card */}
             <div className="bg-surface-container-low p-6">
               <button
@@ -575,6 +642,12 @@ export default function ForgeSetup() {
                 SIGN OUT
               </button>
             </div>
+
+            <UpgradeModal
+              open={upgradeOpen}
+              onClose={() => setUpgradeOpen(false)}
+              variant="upgrade"
+            />
           </div>
         )}
       </main>

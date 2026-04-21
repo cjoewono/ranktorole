@@ -5,7 +5,6 @@ import UploadForm from "../components/UploadForm";
 import SplitPane from "../components/SplitPane";
 import DraftPane from "../components/DraftPane";
 import ChatPane from "../components/ChatPane";
-import UpgradeModal from "../components/UpgradeModal";
 import useResumeMachine from "../hooks/useResumeMachine";
 import { useAuth } from "../context/AuthContext";
 
@@ -107,12 +106,6 @@ export default function ResumeBuilder({ setFullscreen }) {
           </main>
         </div>
       )}
-      <UpgradeModal
-        open={state.dailyLimitHit}
-        onClose={() => dispatch({ type: "DAILY_LIMIT_DISMISS" })}
-        variant="wait"
-        retryAfterSeconds={state.dailyLimitRetryAfter}
-      />
     </>
   );
 }

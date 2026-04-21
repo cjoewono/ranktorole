@@ -380,6 +380,7 @@ None.
 - [x] Bugfix: CHAT_UPDATED reducer dropped `bullet_flags`/`summary_flags` from chat-path responses. 2-line `??` pattern fix (matches AI_SUGGESTIONS_RECEIVED).
 - [x] ResumeChatView is_finalized contract aligned with DATA_CONTRACT: `POST /chat/` returns 409 when `is_finalized=True`. Reopen required to continue editing. DATA_CONTRACT.md updated.
 - [x] Option D — user responsibility banner in FinalizingEditor.jsx between Edit & Finalize header and Mission Headline input. Closes the honesty stack loop with explicit user ownership framing.
+- [x] Global 429 handler: `apiFetch` dispatches `daily-limit` CustomEvent on `DAILY_LIMIT_REACHED`; `AppShell` renders `<UpgradeModal variant="wait" />` globally. Removed duplicate local handling from `useResumeMachine` and dead reducer cases/state.
 
 ## Start Next Session With
 

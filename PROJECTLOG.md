@@ -2,6 +2,12 @@ RankToRole — Project Log
 
 ---
 
+## April 21, 2026 | Global 429 daily-limit handler
+
+`apiFetch` in `client.js` now dispatches a `daily-limit` CustomEvent (with `retryAfterSeconds` in detail) whenever the backend returns `DAILY_LIMIT_REACHED`. `AppShell` in `App.jsx` listens for this event and renders `<UpgradeModal variant="wait" />` globally. Removed duplicate local 429 handling from `useResumeMachine` (`handleGenerateDraft` and `handleChatSend` catch blocks), cleaned up dead `DAILY_LIMIT_HIT`/`DAILY_LIMIT_DISMISS` reducer cases and state fields, and removed the now-dead local `<UpgradeModal>` from `ResumeBuilder.jsx`. Backend unchanged.
+
+---
+
 ## April 21, 2026 | Contract Fix — ResumeChatView 409 on is_finalized
 
 `POST /api/v1/resumes/{id}/chat/` now returns 409 with `{"error": "Resume is finalized. Reopen it to continue editing."}` when `is_finalized=True`. Previously the endpoint allowed chat turns on finalized resumes, contradicting DATA_CONTRACT. Gate short-circuits before any Claude call. Test renamed from `test_finalized_resume_chat_still_works` to `test_finalized_resume_chat_returns_409`. DATA_CONTRACT.md and TASKS.md updated to reflect the enforced contract.

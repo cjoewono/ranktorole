@@ -22,8 +22,18 @@ async function handleResponse(res) {
     // Friendlier generic message for any 429 not specifically routed
     // by the caller. Callers that WANT to handle 429 specifically
     // should still check err.status === 429 and err.data?.code.
-    if (res.status === 429 && !data.code) {
-      message = "You've hit a daily limit. Try again later.";
+    if (res.status === 429) {
+      if (data.code === "DAILY_LIMIT_REACHED") {
+        window.dispatchEvent(
+          new CustomEvent("daily-limit", {
+            detail: { retryAfterSeconds: data.retry_after_seconds ?? null },
+          }),
+        );
+        message = data.detail || "You've hit a daily limit. Try again later.";
+      } else if (!data.code) {
+        // 429 without our structured code (e.g. nginx-level rate limit)
+        message = "You've hit a daily limit. Try again later.";
+      }
     }
 
     throw new APIError(message, data, res.status);

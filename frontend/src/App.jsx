@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ResumeProvider } from "./context/ResumeContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NavBar from "./components/NavBar";
+import UpgradeModal from "./components/UpgradeModal";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
@@ -33,7 +34,16 @@ function AppShell() {
   const { token, user, hydrating } = useAuth();
   const location = useLocation();
   const [fullscreen, setFullscreen] = useState(false);
+  const [dailyLimit, setDailyLimit] = useState(null); // { retryAfterSeconds } | null
   const path = location.pathname;
+
+  useEffect(() => {
+    const handler = (e) => {
+      setDailyLimit({ retryAfterSeconds: e.detail?.retryAfterSeconds ?? null });
+    };
+    window.addEventListener("daily-limit", handler);
+    return () => window.removeEventListener("daily-limit", handler);
+  }, []);
 
   useEffect(() => {
     if (path !== "/resume-builder") setFullscreen(false);
@@ -88,6 +98,12 @@ function AppShell() {
           <Contacts />
         </Suspense>
       </div>
+      <UpgradeModal
+        open={dailyLimit !== null}
+        onClose={() => setDailyLimit(null)}
+        variant="wait"
+        retryAfterSeconds={dailyLimit?.retryAfterSeconds ?? null}
+      />
     </div>
   );
 }

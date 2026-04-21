@@ -128,10 +128,11 @@ class StripeWebhookView(APIView):
         sig = request.META.get('HTTP_STRIPE_SIGNATURE', '')
         try:
             event = verify_webhook(payload, sig)
-        except ValueError:
-            # Malformed payload
+        except ValueError as e:
+            logger.warning("Webhook ValueError: %r | payload_len=%d | sig_present=%s", e, len(payload), bool(sig))
             return Response({"detail": "Invalid payload."}, status=status.HTTP_400_BAD_REQUEST)
-        except stripe.error.SignatureVerificationError:
+        except stripe.error.SignatureVerificationError as e:
+            logger.warning("Webhook SignatureVerificationError: %r | payload_len=%d", e, len(payload))
             return Response({"detail": "Invalid signature."}, status=status.HTTP_400_BAD_REQUEST)
 
         event_id = event.get('id', '')

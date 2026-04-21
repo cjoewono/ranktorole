@@ -127,6 +127,57 @@ class TestStripeWebhook:
         assert r2.data.get('duplicate') is True
         assert SubscriptionAuditLog.objects.filter(stripe_event_id='evt_replay').count() == 1
 
+    @patch('user_app.billing_views.verify_webhook')
+    def test_subscription_updated_transitions_status(self, mock_verify, user):
+        """customer.subscription.updated moves user through status transitions per _STATUS_TO_TIER."""
+        user.stripe_customer_id = 'cus_abc'
+        user.tier = 'pro'
+        user.subscription_status = 'active'
+        user.save()
+
+        # Transition 1: active → past_due. User stays Pro (grace period).
+        mock_verify.return_value = _event(
+            'customer.subscription.updated',
+            customer_id='cus_abc',
+            sub_status='past_due',
+            event_id='evt_upd_1',
+        )
+        r1 = APIClient().post(
+            '/api/v1/billing/webhook/',
+            data=b'{}', content_type='application/json',
+            HTTP_STRIPE_SIGNATURE='sig',
+        )
+        assert r1.status_code == 200
+        user.refresh_from_db()
+        assert user.subscription_status == 'past_due'
+        assert user.tier == 'pro', 'past_due must remain Pro per _STATUS_TO_TIER grace period'
+
+        log1 = SubscriptionAuditLog.objects.get(stripe_event_id='evt_upd_1')
+        assert log1.previous_status == 'active'
+        assert log1.new_status == 'past_due'
+        assert log1.event_type == 'customer.subscription.updated'
+
+        # Transition 2: past_due → canceled via .updated. User flips to Free.
+        mock_verify.return_value = _event(
+            'customer.subscription.updated',
+            customer_id='cus_abc',
+            sub_status='canceled',
+            event_id='evt_upd_2',
+        )
+        r2 = APIClient().post(
+            '/api/v1/billing/webhook/',
+            data=b'{}', content_type='application/json',
+            HTTP_STRIPE_SIGNATURE='sig',
+        )
+        assert r2.status_code == 200
+        user.refresh_from_db()
+        assert user.subscription_status == 'canceled'
+        assert user.tier == 'free'
+
+        log2 = SubscriptionAuditLog.objects.get(stripe_event_id='evt_upd_2')
+        assert log2.previous_status == 'past_due'
+        assert log2.new_status == 'canceled'
+
 
 # ---------------------------------------------------------------------------
 # Portal return_url allowlist

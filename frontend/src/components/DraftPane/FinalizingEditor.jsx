@@ -159,6 +159,21 @@ export default function FinalizingEditor({
           Edit &amp; Finalize
         </h2>
 
+        {/* Final Review — User Responsibility Banner */}
+        <div className="rounded-lg border border-outline-variant/40 bg-surface-container p-4 space-y-2">
+          <p className="font-label text-xs tracking-widest uppercase text-amber-400">
+            Final Review
+          </p>
+          <p className="font-body text-sm text-on-surface leading-relaxed">
+            Automated checks flag fabricated metrics, scope inflation, unearned
+            credentials, and P&amp;L-class claims — but no system catches every
+            stretch. Review each bullet and the executive summary against your
+            own record. You own the final resume; the tool helps you tailor and
+            verify it, but your judgment is the last line of defense before it
+            reaches a recruiter.
+          </p>
+        </div>
+
         {/* Title */}
         <div>
           <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">

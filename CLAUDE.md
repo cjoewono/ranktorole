@@ -44,7 +44,7 @@ April 24, 2026
 
 ### Production (EC2)
 
-- `sudo certbot certonly --webroot -w /var/lib/letsencrypt -d cjoewono.com -d www.cjoewono.com`
+- `sudo certbot certonly --webroot -w /var/lib/letsencrypt -d ranktorole.app -d www.ranktorole.app`
 - `docker compose up -d db nginx frontend`
 - `docker compose run -d backend gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3`
 - `docker compose exec backend python manage.py migrate`
@@ -103,6 +103,13 @@ POST   /api/v1/billing/checkout/        Stripe Checkout Session (Pro upgrade)
 POST   /api/v1/billing/portal/          Stripe Customer Portal (manage/cancel)
 GET    /api/v1/billing/status/          current tier, subscription status, usage, limits
 POST   /api/v1/billing/webhook/         Stripe event receiver (signature-verified)
+```
+
+## Frontend Routes
+
+```
+/billing/success    (auth required) — post-checkout landing; polls profile until tier=pro
+/billing/cancel     (auth required) — checkout cancelled notice
 ```
 
 ## Context Window Budget (per call)
@@ -174,6 +181,9 @@ Raw `military_text` and `job_description` are NEVER passed after call 1.
 - `stripe_customer_id` is the only Stripe reference persisted
 - Audit log: every status transition writes a `SubscriptionAuditLog` row (append-only, unique `stripe_event_id` for idempotency)
 - Env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `STRIPE_CHECKOUT_SUCCESS_URL`, `STRIPE_CHECKOUT_CANCEL_URL`
+- Profile page (`/profile`) hosts Manage Billing (Pro) and Upgrade to Pro (Free) buttons.
+- `PortalSessionView` enforces a `return_url` allowlist: `https://ranktorole.app/*` or `http://localhost:*`. Other URLs return 400.
+- Production security headers (HSTS, SSL redirect, secure cookies, X-Frame-Options DENY) are gated on `not DEBUG` in `settings.py`.
 
 ## Common Pitfalls
 

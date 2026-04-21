@@ -282,23 +282,23 @@
 
 ### DNS + Infrastructure
 
-- [ ] Point `cjoewono.com` and `www.cjoewono.com` A records at EC2 public IP
+- [ ] Point `ranktorole.app` and `www.ranktorole.app` A records at EC2 public IP
 - [ ] Confirm EC2 security group: 80/443 open to world, 22 from admin IP only, no 8000 or 5432
 - [ ] Install `docker.io`, `docker-compose-plugin`, `certbot` on EC2
 
 ### Certificates
 
-- [ ] `sudo certbot certonly --standalone -d cjoewono.com -d www.cjoewono.com`
-- [ ] Verify cert files present at `/etc/letsencrypt/live/cjoewono.com/`
+- [ ] `sudo certbot certonly --standalone -d ranktorole.app -d www.ranktorole.app`
+- [ ] Verify cert files present at `/etc/letsencrypt/live/ranktorole.app/`
 - [ ] Add renewal cron: `0 */12 * * * certbot renew --quiet && docker compose exec nginx nginx -s reload`
 
 ### Application Config
 
 - [ ] Create production `.env` on host with `DEBUG=False`, rotated `SECRET_KEY`, real DB password, production `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`
-- [ ] Set `GOOGLE_OAUTH_REDIRECT_URI=https://cjoewono.com/auth/google/callback`
+- [ ] Set `GOOGLE_OAUTH_REDIRECT_URI=https://ranktorole.app/auth/google/callback`
 - [ ] Set `STRIPE_CHECKOUT_SUCCESS_URL` and `STRIPE_CHECKOUT_CANCEL_URL` to production URLs
-- [ ] Google Cloud Console: add `https://cjoewono.com/auth/google/callback` as authorized redirect
-- [ ] Stripe dashboard: add live webhook endpoint `https://cjoewono.com/api/v1/billing/webhook/` and copy signing secret into `.env`
+- [ ] Google Cloud Console: add `https://ranktorole.app/auth/google/callback` as authorized redirect
+- [ ] Stripe dashboard: add live webhook endpoint `https://ranktorole.app/api/v1/billing/webhook/` and copy signing secret into `.env`
 
 ### Deploy + Verify
 
@@ -389,13 +389,13 @@ Remaining deploy blockers for April 24 launch (priority order):
 1. **Design change** (TBD — Cal will bring spec to next session)
 2. **Secret rotation before EC2** (Anthropic API key, Google OAuth client secret, O\*NET API key, Django SECRET_KEY — all potentially exposed via earlier `docker compose config` terminal output)
 3. **EC2 manual deploy (Wednesday)**:
-   - DNS A records → cjoewono.com
+   - DNS A records → ranktorole.app
    - Security group (80/443 only)
    - Docker + Certbot install
    - Production .env (REDIS_URL=redis://redis:6379/0 alongside other vars)
    - certbot --standalone for SSL
    - Gunicorn override
-   - Google OAuth redirect URI for https://cjoewono.com
+   - Google OAuth redirect URI for https://ranktorole.app
    - Auto-renewal cron
 
 Launch + video recording: Thursday April 24.

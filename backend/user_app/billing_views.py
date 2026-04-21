@@ -35,6 +35,21 @@ _STATUS_TO_TIER = {
 }
 
 
+def _is_allowed_return_url(url: str) -> bool:
+    """Restrict return_url to our production domain or local dev.
+
+    Prevents an authenticated user from redirecting the Stripe portal exit
+    to an attacker-controlled domain.
+    """
+    if not url or not isinstance(url, str):
+        return False
+    if url.startswith('https://ranktorole.app/'):
+        return True
+    if url.startswith('http://localhost:'):
+        return True
+    return False
+
+
 class CheckoutSessionView(APIView):
     """POST /api/v1/billing/checkout/ — create a Stripe Checkout Session."""
     permission_classes = [IsAuthenticated]
@@ -58,11 +73,18 @@ class PortalSessionView(APIView):
     throttle_classes = [CheckoutThrottle]
 
     def post(self, request: Request) -> Response:
-        return_url = request.data.get('return_url') or 'http://localhost:5173/account'
+        return_url = request.data.get('return_url') or 'http://localhost:5173/profile'
+
+        if not _is_allowed_return_url(return_url):
+            return Response(
+                {"detail": "Invalid return_url."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             session = create_portal_session(request.user, return_url)
         except stripe.error.StripeError:
-            logger.exception("Stripe portal session creation failed")
+            logger.exception("Stripe portal session create failed")
             return Response(
                 {"detail": "Billing service unavailable."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,

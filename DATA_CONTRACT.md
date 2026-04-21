@@ -403,11 +403,18 @@ one yet.
 
 ```json
 {
-  "return_url": "https://cjoewono.com/account"
+  "return_url": "string"
 }
 ```
 
-Defaults to `http://localhost:5173/account` if omitted (dev convenience).
+`return_url` must match one of:
+
+- `https://ranktorole.app/*` (production)
+- `http://localhost:*` (development)
+
+Any other URL returns 400 `{"detail": "Invalid return_url."}`.
+
+Defaults to `http://localhost:5173/profile` if omitted (dev convenience).
 
 **Output**
 
@@ -417,6 +424,7 @@ Defaults to `http://localhost:5173/account` if omitted (dev convenience).
 
 **Error Responses**
 
+- 400 → invalid `return_url` (not on allowlist)
 - 401 → missing or expired JWT
 - 503 → Stripe API unreachable
 

@@ -698,12 +698,12 @@ None. Dev still uses Vite on host + backend in Docker with runserver. Nginx is n
 
 ### Manual Steps Required (not in repo)
 
-1. DNS: Point `cjoewono.com` and `www.cjoewono.com` A records to EC2 public IP
+1. DNS: Point `ranktorole.app` and `www.ranktorole.app` A records to EC2 public IP
 2. EC2 security group: Confirm ports 80/443 open, 22 from your IP only, no 8000/5432
 3. Install Docker on EC2 if not already installed
 4. Install Certbot on EC2: `sudo apt install certbot`
-5. Create production `.env` on EC2 with `DEBUG=False`, rotated `SECRET_KEY`, real DB password, production `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_OAUTH_REDIRECT_URI=https://cjoewono.com/auth/google/callback`
-6. Google Cloud Console: Add `https://cjoewono.com/auth/google/callback` as authorized redirect URI
+5. Create production `.env` on EC2 with `DEBUG=False`, rotated `SECRET_KEY`, real DB password, production `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_OAUTH_REDIRECT_URI=https://ranktorole.app/auth/google/callback`
+6. Google Cloud Console: Add `https://ranktorole.app/auth/google/callback` as authorized redirect URI
 7. Run Certbot to obtain cert
 8. Start Docker Compose, run migrations, verify end-to-end
 
@@ -901,13 +901,13 @@ changes — everything in this session is infrastructure, dependencies, or docs.
 
 All covered in ARCHITECTURE.md § SSL / HTTPS. Summary:
 
-1. DNS A records for `cjoewono.com` and `www.cjoewono.com` → EC2 public IP
+1. DNS A records for `ranktorole.app` and `www.ranktorole.app` → EC2 public IP
 2. Security group: ports 80/443 open to world; 22 from admin IP; no 8000 or 5432
 3. `apt install docker.io docker-compose-plugin certbot`
 4. Production `.env` on host with `DEBUG=False`, rotated `SECRET_KEY`, real DB password
-5. `sudo certbot certonly --standalone -d cjoewono.com -d www.cjoewono.com`
-6. Google Cloud Console — add `https://cjoewono.com/auth/google/callback` as authorized redirect
-7. Stripe dashboard — live webhook endpoint pointed at `https://cjoewono.com/api/v1/billing/webhook/`, signing secret copied into `.env`
+5. `sudo certbot certonly --standalone -d ranktorole.app -d www.ranktorole.app`
+6. Google Cloud Console — add `https://ranktorole.app/auth/google/callback` as authorized redirect
+7. Stripe dashboard — live webhook endpoint pointed at `https://ranktorole.app/api/v1/billing/webhook/`, signing secret copied into `.env`
 8. `0 */12 * * * certbot renew --quiet && docker compose exec nginx nginx -s reload` in crontab
 
 ---

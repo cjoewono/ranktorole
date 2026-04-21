@@ -129,6 +129,56 @@ class TestStripeWebhook:
 
 
 # ---------------------------------------------------------------------------
+# Portal return_url allowlist
+# ---------------------------------------------------------------------------
+
+class TestPortalAllowlist:
+    def test_portal_rejects_external_return_url(self, auth_client):
+        r = auth_client.post(
+            '/api/v1/billing/portal/',
+            data={'return_url': 'https://phishing.example.com/landing'},
+            format='json',
+        )
+        assert r.status_code == 400
+
+    def test_portal_rejects_http_production_url(self, auth_client):
+        r = auth_client.post(
+            '/api/v1/billing/portal/',
+            data={'return_url': 'http://ranktorole.app/profile'},
+            format='json',
+        )
+        assert r.status_code == 400
+
+    def test_portal_rejects_javascript_url(self, auth_client):
+        r = auth_client.post(
+            '/api/v1/billing/portal/',
+            data={'return_url': 'javascript:alert(1)'},
+            format='json',
+        )
+        assert r.status_code == 400
+
+    @patch('user_app.billing_views.create_portal_session')
+    def test_portal_accepts_production_https_url(self, mock_portal, auth_client):
+        mock_portal.return_value = {'url': 'https://billing.stripe.com/p/session/abc'}
+        r = auth_client.post(
+            '/api/v1/billing/portal/',
+            data={'return_url': 'https://ranktorole.app/profile'},
+            format='json',
+        )
+        assert r.status_code == 200
+
+    @patch('user_app.billing_views.create_portal_session')
+    def test_portal_accepts_localhost_url(self, mock_portal, auth_client):
+        mock_portal.return_value = {'url': 'https://billing.stripe.com/p/session/abc'}
+        r = auth_client.post(
+            '/api/v1/billing/portal/',
+            data={'return_url': 'http://localhost:5173/profile'},
+            format='json',
+        )
+        assert r.status_code == 200
+
+
+# ---------------------------------------------------------------------------
 # Billing status
 # ---------------------------------------------------------------------------
 

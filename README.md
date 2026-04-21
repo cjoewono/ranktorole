@@ -6,7 +6,7 @@ RankToRole turns a veteran's service record into a targeted civilian resume.
 Upload a PDF, paste a job description, and the app produces a role-grouped
 draft plus a short refinement chat — all grounded in O\*NET career data.
 
-**Live:** [cjoewono.com](https://cjoewono.com) _(pending final deployment)_
+**Live:** [ranktorole.app](https://ranktorole.app) _(pending final deployment)_
 **Deadline:** April 24, 2026
 
 ---

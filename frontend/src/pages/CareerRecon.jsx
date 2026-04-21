@@ -234,8 +234,8 @@ export default function CareerRecon() {
         </h1>
       </div>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 md:py-12">
-        <div className="bg-surface-container-high rounded-2xl border border-outline/40 shadow-lg p-6 md:p-8">
+      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        <div className="bg-surface-container p-5">
           <div className="mb-8 pb-6 border-b border-outline/20">
             <h2 className="font-headline text-xl uppercase text-on-surface mb-2">
               Find Your Civilian Mission
@@ -584,7 +584,7 @@ export default function CareerRecon() {
       {result && (
         <div
           ref={resultRef}
-          className="max-w-3xl mx-auto px-4 mt-8 space-y-6 pb-12"
+          className="max-w-4xl mx-auto px-4 mt-8 space-y-6 pb-12"
         >
           {result.degraded && (
             <div className="bg-surface-container-low rounded-xl px-4 py-3">

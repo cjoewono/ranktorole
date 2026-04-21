@@ -9,7 +9,7 @@
 
 ## Django App Structure (from BridgeBoard)
 
-- Each feature = its own Django app (`translate_app`, `user_app`, `contact_app`, `onet_app`)
+- Each feature = its own Django app (`translate_app`, `user_app`, `contact_app`, `onet_app`, `recon_app`)
 - Namespace apps in `urls.py` to avoid endpoint collisions
 - `services.py` handles all external API and LLM calls
 - Views only handle request/response, nothing else
@@ -159,33 +159,31 @@ applies `overflow-hidden` to prevent body scroll during the split-pane layout.
 
 ### Career Recon
 
-O\*NET-powered career exploration tool at `/recon`. Three-phase UI:
-SEARCH → RESULTS → DETAIL. Serves as a conversion funnel into the resume builder.
+Form-driven career brainstorm at `/recon`. Single endpoint, fully ephemeral.
 
-**O\*NET layer** — pure server-side proxy to O\*NET's My Next Move for Veterans API.
-Three views in `onet_app`: `OnetMilitarySearchView` (military search),
-`OnetCareerDetailView` (aggregated career report), `ReconEnrichView` (Haiku enrichment).
-All search/detail views use `OnetThrottle`. Enrichment uses `ReconEnrichThrottle`.
-O\*NET v2 API (`https://api-v2.onetcenter.org`) with `X-API-Key` auth (env: `ONET_API_KEY`).
+**Flow:** form submit → O\*NET crosswalks (1 call per service entry, merged and deduped) → Haiku ranks top 3 candidates (grounded in the baseline — cannot pick a code outside it) → we fetch full O\*NET detail on the winner → response carries one detailed card plus up to 2 slim runner-up cards.
 
-**Enrichment layer** — `POST /api/v1/onet/enrich/` adds personalized career intelligence
-via Claude Haiku 4.5. O\*NET data and `profile_context` are combined into a single Haiku
-call. Five cost controls defend the feature (defense in depth):
+**Profile-decoupled.** The form body is the sole source of signal. `profile_context` is never read by `recon_app`. A user with no profile can still use Recon from day one.
 
-1. Auth + profile gate — `IsAuthenticated` + non-empty `profile_context` required
-2. Per-user tiered throttle — `ReconEnrichThrottle` (15/day free, 25/day pro)
-3. DB-backed result cache — profile-aware SHA256 keys, 7-day TTL; cache hit = $0
-4. Hard API timeout — 15s ceiling on Haiku call (P95 ~3s)
-5. Global daily ceiling — 500 calls/day max; endpoint returns 503 beyond that
+**Backend:** `recon_app` (new) — `BrainstormView`, `services.run_brainstorm()`, `BrainstormInputSerializer`, `BrainstormRanking` Pydantic schema. Reuses `_resolve_mos_title`, `_check_and_increment_global_ceiling`, `_call_haiku_typed`, and `_normalize_career_data` from `onet_app`. No models — fully ephemeral.
 
-**Shared normalization** — `_normalize_career_data()` helper is used by both
-`OnetCareerDetailView` and `ReconEnrichView` to parse O\*NET v2 response shapes.
+**Cost controls (unchanged from prior Recon):**
 
-**Max spend/day:** $0.04 free / $0.065 pro per user; $1.30 global ceiling.
-**Expected spend at 100 pro users / 10 sessions/month:** ~$3/month with 60-75% cache hit rate.
+1. Auth required
+2. `ReconEnrichThrottle` per-user tiered (15/day free, 25/day pro; scope `user_recon_brainstorm`)
+3. Profile-independent cache — SHA256 of normalized form, 7-day TTL, cache hit = $0
+4. 15s hard timeout on Haiku call
+5. Global 500/day ceiling
 
-**Deliberately excluded:** resume bullets. Resume builder is where veterans draft bullets
-with their real numbers. LLM-fabricated XYZ metrics on Recon is a liability not taken on.
+**Honesty guardrails:**
+
+- Haiku picks validated against the O\*NET baseline — any `onet_code` not in the baseline is discarded, triggering fallback if all three picks fail.
+- MOS titles resolved via O\*NET before Haiku sees them; unresolved MOS codes are passed as "duties not verified — do not invent."
+- All LLM string outputs pass through `strip_tags` (XSS defense).
+
+**Degraded fallback:** On Haiku failure, invalid picks, or global ceiling hit, the response uses the strongest O\*NET crosswalk (`most_duties > some_duties > crosswalk > keyword`) with `reasoning: null`, `also_consider: []`, and `degraded: true`.
+
+**Deliberately excluded:** resume bullets (wrong place), save/pin (deferred post-launch), profile coupling (decoupled by design).
 
 ### MOS Title Resolution
 
@@ -341,14 +339,11 @@ Redis instance with 256mb LRU eviction.
 
 | Key pattern                   | Purpose                                                                                                 | TTL               | Invalidation                               |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------ |
-| `rtr:1:throttle_*`            | DRF tiered throttle counters (upload, draft, chat, finalize, onet, recon_enrich)                        | 24h (rate window) | TTL-only                                   |
+| `rtr:1:throttle_*`            | DRF tiered throttle counters (upload, draft, chat, finalize, recon_brainstorm)                          | 24h (rate window) | TTL-only                                   |
 | `rtr:1:health_probe`          | Health endpoint set/get round-trip                                                                      | 10s               | TTL-only                                   |
 | `rtr:1:mos_title:*`           | O\*NET veteran MOS title lookup (NAVY_OFFICER_DESIGNATORS, COAST_GUARD_RATINGS, O\*NET prefix matching) | 30 days           | TTL-only                                   |
-| `rtr:1:recon_enrich:*`        | Per-career Haiku enrichment payload, profile-fingerprinted                                              | 7 days            | TTL-only                                   |
+| `rtr:1:recon_brainstorm:*`    | Brainstorm response keyed by SHA256 of normalized form inputs                                           | 7 days            | TTL-only                                   |
 | `rtr:1:recon_enrich_global:*` | Daily global ceiling counter (atomic INCR)                                                              | 24h               | TTL-only                                   |
-| `rtr:1:onet_search:*`         | OnetSearchView response payload                                                                         | 6h                | TTL-only; not cached if empty              |
-| `rtr:1:onet_military:*`       | OnetMilitarySearchView response payload                                                                 | 6h                | TTL-only; not cached if empty              |
-| `rtr:1:onet_career:*`         | OnetCareerDetailView normalized career data                                                             | 6h                | TTL-only; not cached on 404                |
 | `rtr:1:resume_list:*`         | Per-user resume list endpoint response                                                                  | 1h (safety net)   | **Explicit** — cleared by every write path |
 
 **Cache-aside pattern.** All response caches use the cache-aside (lazy-load)
@@ -370,14 +365,14 @@ PROJECTLOG.md Session 15.
 
 Rate limits are tier-aware. Every throttled endpoint reads `request.user.tier` (free/pro) and looks up the rate from `settings.TIERED_THROTTLE_RATES[scope][tier]`.
 
-| Scope              | Free   | Pro    | Endpoints                                                   |
-| ------------------ | ------ | ------ | ----------------------------------------------------------- |
-| `user_upload`      | 3/day  | 15/day | POST /api/v1/resumes/upload/                                |
-| `user_draft`       | 1/day  | 5/day  | POST /api/v1/resumes/{id}/draft/                            |
-| `user_chat`        | 10/day | 50/day | POST /api/v1/resumes/{id}/chat/                             |
-| `user_finalize`    | 3/day  | 15/day | PATCH /api/v1/resumes/{id}/finalize/                        |
-| `user_onet`        | 10/day | 30/day | GET /api/v1/onet/{search,military,career}/                  |
-| `billing_checkout` | 5/min  | 5/min  | POST /api/v1/billing/{checkout,portal}/ (anti card-testing) |
+| Scope                   | Free   | Pro    | Endpoints                                                   |
+| ----------------------- | ------ | ------ | ----------------------------------------------------------- |
+| `user_upload`           | 3/day  | 15/day | POST /api/v1/resumes/upload/                                |
+| `user_draft`            | 1/day  | 5/day  | POST /api/v1/resumes/{id}/draft/                            |
+| `user_chat`             | 10/day | 50/day | POST /api/v1/resumes/{id}/chat/                             |
+| `user_finalize`         | 3/day  | 15/day | PATCH /api/v1/resumes/{id}/finalize/                        |
+| `user_recon_brainstorm` | 15/day | 25/day | POST /api/v1/recon/brainstorm/                              |
+| `billing_checkout`      | 5/min  | 5/min  | POST /api/v1/billing/{checkout,portal}/ (anti card-testing) |
 
 All tiered throttle classes live in `translate_app/throttles.py`. The
 `billing_checkout` throttle lives in `user_app/billing_throttles.py`. Cache key

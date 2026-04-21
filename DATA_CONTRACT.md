@@ -309,100 +309,6 @@ All queries filtered by `request.user` — no cross-user access.
 
 ---
 
-## O\*NET Proxy
-
-All O\*NET requests are server-side proxies to `api-v2.onetcenter.org` using the
-`X-API-Key` header sourced from `ONET_API_KEY`. Never called from the frontend.
-All routes use the `user_onet` throttle scope.
-
-### GET /api/v1/onet/search/?keyword={mos_code}
-
-Auth: JWT required
-Legacy keyword search — kept for the resume builder's skills lookup.
-
-**Output**
-
-```json
-{
-  "occupations": [{ "code": "string", "title": "string" }],
-  "skills": ["string"]
-}
-```
-
-### GET /api/v1/onet/military/?keyword={mos}&branch={branch}
-
-Auth: JWT required
-Server-side proxy to O\*NET My Next Move for Veterans military search.
-
-**Query params:**
-
-- `keyword` (required): MOS code or military job title
-- `branch` (optional): `army`, `navy`, `air_force`, `marine_corps`, `coast_guard`. Default: all.
-
-**Output:**
-
-```json
-{
-  "keyword": "11B",
-  "branch": "all",
-  "military_matches": [
-    {
-      "branch": "army",
-      "code": "11B",
-      "title": "Infantryman (Enlisted)",
-      "active": true
-    }
-  ],
-  "careers": [
-    {
-      "code": "47-2061.00",
-      "title": "Construction Laborers",
-      "match_type": "some_duties",
-      "tags": { "bright_outlook": true, "apprenticeship": true },
-      "preparation_needed": "First term",
-      "pay_grade": "E1"
-    }
-  ]
-}
-```
-
-Note: under the hood O\*NET v2 returns `military_match` (flat array) — our proxy
-rewrites it to `military_matches` for frontend compatibility.
-
-### GET /api/v1/onet/career/{onet_code}/
-
-Auth: JWT required
-Aggregates career overview, skills, knowledge, technology, and job outlook from
-O\*NET v2.
-
-**Output:**
-
-```json
-{
-  "code": "47-2061.00",
-  "title": "Construction Laborers",
-  "description": "...",
-  "tags": { "bright_outlook": true },
-  "skills": [{ "name": "...", "description": "..." }],
-  "knowledge": [{ "name": "...", "description": "..." }],
-  "technology": [
-    { "category": "...", "examples": [{ "name": "...", "hot": false }] }
-  ],
-  "outlook": {
-    "category": "Bright",
-    "description": "...",
-    "salary": {
-      "annual_median": "40000",
-      "annual_10th": "30000",
-      "annual_90th": "55000"
-    }
-  }
-}
-```
-
-Note: the proxy normalizes v2 field differences internally (`what_they_do` →
-`description`, `job_outlook` → `outlook`, etc.) so the public contract is stable.
-
 ---
 
 ## Auth Endpoints (no JWT required)
@@ -641,55 +547,85 @@ No PAN, no CVV, no payment methods — ever.
 
 ---
 
-## POST /api/v1/onet/enrich/
+## POST /api/v1/recon/brainstorm/
 
-**Auth:** Required (JWT)
-**Throttle:** ReconEnrichThrottle — 15/day free, 25/day pro
-**Cache:** DB-backed, 7-day TTL, profile-fingerprint key
+Auth: JWT required
+Throttle: ReconEnrichThrottle (scope `user_recon_brainstorm`, 15/day free, 25/day pro)
+Profile-decoupled — the form body is the sole source of signal. `user.profile_context` is never read.
 
-### Request body
-
-```json
-{ "onet_code": "47-2061.00" }
-```
-
-### Response 200
+**Request body:**
 
 ```json
 {
-  "onet_code": "47-2061.00",
-  "career_title": "Construction Laborers",
-  "enrichment": {
-    "match_score": 72,
-    "personalized_description": "2-3 sentences referencing veteran's branch/MOS/skills.",
-    "skill_gaps": ["OSHA 30-Hour Card", "PMP certification"],
-    "education_recommendation": "1-2 sentences with GI Bill path where applicable.",
-    "transferable_skills": [
-      "Team leadership",
-      "Risk assessment",
-      "Equipment operation",
-      "Safety protocols"
-    ]
-  }
+  "services": [{ "branch": "Army", "mos_code": "11B" }],
+  "grade": "E-6",
+  "position": "Squad Leader",
+  "target_career_field": "Cybersecurity",
+  "education": ["Bachelor's in Computer Science"],
+  "certifications": ["CompTIA Security+"],
+  "licenses": [],
+  "state": "Washington"
 }
 ```
 
-### Error responses
+All fields optional except `services` (1–5 entries, each with non-empty `branch` and `mos_code`). `branch` must be one of: Army, Navy, Air Force, Marine Corps, Coast Guard, Space Force.
 
-| Status | When                                                             |
-| ------ | ---------------------------------------------------------------- |
-| 400    | `onet_code` missing, malformed, or user has no `profile_context` |
-| 401    | Unauthenticated                                                  |
-| 404    | O\*NET career code not found                                     |
-| 429    | Per-user throttle exceeded                                       |
-| 502    | O\*NET API unreachable                                           |
-| 503    | Global daily ceiling hit or Haiku API failure                    |
+**Response body (happy path):**
 
-### Internal behavior
+```json
+{
+  "best_match": {
+    "code": "15-1212.00",
+    "title": "Information Security Analysts",
+    "description": "...",
+    "tags": { "bright_outlook": true },
+    "skills": [{ "name": "...", "description": "" }],
+    "knowledge": [{ "name": "...", "description": "" }],
+    "technology": [
+      { "category": "...", "examples": [{ "name": "...", "hot": false }] }
+    ],
+    "outlook": {
+      "category": "Bright",
+      "description": "...",
+      "salary": {
+        "annual_median": "...",
+        "annual_10th": "...",
+        "annual_90th": "..."
+      }
+    },
+    "reasoning": {
+      "match_score": 82,
+      "match_rationale": "2–3 sentences grounded in form inputs.",
+      "skill_gaps": ["...", "..."],
+      "transferable_skills": ["...", "...", "...", "..."]
+    }
+  },
+  "also_consider": [
+    {
+      "code": "...",
+      "title": "...",
+      "match_score": 74,
+      "match_rationale": "..."
+    },
+    {
+      "code": "...",
+      "title": "...",
+      "match_score": 68,
+      "match_rationale": "..."
+    }
+  ],
+  "degraded": false
+}
+```
 
-- `profile_context` is read from `request.user.profile_context` (never from client)
-- Canonical MOS title resolved via `_resolve_mos_title()` before Haiku call; empty string on miss — prompt handles as "known unknown" and will not fabricate
-- Result cached in `django_cache` under key `recon_enrich:{onet_code}:{profile_fingerprint[:16]}` for 7 days
-- Profile fingerprint: SHA256 of `branch|mos|target_sector|sorted(skills)`
-- Global daily ceiling: `RECON_ENRICH_DAILY_CEILING` (default 500) — returns 503 when exceeded
-- Enrichment result is NEVER persisted to the Resume model or any DB table
+**Degraded response (Haiku failed):** `best_match.reasoning = null`, `also_consider = []`, `degraded = true`. HTTP 200.
+
+**Error responses:**
+
+| Status | When                                                  |
+| ------ | ----------------------------------------------------- |
+| 400    | Payload validation failure                            |
+| 401    | Unauthenticated                                       |
+| 429    | Throttle exceeded                                     |
+| 502    | O\*NET baseline fetch failed for all services entries |
+| 503    | Global daily ceiling exceeded                         |

@@ -43,7 +43,7 @@ Required secrets: `SECRET_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE
 
 - Login: 5/min (`LoginRateThrottle`) + Nginx zone (10r/s, burst 10)
 - Register: 5/hour (`RegisterThrottle`, anti-enumeration)
-- Upload/Draft/Chat/Finalize/ONET: tiered (free/pro) via `TieredThrottle` subclasses
+- Upload/Draft/Chat/Finalize/Recon brainstorm: tiered (free/pro) via `TieredThrottle` subclasses
 - Billing checkout/portal: 5/min (`CheckoutThrottle`, anti card-testing)
 
 ## Tier Enforcement (DRF Permissions)
@@ -117,11 +117,11 @@ Do **not** upgrade without explicit go-ahead:
 
 **Five layers of defense (defense in depth):**
 
-1. **Auth + profile gate** — `IsAuthenticated` permission class. Empty `profile_context` returns 400, not a Haiku call. Both checks run before any external API call.
+1. **Auth gate** — `IsAuthenticated` permission class. Unauthenticated requests are rejected before any external API call.
 
-2. **Per-user tiered throttle** — `ReconEnrichThrottle` enforces 15/day (free) / 25/day (pro) via `TIERED_THROTTLE_RATES`. Cache hits do not consume throttle quota.
+2. **Per-user tiered throttle** — `ReconEnrichThrottle` (scope `user_recon_brainstorm`) enforces 15/day (free) / 25/day (pro) via `TIERED_THROTTLE_RATES`. Cache hits do not consume throttle quota.
 
-3. **DB-backed result cache** — Profile-aware SHA256 cache key means MOS/branch changes get fresh enrichment (correctness), not stale output. Two users with identical profile fields share a cache entry (no PII in enrichment response — output is derived solely from O\*NET public data + profile tier/branch/mos/skills). 7-day TTL.
+3. **Profile-independent result cache** — SHA256 of normalized form inputs (not profile). Two users with identical form submissions share a cache entry. 7-day TTL. Profile decoupling removes the risk of stale enrichment on profile edits.
 
 4. **Hard API timeout** — `RECON_ENRICH_TIMEOUT_SECONDS = 15.0` prevents backend thread pile-up on Anthropic partial outages. Haiku P95 is ~3s; 15s is a generous backstop.
 
@@ -129,15 +129,17 @@ Do **not** upgrade without explicit go-ahead:
 
 **XSS defense** — All Haiku string outputs sanitized with `strip_tags` before caching and before returning to client.
 
-**Prompt injection hardening** — `profile_context` fields (branch/mos/skills) go into the Haiku prompt. Malicious prompt injection via The Forge profile is a recognized attack surface; field values are length-capped in the prompt builder. Schema-level `max_length` constraints on `CareerEnrichment` reject runaway LLM responses.
+**Input injection hardening** — Form fields (branch/mos_code/target_career_field) go into the Haiku prompt. Field values are length-capped via `BrainstormInputSerializer` before reaching the prompt builder. `BrainstormRanking` schema-level constraints reject runaway LLM responses.
 
-**No bullet fabrication** — Haiku prompt explicitly instructs: "DO NOT generate resume bullets, XYZ-format accomplishments, or fabricated metrics." Enforced by schema design (no bullets field) and explicit prompt instruction.
+**No bullet fabrication** — Haiku prompt explicitly instructs against generating resume bullets, XYZ-format accomplishments, or fabricated metrics. Enforced by schema design (no bullets field) and explicit prompt instruction.
 
-**O\*NET data trust** — O\*NET career data is fetched server-side; client never passes career payload. Profile context is read from `request.user`, never from request body.
+**Baseline grounding** — O\*NET crosswalk results form the baseline. Haiku can only pick codes from this list; any code outside the baseline is discarded. Prevents hallucinated O\*NET codes from reaching the response.
+
+**O\*NET data trust** — O\*NET career data is fetched server-side from the form inputs; client never passes career payload. Profile context is never read — form body is the sole input.
 
 ### MOS Title Grounding
 
-Enrichment prompts always include a validated military title (or explicit
+Brainstorm prompts always include a validated military title (or explicit
 "not verified" sentinel). This prevents Haiku from fabricating military job
 duties when given only a numeric code. Titles come from:
 

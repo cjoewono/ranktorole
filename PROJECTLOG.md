@@ -2,6 +2,74 @@ RankToRole — Project Log
 
 ---
 
+## April 21, 2026 | Session 14 | Recon Rebuild — Form-Driven Brainstorm
+
+**Status:** ✅ Complete
+
+### Summary
+
+Replaced the SEARCH → RESULTS → DETAIL three-phase Recon UI with a single form-driven brainstorm endpoint modeled on RankToRole's intake pattern. Profile-decoupled by design: the form body is the sole source of signal. One best-match card with full O\*NET detail + Haiku reasoning, plus up to 2 slim "also consider" runner-up cards.
+
+### Decisions
+
+- **Profile-decoupled.** `user.profile_context` is never read by `recon_app`. First-time users can brainstorm from day one.
+- **Ephemeral.** No model, no migration. Pin/save deferred post-launch — capstone CRUD-model scope stays at Resume + Contact.
+- **New `recon_app` Django app.** Clean boundary. Reuses MOS resolver, global ceiling, and typed Haiku caller from `onet_app`.
+- **Baseline-grounded Haiku.** Any `onet_code` Haiku returns that isn't in the O\*NET baseline is discarded, preventing code hallucination.
+- **Throttle renamed.** `user_recon_enrich` → `user_recon_brainstorm`. Every active user's daily counter resets on deploy (acceptable at launch).
+- **Degraded fallback.** On Haiku failure: strongest O\*NET crosswalk, no reasoning, `degraded: true`, HTTP 200.
+- **Design-system debt noted.** `CareerRecon.jsx` inlines its page-header structure (breadcrumb + title) instead of using the shared `<PageHeader>` component. This was done during visual polish to apply a muted breadcrumb color, then reverted to match other pages but the inline structure stayed. Functionally identical to other pages but decoupled at the source level. Consolidate post-launch if `<PageHeader>` gains a color/variant prop.
+
+### Backend Changes
+
+| File                               | Action   | Detail                                                                  |
+| ---------------------------------- | -------- | ----------------------------------------------------------------------- |
+| `recon_app/`                       | Created  | New app with views, services, serializers, schemas, tests               |
+| `onet_app/views.py`                | Pruned   | Deleted all view classes; kept utility helpers                          |
+| `onet_app/urls.py`                 | Emptied  | No more endpoints                                                       |
+| `onet_app/cache_utils.py`          | Deleted  | All consumers removed                                                   |
+| `onet_app/recon_enrich_service.py` | Pruned   | Deleted enrich_career, \_build_enrichment_prompt, \_profile_fingerprint |
+| `onet_app/schemas.py`              | Deleted  | CareerEnrichment no longer used                                         |
+| `onet_app/tests.py`                | Pruned   | Kept MOS resolver and ceiling tests only                                |
+| `onet_app/tests_cache.py`          | Deleted  | All three cache test classes removed                                    |
+| `config/urls.py`                   | Modified | Removed onet_app include, kept recon_app                                |
+| `config/settings.py`               | Modified | INSTALLED_APPS += recon_app, throttle scope renamed                     |
+| `translate_app/throttles.py`       | Modified | `ReconEnrichThrottle.scope` → `user_recon_brainstorm`                   |
+
+### Frontend Changes
+
+| File                    | Action    | Detail                                  |
+| ----------------------- | --------- | --------------------------------------- |
+| `api/recon.js`          | Created   | `submitBrainstorm()`                    |
+| `api/onet.js`           | Deleted   | Consumers gone                          |
+| `pages/CareerRecon.jsx` | Rewritten | Single-form intake; tactical dark theme |
+
+### Visual Polish (Prompts D–F)
+
+After the initial Prompt B shipped, three follow-up prompts tightened the UI:
+
+- **Prompt D** — removed duplicate hero/headline stack; demoted in-card title to a tagline; fixed garbled `(optional)` labels (parent uppercase transform was cascading onto span — fixed by matching ForgeSetup's `normal-case tracking-normal` pattern); eliminated floating-card pattern in favor of single card with clear boundary.
+- **Prompt E** — restored green breadcrumb (`text-secondary`) to match Dashboard and other pages after Prompt D muted it (decision flipped after seeing it in context); fixed tagline to use `font-headline uppercase` to match app's headline treatment.
+- **Prompt F** — matched page container and card classes to Dashboard exactly (`max-w-4xl mx-auto px-4 py-6 space-y-6` outer; `bg-surface-container p-5` card — no border, no rounded, no shadow) so `/recon` and `/dashboard` read as siblings.
+
+### Test Count
+
+| Stage                      | Count |
+| -------------------------- | ----- |
+| Pre-rebuild (baseline)     | 241   |
+| After Prompt A (new tests) | 257   |
+| After Prompt C (deletions) | 226   |
+
+The drop from 257 → 226 is expected: 23 tests deleted from `onet_app/tests.py` (OnetSearchView × 3, OnetMilitarySearchView × 6, OnetCareerDetailView × 5, ReconEnrichView × 7, enrich cache × 2) + 8 tests deleted from `onet_app/tests_cache.py` = 31 deleted, 1 rewritten (`test_global_ceiling_returns_none` now tests `_check_and_increment_global_ceiling` directly). Net: −31.
+
+### Post-launch backlog
+
+1. Pin / Save model (deferred — new CRUD model post-launch decision)
+2. Form auto-save to localStorage (opt-in only if users request it)
+3. "Explore similar" button on also_consider cards (re-submit with that field pre-filled)
+
+---
+
 ## April 20, 2026 (evening) | Tailoring v2: authority rebalance + per-role identity
 
 **Status:** ✅ Shipped.

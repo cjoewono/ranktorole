@@ -1,15 +1,8 @@
-from django.urls import path
+# Intentionally empty — onet_app no longer exposes any endpoints.
+# Kept as a Django app for the shared utility modules in views.py and
+# recon_enrich_service.py. Remove the app entirely only after confirming
+# no migrations reference it.
 
-from .views import (
-    OnetCareerDetailView,
-    OnetMilitarySearchView,
-    OnetSearchView,
-    ReconEnrichView,
-)
+from django.urls import path  # noqa: F401  (stub to keep the module importable)
 
-urlpatterns = [
-    path("search/", OnetSearchView.as_view(), name="onet-search"),
-    path("military/", OnetMilitarySearchView.as_view(), name="onet-military-search"),
-    path("career/<str:onet_code>/", OnetCareerDetailView.as_view(), name="onet-career-detail"),
-    path("enrich/", ReconEnrichView.as_view(), name="recon-enrich"),
-]
+urlpatterns = []

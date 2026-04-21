@@ -306,7 +306,7 @@
 - [ ] `docker compose exec backend python manage.py migrate`
 - [ ] Smoke test: register, login, upload PDF, generate draft, chat turn, finalize, export PDF
 - [ ] Smoke test: Stripe Checkout → webhook → user flips to Pro
-- [ ] Smoke test: Career Recon search and detail
+- [ ] Smoke test: Career Recon brainstorm (POST /api/v1/recon/brainstorm/)
 
 ---
 
@@ -402,6 +402,9 @@ Launch + video recording: Thursday April 24.
 
 Post-launch backlog (not blocking April 24):
 
+- [ ] PinnedCareer model (Recon save feature)
+- [ ] Recon form auto-save to localStorage (opt-in)
+- [ ] "Explore similar" action on also_consider cards (re-submit with that field pre-filled)
 - Wrap `invalidate_*_cache()` calls in try/except to degrade gracefully on Redis outage (Session 15 tradeoff documented)
 - Per-tier custom 429 copy (current generic apiFetch fallback works, just not pretty)
 - Qualitative-aggregate refinement (prompt tweak for "multi-million dollar programs" claims)

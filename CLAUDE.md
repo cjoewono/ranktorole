@@ -98,10 +98,7 @@ PATCH  /api/v1/resumes/{id}/finalize/   final edits → is_finalized=True
 GET    /api/v1/resumes/                 list resumes for authenticated user
 GET    /api/v1/resumes/{id}/            retrieve single resume
 DELETE /api/v1/resumes/{id}/            delete resume
-GET    /api/v1/onet/search/?keyword=    legacy keyword search (resume builder)
-GET    /api/v1/onet/military/           MOS search → civilian career matches (Veterans API)
-GET    /api/v1/onet/career/{code}/      career detail aggregation (skills, knowledge, salary, outlook)
-POST   /api/v1/onet/enrich/            onet_code → personalized career intelligence (Haiku 4.5)
+POST   /api/v1/recon/brainstorm/         form-driven career brainstorm (Haiku 4.5)
 POST   /api/v1/billing/checkout/        Stripe Checkout Session (Pro upgrade)
 POST   /api/v1/billing/portal/          Stripe Customer Portal (manage/cancel)
 GET    /api/v1/billing/status/          current tier, subscription status, usage, limits
@@ -158,9 +155,9 @@ Raw `military_text` and `job_description` are NEVER passed after call 1.
 
 - Base URL: `https://api-v2.onetcenter.org`
 - Auth: `X-API-Key` header (key from `ONET_API_KEY` env var)
-- Purpose: map military occupation codes to civilian job titles; career detail lookup
-- Server-side proxy only, never call from frontend
-- Routes: `/api/v1/onet/search/`, `/api/v1/onet/military/`, `/api/v1/onet/career/{code}/`
+- Purpose: map military occupation codes to civilian job titles; used internally by `recon_app`
+- Server-side only, never call from frontend
+- Public routes removed after Recon rebuild (April 2026). O\*NET is now a support library for `recon_app`'s brainstorm pipeline — `onet_app` exports `ONET_BASE`, `_onet_headers()`, `_normalize_career_data()`, and shared helpers from `recon_enrich_service.py`.
 
 ## OAuth
 
@@ -207,4 +204,6 @@ Raw `military_text` and `job_description` are NEVER passed after call 1.
 - `flag_unearned_claims` in `grounding.py` is the deterministic enforcement layer for claim-class violations that Layer 1 (prompt) cannot reliably hold. Four categories: P&L-class (always flagged), unearned skills (source-check), unearned credentials (source-check), aggregate dollar fabrications (source-check). Before adding a new phrase to any of the four blocklists, add a matching test to `TestUnearnedClaimsValidator`. Before relaxing a blocklist entry, review whether a real-resume smoke test justified the relaxation — false positives on common civilian phrases are a real risk, but so is silent regression on honesty guarantees.
 - Recon enrichment must never call Haiku without first resolving the MOS title via `_resolve_mos_title()`. An empty resolved title is a valid input — the prompt has explicit "do not invent" handling for that case. Never pass a bare MOS code to Haiku for interpretation.
 - The MOS title resolver checks local dicts (`NAVY_OFFICER_DESIGNATORS`, `COAST_GUARD_RATINGS`) FIRST, then O*NET with exact-match, then O*NET with prefix-match (AF/USSF only). Never reorder this priority without updating tests.
-- Enrichment cache key must include profile fingerprint. When adding new `profile_context` fields that affect output semantics, update `_profile_fingerprint()` to include them — otherwise users see stale enrichment from their old profile.
+- Recon is profile-decoupled. Never read `request.user.profile_context` from `recon_app` views or services.
+- `recon_app` has no models. Do not add one without revisiting the capstone CRUD-model scope.
+- Haiku picks are validated against the O\*NET baseline in `recon_app.services.run_brainstorm` — never trust a code the model returns without checking it against the baseline list.

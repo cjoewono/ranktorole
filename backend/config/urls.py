@@ -43,7 +43,6 @@ urlpatterns = [
     path('api/v1/resumes/', include('translate_app.resume_urls')),
     path('api/v1/auth/', include('user_app.urls')),
     path('api/v1/contacts/', include('contact_app.urls')),
-    path('api/v1/onet/', include('onet_app.urls')),
     path('api/v1/recon/', include('recon_app.urls')),
     path('api/v1/billing/', include('user_app.billing_urls')),
     # Social auth

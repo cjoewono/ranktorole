@@ -1,60 +1,88 @@
 import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
-import {
-  searchMilitaryCareers,
-  getCareerDetail,
-  enrichCareer,
-} from "../api/onet";
-
-const loadingKeyframes = `
-@keyframes loading {
-  0% { transform: translateX(-100%); }
-  50% { transform: translateX(60%); }
-  100% { transform: translateX(200%); }
-}
-`;
+import { submitBrainstorm } from "../api/recon";
 
 const BRANCHES = [
-  { value: "all", label: "All Branches" },
-  { value: "army", label: "Army" },
-  { value: "navy", label: "Navy" },
-  { value: "air_force", label: "Air Force" },
-  { value: "marine_corps", label: "Marines" },
-  { value: "coast_guard", label: "Coast Guard" },
+  "Army",
+  "Navy",
+  "Air Force",
+  "Marine Corps",
+  "Coast Guard",
+  "Space Force",
 ];
 
-function MatchBadge({ matchType }) {
-  const styles = {
-    most_duties: "bg-secondary/10 text-secondary",
-    some_duties: "bg-primary/10 text-primary",
-    crosswalk: "bg-surface-container-highest text-on-surface-variant",
-    keyword: "bg-surface-container-highest text-on-surface-variant",
-  };
-  const labels = {
-    most_duties: "STRONG MATCH",
-    some_duties: "PARTIAL MATCH",
-    crosswalk: "CROSSWALK",
-    keyword: "KEYWORD",
-  };
+const GRADES = {
+  Enlisted: ["E-1", "E-2", "E-3", "E-4", "E-5", "E-6", "E-7", "E-8", "E-9"],
+  "Warrant Officer": ["W-1", "W-2", "W-3", "W-4", "W-5"],
+  Officer: [
+    "O-1",
+    "O-2",
+    "O-3",
+    "O-4",
+    "O-5",
+    "O-6",
+    "O-7",
+    "O-8",
+    "O-9",
+    "O-10",
+  ],
+};
 
-  return (
-    <span
-      className={`font-label text-xs tracking-widest uppercase px-3 py-1 rounded-sm ${styles[matchType] || styles.keyword}`}
-    >
-      {labels[matchType] || matchType?.toUpperCase() || "MATCH"}
-    </span>
-  );
-}
-
-function TagBadge({ label, active }) {
-  if (!active) return null;
-  return (
-    <span className="bg-tertiary/10 text-tertiary font-label text-xs tracking-widest uppercase px-2 py-0.5 rounded-sm">
-      {label}
-    </span>
-  );
-}
+const US_STATES = [
+  "Alabama",
+  "Alaska",
+  "Arizona",
+  "Arkansas",
+  "California",
+  "Colorado",
+  "Connecticut",
+  "Delaware",
+  "District of Columbia",
+  "Florida",
+  "Georgia",
+  "Hawaii",
+  "Idaho",
+  "Illinois",
+  "Indiana",
+  "Iowa",
+  "Kansas",
+  "Kentucky",
+  "Louisiana",
+  "Maine",
+  "Maryland",
+  "Massachusetts",
+  "Michigan",
+  "Minnesota",
+  "Mississippi",
+  "Missouri",
+  "Montana",
+  "Nebraska",
+  "Nevada",
+  "New Hampshire",
+  "New Jersey",
+  "New Mexico",
+  "New York",
+  "North Carolina",
+  "North Dakota",
+  "Ohio",
+  "Oklahoma",
+  "Oregon",
+  "Pennsylvania",
+  "Puerto Rico",
+  "Rhode Island",
+  "South Carolina",
+  "South Dakota",
+  "Tennessee",
+  "Texas",
+  "Utah",
+  "Vermont",
+  "Virginia",
+  "Washington",
+  "West Virginia",
+  "Wisconsin",
+  "Wyoming",
+];
 
 function MatchScoreBadge({ score }) {
   let color = "bg-error/10 text-error";
@@ -78,652 +106,741 @@ function MatchScoreBadge({ score }) {
   );
 }
 
+function OptionalLabel() {
+  return (
+    <span className="text-outline normal-case tracking-normal font-body font-normal text-xs ml-1">
+      (optional)
+    </span>
+  );
+}
+
 export default function CareerRecon() {
-  // Search state
-  const [keyword, setKeyword] = useState("");
-  const [branch, setBranch] = useState("all");
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState(null);
+  const [services, setServices] = useState([{ branch: "Army", mos_code: "" }]);
+  const [grade, setGrade] = useState("");
+  const [position, setPosition] = useState("");
+  const [targetField, setTargetField] = useState("");
+  const [education, setEducation] = useState([""]);
+  const [certifications, setCertifications] = useState([""]);
+  const [licenses, setLicenses] = useState([""]);
+  const [state, setState] = useState("");
 
-  // Results state
-  const [results, setResults] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
 
-  // Detail state
-  const [selectedCode, setSelectedCode] = useState(null);
-  const [detail, setDetail] = useState(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [enrichment, setEnrichment] = useState(null);
-  const [enrichError, setEnrichError] = useState(null);
-  const latestClickRef = useRef(null);
+  const resultRef = useRef(null);
 
-  const phase = detail ? "DETAIL" : results ? "RESULTS" : "SEARCH";
+  const canSubmit = services.some((s) => s.branch.trim() && s.mos_code.trim());
 
-  async function handleSearch(e) {
+  function addService() {
+    setServices((prev) =>
+      prev.length < 5 ? [...prev, { branch: "Army", mos_code: "" }] : prev,
+    );
+  }
+  function updateService(i, field, val) {
+    setServices((prev) =>
+      prev.map((s, idx) => (idx === i ? { ...s, [field]: val } : s)),
+    );
+  }
+  function removeService(i) {
+    setServices((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  function addRow(setter, cap) {
+    setter((prev) => (prev.length < cap ? [...prev, ""] : prev));
+  }
+  function updateRow(setter, i, val) {
+    setter((prev) => prev.map((v, idx) => (idx === i ? val : v)));
+  }
+  function removeRow(setter, i) {
+    setter((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
-    if (!keyword.trim()) return;
-    setSearching(true);
-    setSearchError(null);
-    setDetail(null);
-    setSelectedCode(null);
+    setSubmitting(true);
+    setError(null);
+
+    const payload = {
+      services: services.filter((s) => s.branch.trim() && s.mos_code.trim()),
+      grade: grade.trim(),
+      position: position.trim(),
+      target_career_field: targetField.trim(),
+      education: education.map((v) => v.trim()).filter(Boolean),
+      certifications: certifications.map((v) => v.trim()).filter(Boolean),
+      licenses: licenses.map((v) => v.trim()).filter(Boolean),
+      state: state.trim(),
+    };
 
     try {
-      const data = await searchMilitaryCareers(keyword.trim(), branch);
-      if (data.careers?.length > 0) {
-        setResults(data);
-      } else {
-        setResults(null);
-        setSearchError(
-          `No civilian career matches found for "${keyword.trim()}". Try a different code or broaden the branch filter.`,
-        );
-      }
+      const data = await submitBrainstorm(payload);
+      setResult(data);
+      setTimeout(
+        () => resultRef.current?.scrollIntoView({ behavior: "smooth" }),
+        50,
+      );
     } catch (err) {
-      setResults(null);
-      setSearchError(err.message || "Search failed. Please try again.");
+      const s = err.status;
+      if (s === 400)
+        setError({
+          type: "validation",
+          message: "Please check your entries and try again.",
+        });
+      else if (s === 429)
+        setError({
+          type: "throttle",
+          message:
+            "You've hit your daily Recon limit. Try again tomorrow or upgrade to Pro.",
+        });
+      else if (s === 502)
+        setError({
+          type: "onet",
+          message:
+            "O*NET Web Services is unreachable. This usually clears in a few minutes.",
+        });
+      else if (s === 503)
+        setError({
+          type: "ceiling",
+          message: "Recon is at peak capacity. Please try again shortly.",
+        });
+      else
+        setError({
+          type: "unknown",
+          message: "Something went wrong. Please try again.",
+        });
     } finally {
-      setSearching(false);
+      setSubmitting(false);
     }
   }
 
-  async function handleCareerClick(onetCode) {
-    latestClickRef.current = onetCode;
-    setSelectedCode(onetCode);
-    setLoadingDetail(true);
-    setEnrichment(null);
-    setEnrichError(null);
-    setDetail(null);
-
-    const [careerResult, enrichResult] = await Promise.allSettled([
-      getCareerDetail(onetCode),
-      enrichCareer(onetCode),
-    ]);
-
-    // Ignore if user clicked a different career while this fetch was in flight
-    if (latestClickRef.current !== onetCode) return;
-
-    if (careerResult.status === "fulfilled") {
-      setDetail(careerResult.value);
-    } else {
-      setSelectedCode(null);
-      setLoadingDetail(false);
-      return;
-    }
-
-    if (enrichResult.status === "fulfilled") {
-      setEnrichment(enrichResult.value?.enrichment ?? null);
-    } else {
-      setEnrichError("Personalized analysis unavailable.");
-    }
-
-    setLoadingDetail(false);
-  }
-
-  function handleBackToResults() {
-    setDetail(null);
-    setSelectedCode(null);
-    setEnrichment(null);
-    setEnrichError(null);
-  }
-
-  function handleNewSearch() {
-    setResults(null);
-    setDetail(null);
-    setSelectedCode(null);
-    setEnrichment(null);
-    setEnrichError(null);
-    setKeyword("");
-    setBranch("all");
-  }
+  const bm = result?.best_match;
+  const knowledgeTop6 = bm?.knowledge?.slice(0, 6) ?? [];
+  const techTop6 = (bm?.technology ?? [])
+    .flatMap((cat) =>
+      (cat.examples ?? []).map((ex) => ({ ...ex, category: cat.category })),
+    )
+    .slice(0, 6);
 
   return (
     <>
-      <style>{loadingKeyframes}</style>
-      <PageHeader
-        label={
-          phase === "DETAIL"
-            ? "RECON / CAREER_DETAIL"
-            : phase === "RESULTS"
-              ? "RECON / SEARCH_RESULTS"
-              : "RECON / INITIALIZE"
-        }
-        title={
-          phase === "DETAIL"
-            ? detail?.title?.toUpperCase() || "CAREER DETAIL"
-            : "CAREER RECON"
-        }
-        action={
-          phase !== "SEARCH" ? (
-            <button
-              onClick={
-                phase === "DETAIL" ? handleBackToResults : handleNewSearch
-              }
-              className="font-label text-xs tracking-widest uppercase text-tertiary hover:text-tertiary-fixed transition-colors"
+      <PageHeader label="RECON / BRAINSTORM" title="CAREER RECON" />
+
+      {/* Hero */}
+      <div className="bg-surface-container-highest px-4 py-16 text-center">
+        <h2 className="font-headline font-bold text-3xl md:text-4xl uppercase text-on-surface mb-3">
+          Find Your Civilian Mission
+        </h2>
+        <p className="font-body text-base text-on-surface-variant max-w-lg mx-auto">
+          Tell us about your service. We'll map your military experience to
+          civilian careers using O*NET data and AI analysis.
+        </p>
+      </div>
+
+      {/* Form card — floats over hero */}
+      <div className="max-w-3xl mx-auto px-4 -mt-10 md:-mt-16 relative z-10 pb-12">
+        <div className="bg-surface-container-low rounded-2xl shadow-xl p-6 md:p-8">
+          {/* Error banner */}
+          {error && (
+            <div
+              role="alert"
+              className="flex items-start justify-between gap-3 bg-error-container text-on-error-container font-body text-sm px-4 py-3 rounded-md mb-6"
             >
-              {phase === "DETAIL" ? "← RESULTS" : "← NEW SEARCH"}
-            </button>
-          ) : null
-        }
-      />
+              <span>{error.message}</span>
+              <button
+                type="button"
+                onClick={() => setError(null)}
+                className="shrink-0 text-on-error-container hover:opacity-70 transition-opacity font-label text-lg leading-none"
+                aria-label="Dismiss error"
+              >
+                ×
+              </button>
+            </div>
+          )}
 
-      <main className="max-w-4xl mx-auto px-4 py-6">
-        {/* ─── SEARCH PHASE ─── */}
-        {phase === "SEARCH" && (
-          <div className="max-w-lg mx-auto space-y-6">
-            <div className="bg-surface-container-low p-6 space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-2 h-2 rounded-full bg-secondary inline-block" />
-                <span className="font-label text-xs tracking-widest uppercase text-secondary">
-                  O*NET VETERANS DATABASE
-                </span>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Services */}
+            <fieldset>
+              <legend className="font-label text-xs tracking-widest uppercase text-on-surface-variant mb-3">
+                Service Branch &amp; MOS / AFSC / Rating{" "}
+                <span className="text-primary">*</span>
+              </legend>
+              <div className="space-y-3">
+                {services.map((svc, i) => (
+                  <div key={i} className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      {i === 0 && (
+                        <label
+                          htmlFor={`branch-${i}`}
+                          className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1"
+                        >
+                          Branch
+                        </label>
+                      )}
+                      <select
+                        id={`branch-${i}`}
+                        value={svc.branch}
+                        onChange={(e) =>
+                          updateService(i, "branch", e.target.value)
+                        }
+                        className="tactical-input appearance-none cursor-pointer"
+                      >
+                        {BRANCHES.map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      {i === 0 && (
+                        <label
+                          htmlFor={`mos-${i}`}
+                          className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1"
+                        >
+                          MOS / AFSC / Rating
+                        </label>
+                      )}
+                      <input
+                        id={`mos-${i}`}
+                        type="text"
+                        value={svc.mos_code}
+                        onChange={(e) =>
+                          updateService(i, "mos_code", e.target.value)
+                        }
+                        placeholder="e.g. 11B, 3D0X4, IT2"
+                        className="tactical-input"
+                      />
+                    </div>
+                    {services.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeService(i)}
+                        className="shrink-0 pb-2 text-outline hover:text-error transition-colors font-label text-xl leading-none"
+                        aria-label={`Remove service entry ${i + 1}`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
-              <p className="font-body text-sm text-on-surface-variant">
-                Enter your military occupation code or job title. We'll search
-                the Department of Labor's veterans career database for matching
-                civilian careers with salary data, required skills, and
-                transition guidance.
-              </p>
+              {services.length < 5 && (
+                <button
+                  type="button"
+                  onClick={addService}
+                  className="mt-3 font-label text-xs tracking-widest uppercase text-tertiary hover:opacity-70 transition-opacity"
+                >
+                  + ADD ANOTHER
+                </button>
+              )}
+            </fieldset>
 
-              <form onSubmit={handleSearch} className="space-y-4">
-                <div>
-                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                    MOS / Rating / AFSC
-                  </label>
-                  <input
-                    type="text"
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    placeholder="e.g., 11B, IT2, 3D0X4, Infantryman"
-                    className="tactical-input"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                    Service Branch
-                  </label>
-                  <select
-                    value={branch}
-                    onChange={(e) => setBranch(e.target.value)}
-                    className="tactical-input appearance-none cursor-pointer"
-                  >
-                    {BRANCHES.map((b) => (
-                      <option key={b.value} value={b.value}>
-                        {b.label}
+            {/* Grade */}
+            <div>
+              <label
+                htmlFor="grade"
+                className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1"
+              >
+                Grade <OptionalLabel />
+              </label>
+              <select
+                id="grade"
+                value={grade}
+                onChange={(e) => setGrade(e.target.value)}
+                className="tactical-input appearance-none cursor-pointer"
+              >
+                <option value="">Select grade...</option>
+                {Object.entries(GRADES).map(([group, grades]) => (
+                  <optgroup key={group} label={group}>
+                    {grades.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
                       </option>
                     ))}
-                  </select>
-                </div>
+                  </optgroup>
+                ))}
+              </select>
+            </div>
 
+            {/* Position */}
+            <div>
+              <label
+                htmlFor="position"
+                className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1"
+              >
+                Position / Job Title <OptionalLabel />
+              </label>
+              <input
+                id="position"
+                type="text"
+                value={position}
+                onChange={(e) => setPosition(e.target.value)}
+                placeholder="e.g. Platoon Leader, Avionics Technician"
+                className="tactical-input"
+                maxLength={100}
+              />
+            </div>
+
+            {/* Target Career Field */}
+            <div>
+              <label
+                htmlFor="targetField"
+                className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1"
+              >
+                Target Career Field <OptionalLabel />
+              </label>
+              <input
+                id="targetField"
+                type="text"
+                value={targetField}
+                onChange={(e) => setTargetField(e.target.value)}
+                placeholder="e.g. Cybersecurity, Project Management, Healthcare"
+                className="tactical-input"
+                maxLength={100}
+              />
+            </div>
+
+            {/* Education */}
+            <fieldset>
+              <legend className="font-label text-xs tracking-widest uppercase text-on-surface-variant mb-3">
+                Education <OptionalLabel />
+              </legend>
+              <div className="space-y-2">
+                {education.map((edu, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <label htmlFor={`edu-${i}`} className="sr-only">
+                      Education entry {i + 1}
+                    </label>
+                    <input
+                      id={`edu-${i}`}
+                      type="text"
+                      value={edu}
+                      onChange={(e) =>
+                        updateRow(setEducation, i, e.target.value)
+                      }
+                      placeholder="e.g. Bachelor's in Computer Science"
+                      className="tactical-input"
+                    />
+                    {education.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeRow(setEducation, i)}
+                        className="shrink-0 text-outline hover:text-error transition-colors font-label text-xl leading-none"
+                        aria-label={`Remove education entry ${i + 1}`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {education.length < 10 && (
                 <button
-                  type="submit"
-                  disabled={searching || !keyword.trim()}
-                  className="mission-gradient w-full text-on-primary font-label font-semibold tracking-widest uppercase text-sm py-3 rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+                  type="button"
+                  onClick={() => addRow(setEducation, 10)}
+                  className="mt-3 font-label text-xs tracking-widest uppercase text-tertiary hover:opacity-70 transition-opacity"
                 >
-                  {searching ? "SCANNING..." : "SEARCH CAREERS"}
+                  + ADD
                 </button>
-              </form>
+              )}
+            </fieldset>
 
-              {searchError && (
-                <div className="bg-error-container text-on-error-container font-body text-sm px-4 py-3">
-                  {searchError}
+            {/* Certifications */}
+            <fieldset>
+              <legend className="font-label text-xs tracking-widest uppercase text-on-surface-variant mb-3">
+                Certifications <OptionalLabel />
+              </legend>
+              <div className="space-y-2">
+                {certifications.map((cert, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <label htmlFor={`cert-${i}`} className="sr-only">
+                      Certification entry {i + 1}
+                    </label>
+                    <input
+                      id={`cert-${i}`}
+                      type="text"
+                      value={cert}
+                      onChange={(e) =>
+                        updateRow(setCertifications, i, e.target.value)
+                      }
+                      placeholder="e.g. CompTIA Security+, PMP"
+                      className="tactical-input"
+                    />
+                    {certifications.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeRow(setCertifications, i)}
+                        className="shrink-0 text-outline hover:text-error transition-colors font-label text-xl leading-none"
+                        aria-label={`Remove certification entry ${i + 1}`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {certifications.length < 20 && (
+                <button
+                  type="button"
+                  onClick={() => addRow(setCertifications, 20)}
+                  className="mt-3 font-label text-xs tracking-widest uppercase text-tertiary hover:opacity-70 transition-opacity"
+                >
+                  + ADD
+                </button>
+              )}
+            </fieldset>
+
+            {/* Licenses */}
+            <fieldset>
+              <legend className="font-label text-xs tracking-widest uppercase text-on-surface-variant mb-3">
+                Licenses <OptionalLabel />
+              </legend>
+              <div className="space-y-2">
+                {licenses.map((lic, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <label htmlFor={`lic-${i}`} className="sr-only">
+                      License entry {i + 1}
+                    </label>
+                    <input
+                      id={`lic-${i}`}
+                      type="text"
+                      value={lic}
+                      onChange={(e) =>
+                        updateRow(setLicenses, i, e.target.value)
+                      }
+                      placeholder="e.g. FAA Airframe & Powerplant, CDL Class A"
+                      className="tactical-input"
+                    />
+                    {licenses.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeRow(setLicenses, i)}
+                        className="shrink-0 text-outline hover:text-error transition-colors font-label text-xl leading-none"
+                        aria-label={`Remove license entry ${i + 1}`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {licenses.length < 20 && (
+                <button
+                  type="button"
+                  onClick={() => addRow(setLicenses, 20)}
+                  className="mt-3 font-label text-xs tracking-widest uppercase text-tertiary hover:opacity-70 transition-opacity"
+                >
+                  + ADD
+                </button>
+              )}
+            </fieldset>
+
+            {/* State */}
+            <div>
+              <label
+                htmlFor="state"
+                className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1"
+              >
+                State <OptionalLabel />
+              </label>
+              <select
+                id="state"
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                className="tactical-input appearance-none cursor-pointer"
+              >
+                <option value="">Select state...</option>
+                {US_STATES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Submit */}
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={!canSubmit || submitting}
+                aria-busy={submitting}
+                className="mission-gradient text-on-primary font-label font-semibold tracking-widest uppercase px-8 py-3 rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 w-full sm:w-auto"
+              >
+                {submitting ? "ANALYZING..." : "ANALYZE CAREERS"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {/* Results */}
+      {result && (
+        <div
+          ref={resultRef}
+          className="max-w-3xl mx-auto px-4 mt-8 space-y-6 pb-12"
+        >
+          {result.degraded && (
+            <div className="bg-surface-container-low rounded-xl px-4 py-3">
+              <p className="font-label text-xs tracking-widest uppercase text-outline">
+                Match reasoning unavailable — showing strongest O*NET crosswalk
+              </p>
+            </div>
+          )}
+
+          {/* Best match card */}
+          {bm && (
+            <div className="bg-surface-container-low rounded-2xl p-6 space-y-5">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="font-label text-xs tracking-widest uppercase text-secondary mb-1">
+                    BEST MATCH
+                  </p>
+                  <h2 className="font-headline font-bold text-2xl uppercase text-on-surface leading-tight">
+                    {bm.title}
+                  </h2>
+                  <p className="font-label text-xs tracking-widest text-outline uppercase mt-1">
+                    {bm.code}
+                  </p>
+                </div>
+                {!result.degraded && bm.reasoning?.match_score != null && (
+                  <MatchScoreBadge score={bm.reasoning.match_score} />
+                )}
+              </div>
+
+              {bm.description && (
+                <p className="font-body text-sm text-on-surface-variant leading-relaxed">
+                  {bm.description}
+                </p>
+              )}
+
+              {!result.degraded && bm.reasoning?.match_rationale && (
+                <div className="pt-3 border-t border-outline-variant">
+                  <p className="font-label text-xs tracking-widest uppercase text-primary mb-2">
+                    WHY THIS ROLE
+                  </p>
+                  <p className="font-body text-sm text-on-surface-variant leading-relaxed">
+                    {bm.reasoning.match_rationale}
+                  </p>
                 </div>
               )}
-            </div>
-          </div>
-        )}
 
-        {/* ─── RESULTS PHASE ─── */}
-        {phase === "RESULTS" && results && (
-          <div className="space-y-4">
-            {/* Military match confirmation */}
-            {results.military_matches?.length > 0 && (
-              <div className="bg-surface-container-low p-4 flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-secondary inline-block" />
-                <span className="font-label text-xs tracking-widest uppercase text-secondary">
-                  MATCH CONFIRMED
-                </span>
-                <span className="font-body text-sm text-on-surface">
-                  {results.military_matches[0].title}
-                  {results.military_matches[0].branch
-                    ? ` · ${results.military_matches[0].branch.toUpperCase()}`
-                    : ""}
-                </span>
-              </div>
-            )}
+              {!result.degraded &&
+                (bm.reasoning?.transferable_skills?.length > 0 ||
+                  bm.reasoning?.skill_gaps?.length > 0) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-outline-variant">
+                    {bm.reasoning?.transferable_skills?.length > 0 && (
+                      <div>
+                        <p className="font-label text-xs tracking-widest uppercase text-secondary mb-2">
+                          TRANSFERABLE SKILLS
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {bm.reasoning.transferable_skills.map((skill, i) => (
+                            <span
+                              key={i}
+                              className="bg-secondary/10 text-secondary font-body text-xs px-2 py-1 rounded-sm"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {bm.reasoning?.skill_gaps?.length > 0 && (
+                      <div>
+                        <p className="font-label text-xs tracking-widest uppercase text-error mb-2">
+                          SKILL GAPS
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {bm.reasoning.skill_gaps.map((gap, i) => (
+                            <span
+                              key={i}
+                              className="bg-error/10 text-error font-body text-xs px-2 py-1 rounded-sm"
+                            >
+                              {gap}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-            {/* Inline search bar for refinement */}
-            <form
-              onSubmit={handleSearch}
-              className="bg-surface-container-low p-4 space-y-3"
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-2 h-2 rounded-full bg-secondary inline-block" />
-                <span className="font-label text-xs tracking-widest uppercase text-secondary">
-                  SEARCH
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                    MOS / Rating / AFSC
-                  </label>
-                  <input
-                    type="text"
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    placeholder="e.g., 11B, IT2, 3D0X4"
-                    className="tactical-input w-full"
-                    required
-                  />
-                </div>
-                <div className="w-40">
-                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                    Branch
-                  </label>
-                  <select
-                    value={branch}
-                    onChange={(e) => setBranch(e.target.value)}
-                    className="tactical-input appearance-none cursor-pointer w-full"
-                  >
-                    {BRANCHES.map((b) => (
-                      <option key={b.value} value={b.value}>
-                        {b.label}
-                      </option>
+              {knowledgeTop6.length > 0 && (
+                <div className="pt-3 border-t border-outline-variant">
+                  <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant mb-2">
+                    KEY KNOWLEDGE AREAS
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {knowledgeTop6.map((k, i) => (
+                      <span
+                        key={i}
+                        className="bg-surface-container text-on-surface-variant font-body text-xs px-2 py-1 rounded-sm"
+                      >
+                        {k.name}
+                      </span>
                     ))}
-                  </select>
+                  </div>
                 </div>
-                <div className="flex items-end">
-                  <button
-                    type="submit"
-                    disabled={searching || !keyword.trim()}
-                    className="mission-gradient text-on-primary font-label font-semibold tracking-widest uppercase text-xs px-6 py-3 rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-                  >
-                    {searching ? "..." : "GO"}
-                  </button>
-                </div>
-              </div>
-            </form>
+              )}
 
-            {loadingDetail && (
-              <div className="bg-surface-container-low p-4 flex items-center gap-3">
-                <div className="w-full">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse" />
-                    <span className="font-label text-xs tracking-widest uppercase text-primary">
-                      LOADING CAREER INTEL
+              {techTop6.length > 0 && (
+                <div className="pt-3 border-t border-outline-variant">
+                  <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant mb-2">
+                    TOP TECHNOLOGY
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {techTop6.map((ex, i) => (
+                      <span
+                        key={i}
+                        className={`font-body text-xs px-2 py-1 rounded-sm ${
+                          ex.hot
+                            ? "bg-primary/10 text-primary"
+                            : "bg-surface-container text-on-surface-variant"
+                        }`}
+                      >
+                        {ex.name}
+                        {ex.hot ? " 🔥" : ""}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {bm.outlook?.salary && (
+                <div className="pt-3 border-t border-outline-variant">
+                  <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant mb-3">
+                    SALARY RANGE
+                  </p>
+                  <div className="grid grid-cols-3 gap-4">
+                    {bm.outlook.salary.annual_10th && (
+                      <div>
+                        <p className="font-label text-xs tracking-widest text-outline uppercase">
+                          10TH PCTL
+                        </p>
+                        <p className="font-headline font-semibold text-lg text-on-surface">
+                          $
+                          {Number(
+                            bm.outlook.salary.annual_10th,
+                          ).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                    {bm.outlook.salary.annual_median && (
+                      <div>
+                        <p className="font-label text-xs tracking-widest text-outline uppercase">
+                          MEDIAN
+                        </p>
+                        <p className="font-headline font-semibold text-lg text-primary">
+                          $
+                          {Number(
+                            bm.outlook.salary.annual_median,
+                          ).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                    {bm.outlook.salary.annual_90th && (
+                      <div>
+                        <p className="font-label text-xs tracking-widest text-outline uppercase">
+                          90TH PCTL
+                        </p>
+                        <p className="font-headline font-semibold text-lg text-on-surface">
+                          $
+                          {Number(
+                            bm.outlook.salary.annual_90th,
+                          ).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {bm.outlook?.category && (
+                <div className="flex items-center gap-2 pt-2">
+                  <span className="w-2 h-2 rounded-full bg-secondary inline-block" />
+                  <span className="font-label text-xs tracking-widest uppercase text-secondary">
+                    {bm.outlook.category}
+                  </span>
+                  {bm.outlook.description && (
+                    <span className="font-body text-xs text-on-surface-variant">
+                      — {bm.outlook.description}
                     </span>
-                  </div>
-                  <div className="w-full bg-surface-container-highest rounded-full h-1 overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full animate-[loading_1.5s_ease-in-out_infinite]"
-                      style={{ width: "60%" }}
-                    />
-                  </div>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Empty state */}
-            {results.careers?.length === 0 && (
-              <div className="bg-surface-container-low p-6 text-center">
-                <p className="font-body text-sm text-on-surface-variant">
-                  No civilian career matches found for "{results.keyword}". Try
-                  a different code or broaden the branch filter.
-                </p>
-              </div>
-            )}
-
-            {/* Career cards */}
-            <div
-              className={`space-y-2 ${searching ? "opacity-40 pointer-events-none" : ""}`}
-            >
-              {results.careers?.map((career) => (
-                <button
-                  key={career.code}
-                  onClick={() => handleCareerClick(career.code)}
-                  disabled={loadingDetail && selectedCode === career.code}
-                  className={`w-full text-left bg-surface-container-low p-4 hover:bg-surface-container transition-colors group ${loadingDetail && selectedCode === career.code ? "opacity-60" : ""}`}
+              <div className="pt-4 border-t border-outline-variant">
+                <Link
+                  to="/resume-builder"
+                  className="inline-block mission-gradient text-on-primary font-label font-semibold tracking-widest uppercase text-sm px-6 py-3 rounded-md hover:opacity-90 transition-opacity"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap mb-1">
-                        <h3 className="font-headline font-semibold text-base uppercase text-on-surface">
-                          {career.title}
-                        </h3>
-                        <MatchBadge matchType={career.match_type} />
-                        <TagBadge
-                          label="BRIGHT OUTLOOK"
-                          active={career.tags?.bright_outlook}
-                        />
-                        <TagBadge
-                          label="APPRENTICESHIP"
-                          active={career.tags?.apprenticeship}
-                        />
-                      </div>
-                      <div className="flex items-center gap-4 mt-1">
-                        <span className="font-label text-xs tracking-widest text-outline uppercase">
-                          {career.code}
-                        </span>
-                        {career.pay_grade && (
-                          <span className="font-label text-xs tracking-widest text-on-surface-variant uppercase">
-                            MIN GRADE: {career.pay_grade}
-                          </span>
-                        )}
-                        {career.preparation_needed && (
-                          <span className="font-label text-xs tracking-widest text-on-surface-variant uppercase">
-                            PREP: {career.preparation_needed}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-outline-variant group-hover:text-on-surface-variant transition-colors shrink-0 mt-1">
-                      {loadingDetail && selectedCode === career.code
-                        ? "..."
-                        : "→"}
-                    </span>
+                  TRANSLATE YOUR RESUME FOR THIS ROLE →
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Also consider */}
+          {result.also_consider?.length > 0 && (
+            <div className="space-y-3">
+              <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant px-1">
+                ALSO CONSIDER
+              </p>
+              {result.also_consider.map((c) => (
+                <div
+                  key={c.code}
+                  className="bg-surface-container-low rounded-xl p-4"
+                >
+                  <div className="flex items-start justify-between gap-4 flex-wrap mb-1">
+                    <h3 className="font-headline font-semibold text-base uppercase text-on-surface">
+                      {c.title}
+                    </h3>
+                    {!result.degraded && c.match_score != null && (
+                      <MatchScoreBadge score={c.match_score} />
+                    )}
                   </div>
-                </button>
+                  <p className="font-label text-xs tracking-widest text-outline uppercase mb-2">
+                    {c.code}
+                  </p>
+                  {c.match_rationale && (
+                    <p className="font-body text-sm text-on-surface-variant">
+                      {c.match_rationale}
+                    </p>
+                  )}
+                </div>
               ))}
             </div>
+          )}
 
-            {/* Funnel CTA */}
-            <div className="bg-surface-container-low p-6 text-center space-y-3 mt-6">
-              <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
-                FOUND A TARGET ROLE?
-              </p>
-              <Link
-                to="/resume-builder"
-                className="inline-block mission-gradient text-on-primary font-label font-semibold tracking-widest uppercase text-sm px-8 py-3 rounded-md hover:opacity-90 transition-opacity"
-              >
-                TRANSLATE YOUR RESUME →
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* ─── DETAIL PHASE ─── */}
-        {phase === "DETAIL" && detail && (
-          <div className="space-y-6">
-            {/* Enrichment — Claude Haiku personalized analysis */}
-            {enrichment && (
-              <div className="bg-surface-container-low p-6 space-y-4">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-primary inline-block" />
-                    <span className="font-label text-xs tracking-widest uppercase text-primary">
-                      PERSONALIZED CAREER INTELLIGENCE
-                    </span>
-                  </div>
-                  <MatchScoreBadge score={enrichment.match_score ?? 0} />
-                </div>
-
-                <p className="font-body text-sm text-on-surface-variant leading-relaxed">
-                  {enrichment.personalized_description}
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <p className="font-label text-xs tracking-widest uppercase text-secondary">
-                      <span className="text-secondary mr-1">✓</span>
-                      TRANSFERABLE SKILLS
-                    </p>
-                    <div className="space-y-1">
-                      {(enrichment.transferable_skills ?? []).map((skill, i) => (
-                        <div key={i} className="flex items-start gap-2">
-                          <span className="text-secondary shrink-0 mt-0.5 text-xs">✓</span>
-                          <span className="font-body text-sm text-on-surface">{skill}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="font-label text-xs tracking-widest uppercase text-error">
-                      <span className="text-error mr-1">△</span>
-                      SKILL GAPS TO BRIDGE
-                    </p>
-                    <div className="space-y-1">
-                      {(enrichment.skill_gaps ?? []).map((gap, i) => (
-                        <div key={i} className="flex items-start gap-2">
-                          <span className="text-error shrink-0 mt-0.5 text-xs">△</span>
-                          <span className="font-body text-sm text-on-surface">{gap}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-outline-variant space-y-1">
-                  <p className="font-label text-xs tracking-widest uppercase text-tertiary">
-                    <span className="text-tertiary mr-1">◆</span>
-                    EDUCATION PATH
-                  </p>
-                  <p className="font-body text-sm text-on-surface-variant">
-                    {enrichment.education_recommendation}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {enrichError && !enrichment && (
-              <div className="bg-surface-container-low px-4 py-3 font-body text-sm text-on-surface-variant">
-                {enrichError} Showing O*NET data only.
-              </div>
-            )}
-
-            {/* Overview */}
-            <div className="bg-surface-container-low p-6 space-y-3">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="font-label text-xs tracking-widest text-outline uppercase">
-                  {detail.code}
-                </span>
-                <TagBadge
-                  label="BRIGHT OUTLOOK"
-                  active={detail.tags?.bright_outlook}
-                />
-              </div>
-              {detail.description && (
-                <p className="font-body text-sm text-on-surface-variant leading-relaxed">
-                  {detail.description}
-                </p>
-              )}
-            </div>
-
-            {/* Salary & Outlook */}
-            {detail.outlook &&
-              (detail.outlook.category || detail.outlook.salary) && (
-                <div className="bg-surface-container-low p-6 space-y-3">
-                  <h2 className="font-headline font-semibold text-sm uppercase text-on-surface tracking-wide">
-                    Job Outlook & Salary
-                  </h2>
-                  {detail.outlook.category && (
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-secondary inline-block" />
-                      <span className="font-label text-xs tracking-widest uppercase text-secondary">
-                        {detail.outlook.category}
-                      </span>
-                    </div>
-                  )}
-                  {detail.outlook.description && (
-                    <p className="font-body text-sm text-on-surface-variant">
-                      {detail.outlook.description}
-                    </p>
-                  )}
-                  {detail.outlook.salary && (
-                    <div className="grid grid-cols-3 gap-4 mt-2">
-                      {detail.outlook.salary.annual_10th && (
-                        <div>
-                          <p className="font-label text-xs tracking-widest text-outline uppercase">
-                            10TH PCTL
-                          </p>
-                          <p className="font-headline font-semibold text-lg text-on-surface">
-                            $
-                            {Number(
-                              detail.outlook.salary.annual_10th,
-                            ).toLocaleString()}
-                          </p>
-                        </div>
-                      )}
-                      {detail.outlook.salary.annual_median && (
-                        <div>
-                          <p className="font-label text-xs tracking-widest text-outline uppercase">
-                            MEDIAN
-                          </p>
-                          <p className="font-headline font-semibold text-lg text-primary">
-                            $
-                            {Number(
-                              detail.outlook.salary.annual_median,
-                            ).toLocaleString()}
-                          </p>
-                        </div>
-                      )}
-                      {detail.outlook.salary.annual_90th && (
-                        <div>
-                          <p className="font-label text-xs tracking-widest text-outline uppercase">
-                            90TH PCTL
-                          </p>
-                          <p className="font-headline font-semibold text-lg text-on-surface">
-                            $
-                            {Number(
-                              detail.outlook.salary.annual_90th,
-                            ).toLocaleString()}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-            {/* Skills */}
-            {detail.skills?.length > 0 && (
-              <div className="bg-surface-container-low p-6 space-y-3">
-                <h2 className="font-headline font-semibold text-sm uppercase text-on-surface tracking-wide">
-                  Key Skills
-                </h2>
-                <div className="space-y-2">
-                  {detail.skills.map((s) => (
-                    <div key={s.name} className="flex items-start gap-2">
-                      <span className="text-secondary shrink-0 mt-0.5">✓</span>
-                      <div>
-                        <span className="font-body text-sm font-medium text-on-surface">
-                          {s.name}
-                        </span>
-                        {s.description && (
-                          <span className="font-body text-sm text-on-surface-variant">
-                            {" — "}
-                            {s.description}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Knowledge */}
-            {detail.knowledge?.length > 0 && (
-              <div className="bg-surface-container-low p-6 space-y-3">
-                <h2 className="font-headline font-semibold text-sm uppercase text-on-surface tracking-wide">
-                  Knowledge Areas
-                </h2>
-                <div className="space-y-2">
-                  {detail.knowledge.map((k) => (
-                    <div key={k.name} className="flex items-start gap-2">
-                      <span className="text-primary shrink-0 mt-0.5">◆</span>
-                      <div>
-                        <span className="font-body text-sm font-medium text-on-surface">
-                          {k.name}
-                        </span>
-                        {k.description && (
-                          <span className="font-body text-sm text-on-surface-variant">
-                            {" — "}
-                            {k.description}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Technology */}
-            {detail.technology?.length > 0 && (
-              <div className="bg-surface-container-low p-6 space-y-3">
-                <h2 className="font-headline font-semibold text-sm uppercase text-on-surface tracking-wide">
-                  Technology Skills
-                </h2>
-                <div className="space-y-4">
-                  {detail.technology.map((cat) => (
-                    <div key={cat.category}>
-                      <p className="font-label text-xs tracking-widest text-on-surface-variant uppercase mb-1">
-                        {cat.category}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {cat.examples.map((ex) => (
-                          <span
-                            key={ex.name}
-                            className={`font-body text-xs px-2 py-1 rounded-sm ${
-                              ex.hot
-                                ? "bg-primary/10 text-primary"
-                                : "bg-surface-container text-on-surface-variant"
-                            }`}
-                          >
-                            {ex.name}
-                            {ex.hot && " 🔥"}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Funnel CTA */}
-            <div className="bg-surface-container-low p-6 text-center space-y-3">
-              <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
-                READY TO TARGET THIS ROLE?
-              </p>
-              <Link
-                to="/resume-builder"
-                className="inline-block mission-gradient text-on-primary font-label font-semibold tracking-widest uppercase text-sm px-8 py-3 rounded-md hover:opacity-90 transition-opacity"
-              >
-                TRANSLATE YOUR RESUME FOR THIS ROLE →
-              </Link>
-            </div>
-          </div>
-        )}
-        {/* O*NET Attribution */}
-        <div className="mt-8 pt-4 border-t border-outline-variant flex items-center gap-3">
-          <a
-            href="https://services.onetcenter.org/"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="This site incorporates information from O*NET Web Services. Click to learn more."
-          >
-            <img
-              src="https://www.onetcenter.org/image/link/onet-in-it.svg"
-              alt="O*NET in-it"
-              className="h-7 w-auto opacity-60 hover:opacity-100 transition-opacity"
-            />
-          </a>
-          <p className="font-body text-xs text-outline leading-relaxed">
-            Career data from{" "}
+          {/* O*NET Attribution */}
+          <div className="pt-4 border-t border-outline-variant flex items-center gap-3">
             <a
               href="https://services.onetcenter.org/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-tertiary hover:underline"
+              title="This site incorporates information from O*NET Web Services. Click to learn more."
             >
-              O*NET Web Services
-            </a>{" "}
-            · USDOL/ETA. O*NET® is a trademark of USDOL/ETA.
-          </p>
+              <img
+                src="https://www.onetcenter.org/image/link/onet-in-it.svg"
+                alt="O*NET in-it"
+                className="h-7 w-auto opacity-60 hover:opacity-100 transition-opacity"
+              />
+            </a>
+            <p className="font-body text-xs text-outline leading-relaxed">
+              Career data from{" "}
+              <a
+                href="https://services.onetcenter.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-tertiary hover:underline"
+              >
+                O*NET Web Services
+              </a>{" "}
+              · USDOL/ETA. O*NET® is a trademark of USDOL/ETA.
+            </p>
+          </div>
         </div>
-      </main>
+      )}
     </>
   );
 }

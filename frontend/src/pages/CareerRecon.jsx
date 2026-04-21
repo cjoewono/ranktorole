@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import PageHeader from "../components/PageHeader";
 import { submitBrainstorm } from "../api/recon";
 
 const BRANCHES = [
@@ -223,22 +222,30 @@ export default function CareerRecon() {
 
   return (
     <>
-      <PageHeader label="RECON / BRAINSTORM" title="CAREER RECON" />
-
-      {/* Hero */}
-      <div className="bg-surface-container-highest px-4 py-16 text-center">
-        <h2 className="font-headline font-bold text-3xl md:text-4xl uppercase text-on-surface mb-3">
-          Find Your Civilian Mission
-        </h2>
-        <p className="font-body text-base text-on-surface-variant max-w-lg mx-auto">
-          Tell us about your service. We'll map your military experience to
-          civilian careers using O*NET data and AI analysis.
-        </p>
+      <div className="bg-surface-container-low px-4 pt-4 pb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-2 h-2 rounded-full bg-on-surface-variant/40 inline-block" />
+          <span className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
+            RECON / BRAINSTORM
+          </span>
+        </div>
+        <h1 className="font-headline font-bold text-4xl uppercase text-on-surface leading-tight">
+          CAREER RECON
+        </h1>
       </div>
 
-      {/* Form card — floats over hero */}
-      <div className="max-w-3xl mx-auto px-4 -mt-10 md:-mt-16 relative z-10 pb-12">
-        <div className="bg-surface-container-low rounded-2xl shadow-xl p-6 md:p-8">
+      <main className="max-w-3xl mx-auto px-4 py-8 md:py-12">
+        <div className="bg-surface-container-high rounded-2xl border border-outline/40 shadow-lg p-6 md:p-8">
+          <div className="mb-8 pb-6 border-b border-outline/20">
+            <h2 className="font-headline text-xl text-on-surface mb-2">
+              Find Your Civilian Mission
+            </h2>
+            <p className="font-body text-sm text-on-surface-variant">
+              Tell us about your service. We'll map your military experience to
+              civilian careers using O*NET data and AI analysis.
+            </p>
+          </div>
+
           {/* Error banner */}
           {error && (
             <div
@@ -571,7 +578,7 @@ export default function CareerRecon() {
             </div>
           </form>
         </div>
-      </div>
+      </main>
 
       {/* Results */}
       {result && (

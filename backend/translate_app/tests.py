@@ -1137,6 +1137,72 @@ class TestSystemPromptGrounding:
         lowered = _SYSTEM_PROMPT.lower()
         assert "rewrite the verb" in lowered
 
+    def test_system_prompt_has_hard_limits_section(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        # HARD LIMITS must be its own named section, not a carve-out
+        # inside R3. Enforces the authority-gradient fix from v2.2.
+        assert "HARD LIMITS" in _SYSTEM_PROMPT
+        assert "apply before every other rule" in _SYSTEM_PROMPT
+
+    def test_system_prompt_hard_limits_enumerate_pnl_phrases(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        # H1 must name specific forbidden P&L variants, not just
+        # describe the pattern abstractly.
+        assert "'P&L management'" in _SYSTEM_PROMPT
+        assert "'managed P&L'" in _SYSTEM_PROMPT
+        # The COR carve-out must be explicit (product-critical — Brandon
+        # case).
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "cor" in lowered
+        assert "contracting officer" in lowered
+
+    def test_system_prompt_hard_limits_forbid_aggregates(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        # H2 must name aggregate totals as a specific pattern, not
+        # just generic 'no invented facts'.
+        assert "H2" in _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        # Key concrete phrases: aggregates across separate source
+        # numbers are forbidden.
+        assert "aggregate" in lowered
+        assert "summed total" in lowered or "summing" in lowered
+
+    def test_system_prompt_hard_limits_forbid_fabricated_credentials(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        # H3 must cover credentials/clearances/certifications added to
+        # output that do not appear in source.
+        assert "H3" in _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        # Clearance and certification classes must be named explicitly.
+        assert "clearance" in lowered
+        assert "certification" in lowered or "certified" in lowered
+
+    def test_system_prompt_hard_limits_ats_strong_matches_grounded(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        # H4 must require ATS FIT ASSESSMENT Strong matches to be
+        # grounded in source — preventing the Stage 1 analysis from
+        # self-certifying unearned capabilities.
+        assert "H4" in _SYSTEM_PROMPT
+        lowered = _SYSTEM_PROMPT.lower()
+        assert "strong matches must be grounded" in lowered
+
+    def test_example_4_references_hard_limit_h1(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        # Example 4's commentary must now name the HARD LIMIT rule
+        # that enforces the guardrail, not just R3(c).
+        # The commentary update from v2.2 should reference 'HARD LIMIT
+        # H1' explicitly.
+        assert "HARD LIMIT H1" in _SYSTEM_PROMPT
+
+    def test_system_prompt_r3c_no_longer_owns_pnl_guardrail(self):
+        from translate_app.services import _SYSTEM_PROMPT
+        # R3(c) should now reference HARD LIMITS for unearned
+        # responsibility — it should NOT re-describe the full P&L
+        # guardrail (that's now H1's job). Spot check: R3(c) should
+        # mention 'HARD LIMITS H1-H4' as a reference.
+        assert "HARD LIMITS H1-H4" in _SYSTEM_PROMPT \
+            or "HARD LIMITS H1" in _SYSTEM_PROMPT
+
 
 # ---------------------------------------------------------------------------
 # grounding.py — TestGroundingValidator

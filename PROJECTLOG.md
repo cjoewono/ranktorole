@@ -1277,5 +1277,65 @@ presence, and P&L guardrail enforcement).
 
 ---
 
+## April 20, 2026 (late evening) | Tailoring v2.2: HARD LIMITS block
+
+**Status:** ✅ Shipped.
+
+v2.1 shipped earlier today with R3 extended for noun-phrase mirroring
+and R3(c) expanded to cover unearned-responsibility claims (P&L as the
+canonical example). Smoke test against Aquent Engagement Manager JD +
+Brandon PSYOP resume showed:
+
+Positive: noun mirroring worked — "stakeholder navigation" and "team
+orchestration" correctly pulled into bullets where activity supported
+them.
+
+Regression: the P&L guardrail failed. Role 2 bullet 1 output "Managed
+P&L for two $240K+ program contracts as COR" — a false responsibility
+claim (COR ≠ P&L authority). Executive summary fabricated a "$1.4M+
+program portfolio" by summing separate source numbers (rule P2
+violation that wasn't caught). ATS FIT ASSESSMENT self-certified "P&L
+management" as a Strong match, upstream of the bullet.
+
+Diagnosis: the guardrail was a carve-out clause inside R3(c) while
+R3(a) was a strong positive directive to mirror JD nouns. Under
+pressure, the positive directive dominated and the exception clause
+eroded. Architectural, not a language problem.
+
+Structural fix (v2.2): promoted guardrails OUT of R3 into a new named
+block "HARD LIMITS" sitting alongside PRESERVATION RULES and REWRITE
+RULES. Four hard limits, each enumerating specific forbidden phrases
+rather than describing patterns:
+
+- H1: P&L-adjacent phrases forbidden unless source explicitly
+  establishes profit-and-loss authority. COR and budget management
+  explicitly carved out as NOT establishing P&L authority.
+- H2: aggregate totals across source numbers forbidden (concretizes
+  the P2 rule that was abstract).
+- H3: credentials/clearances/certifications absent from source cannot
+  be added to output.
+- H4: ATS FIT ASSESSMENT Strong matches must be grounded in source —
+  closes the Stage 1 self-certification path.
+
+R3(c) slimmed back to skill/tool fabrication only, with a pointer to
+HARD LIMITS for the rest. Example 4 commentary updated to name H1 as
+the enforcing rule.
+
+HARD LIMITS placed BEFORE PRESERVATION RULES and REWRITE RULES in
+prompt order. This changes the authority gradient: Claude reads hard
+limits first, then positive rules. Positive rules cannot pressure
+Claude past the hard limits because the hard limits are structurally
+primary, not an exception clause.
+
+Test count: 216 → 223 (+7 tests covering HARD LIMITS block, each rule
+H1-H4, Example 4 commentary update, R3(c) simplification).
+
+Option A (grounding.py unearned-claim validator) remains the next
+task — it adds Layer 2 deterministic catches for P&L-class phrases
+and aggregate totals as a defense-in-depth layer behind this prompt
+fix.
+
+---
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 20, 2026 — Tailoring v2.1: noun-phrase mirroring, 216 tests passing
+Last updated: April 20, 2026 — Tailoring v2.2: HARD LIMITS block, 223 tests passing

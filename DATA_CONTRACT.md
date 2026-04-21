@@ -529,7 +529,7 @@ No PAN, no CVV, no payment methods — ever.
 - `chat_history`: stored in DB — backend loads and appends to it on every chat turn
 - `chat_turn_count`: stored (integer counter; drives per-resume chat quota)
 - `ai_initial_draft`: stored (snapshot of the first draft, used for redline diff in FINALIZING)
-- `is_finalized`: stored (boolean; marks the resume as having been formally finalized at least once. Does not lock the chat endpoint — users may continue refining after finalize)
+- `is_finalized`: stored (boolean; marks the resume as finalized. Locks the chat endpoint — `POST /chat/` returns 409 when true. Reopen via `PATCH /reopen/` to re-enable chat.)
 - Raw Claude API response: never stored
 - Raw PDF bytes: never stored — extracted text only
 - Failed translation attempts: not stored

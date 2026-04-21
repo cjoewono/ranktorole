@@ -2,6 +2,12 @@ RankToRole — Project Log
 
 ---
 
+## April 21, 2026 | Contract Fix — ResumeChatView 409 on is_finalized
+
+`POST /api/v1/resumes/{id}/chat/` now returns 409 with `{"error": "Resume is finalized. Reopen it to continue editing."}` when `is_finalized=True`. Previously the endpoint allowed chat turns on finalized resumes, contradicting DATA_CONTRACT. Gate short-circuits before any Claude call. Test renamed from `test_finalized_resume_chat_still_works` to `test_finalized_resume_chat_returns_409`. DATA_CONTRACT.md and TASKS.md updated to reflect the enforced contract.
+
+---
+
 ## April 21, 2026 | Session 14 | Recon Rebuild — Form-Driven Brainstorm
 
 **Status:** ✅ Complete

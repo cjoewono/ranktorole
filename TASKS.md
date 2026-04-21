@@ -378,7 +378,7 @@ None.
 - [x] Tailoring v2.2: HARD LIMITS block (H1-H4) promoted to standalone section before PRESERVATION RULES. H1: P&L phrases. H2: aggregate totals. H3: unearned credentials. H4: ATS Strong matches must be grounded.
 - [x] Option A — unearned-claim validator: `flag_unearned_claims` added to `grounding.py` covering P&L phrases (always flagged), unearned skills (source-check), unearned credentials (source-check), dollar aggregates (source-check). Wired into `flag_bullet`; `flag_summary` picks it up transitively. Zero frontend or API shape changes. +18 tests, 223 → 241.
 - [x] Bugfix: CHAT_UPDATED reducer dropped `bullet_flags`/`summary_flags` from chat-path responses. 2-line `??` pattern fix (matches AI_SUGGESTIONS_RECEIVED).
-- [x] ResumeChatView is_finalized contract resolved: chat stays open post-finalize (decision: enable continued refinement via chat). Code already correct, DATA_CONTRACT.md updated.
+- [x] ResumeChatView is_finalized contract aligned with DATA_CONTRACT: `POST /chat/` returns 409 when `is_finalized=True`. Reopen required to continue editing. DATA_CONTRACT.md updated.
 - [x] Option D — user responsibility banner in FinalizingEditor.jsx between Edit & Finalize header and Mission Headline input. Closes the honesty stack loop with explicit user ownership framing.
 
 ## Start Next Session With

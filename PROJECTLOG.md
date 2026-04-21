@@ -1337,5 +1337,50 @@ fix.
 
 ---
 
+## April 20, 2026 (late evening) | Option A: grounding.py unearned-claim validator
+
+**Status:** ✅ Shipped.
+
+Two consecutive prompt iterations (v2.1, v2.2) could not reliably
+enforce the P&L-class claim prohibition under JD-anchoring pressure.
+The Aquent JD names 'P&L' as a specific priority; noun-mirroring
+pressure pulled Claude to match the phrase despite the HARD LIMITS H1
+block sitting structurally primary.
+
+Correct response: accept that prompt-layer enforcement of this claim
+class is unreliable, and move enforcement to Layer 2 (validator) where
+it is deterministic. This is the honesty stack working as designed —
+Layer 1 sets the goal, Layer 2 catches what Layer 1 cannot, Layer 3
+puts the user in the loop via flag-gated verify UX.
+
+Extended `grounding.py` with `flag_unearned_claims(text, source_text)`
+covering four categories:
+
+1. P&L-class phrases (always flagged). Flag message explains the
+   COR / budget-management carve-out so the user can verify or reject.
+2. Skill/tool claims (flagged when in output but not source). AI/ML,
+   cloud, named languages, SaaS, project management platforms.
+3. Credentials (flagged when in output but not source). TS/SCI, PMP,
+   Series 7, AWS Certified, etc. Flag message emphasizes
+   verification harm to the veteran.
+4. Dollar-amount aggregates (flagged when output dollar amount is not
+   verbatim-present in source). Deterministic backstop for H2.
+
+Wired into existing `flag_bullet`; `flag_summary` picks it up
+transitively. No API shape change — new flag strings flow through
+existing `bullet_flags` and `summary_flags` response fields. Zero
+frontend changes.
+
+Test count: 223 → 241 (+18 tests across all four categories plus
+integration with flag_bullet and edge cases).
+
+Known scope: this is launch-ready, not exhaustive. Semantic stretches
+that don't match the blocklists (e.g., 'technical advisory' when
+source said 'red-team') remain uncaught by code. Option D (user
+responsibility banner) closes that gap by acknowledging the user owns
+the final product.
+
+---
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 20, 2026 — Tailoring v2.2: HARD LIMITS block, 223 tests passing
+Last updated: April 20, 2026 — Option A: grounding.py unearned-claim validator, 241 tests passing

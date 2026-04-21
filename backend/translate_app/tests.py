@@ -1299,3 +1299,147 @@ class TestGroundingValidator:
         from translate_app.grounding import flag_summary
         assert flag_summary("", "source") == []
         assert flag_summary("summary", "") == []
+
+
+class TestUnearnedClaimsValidator:
+    """Tests for flag_unearned_claims — P&L, unearned skills,
+    unearned credentials, dollar-amount aggregates."""
+
+    # ------------------------- P&L phrases -------------------------
+
+    def test_pnl_phrase_always_flagged(self):
+        from translate_app.grounding import flag_unearned_claims
+        source = "Managed $250K budget for training programs."
+        text = "Managed P&L for $250K programs."
+        flags = flag_unearned_claims(text, source)
+        assert any("p&l" in f.lower() for f in flags)
+
+    def test_pnl_accountability_flagged(self):
+        from translate_app.grounding import flag_unearned_claims
+        source = "Led three programs as COR."
+        text = "P&L accountability for three programs."
+        flags = flag_unearned_claims(text, source)
+        assert any("p&l" in f.lower() for f in flags)
+
+    def test_profit_and_loss_flagged(self):
+        from translate_app.grounding import flag_unearned_claims
+        source = "Managed contracts as COR."
+        text = "Owned profit and loss across the engagement."
+        flags = flag_unearned_claims(text, source)
+        assert any("p&l" in f.lower() or "profit-and-loss" in f.lower() for f in flags)
+
+    def test_pnl_flag_explains_cor_carve_out(self):
+        """Flag message must guide user to the COR / budget alternative."""
+        from translate_app.grounding import flag_unearned_claims
+        text = "Managed P&L for programs."
+        flags = flag_unearned_claims(text, "")
+        combined = " ".join(flags).lower()
+        assert "cor" in combined
+        assert "budget" in combined
+
+    # ----------------- Unearned skill/tool claims -----------------
+
+    def test_unearned_skill_flagged_when_absent_from_source(self):
+        from translate_app.grounding import flag_unearned_claims
+        source = "Served as Army logistics officer managing convoys."
+        text = "Managed AWS cloud infrastructure for logistics systems."
+        flags = flag_unearned_claims(text, source)
+        assert any("aws" in f.lower() for f in flags)
+
+    def test_grounded_skill_not_flagged(self):
+        from translate_app.grounding import flag_unearned_claims
+        source = "Managed Google Ads and Meta Ads campaigns."
+        text = "Led Google Ads campaigns across 12 clients."
+        flags = flag_unearned_claims(text, source)
+        assert not any("google ads" in f.lower() for f in flags)
+
+    def test_ai_ml_claim_flagged_when_source_silent(self):
+        from translate_app.grounding import flag_unearned_claims
+        source = "Designed influence campaigns and counter-propaganda efforts."
+        text = "Delivered AI/ML workflows and data pipelines for influence campaigns."
+        flags = flag_unearned_claims(text, source)
+        assert any("ai/ml" in f.lower() or "data pipeline" in f.lower() for f in flags)
+
+    # -------------------- Unearned credentials --------------------
+
+    def test_unearned_credential_flagged_when_absent_from_source(self):
+        from translate_app.grounding import flag_unearned_claims
+        source = "Served as a project manager for Army logistics."
+        text = "PMP certified project manager with Series 7."
+        flags = flag_unearned_claims(text, source)
+        combined = " ".join(flags).lower()
+        assert "pmp" in combined or "series 7" in combined
+
+    def test_grounded_credential_not_flagged(self):
+        from translate_app.grounding import flag_unearned_claims
+        source = "Active TS/SCI clearance. COR certified."
+        text = "TS/SCI cleared project manager with COR experience."
+        flags = flag_unearned_claims(text, source)
+        # TS/SCI is in source, so should not be flagged as unearned
+        assert not any("ts/sci" in f.lower() for f in flags)
+
+    def test_credential_flag_mentions_verification_harm(self):
+        from translate_app.grounding import flag_unearned_claims
+        text = "PMP certified program lead."
+        flags = flag_unearned_claims(text, "")
+        combined = " ".join(flags).lower()
+        assert "verif" in combined or "fabricat" in combined
+
+    # ---------------- Dollar-amount aggregates ----------------
+
+    def test_aggregate_dollar_amount_flagged(self):
+        from translate_app.grounding import flag_unearned_claims
+        source = "Managed $275K in one program. Oversaw $240K in another. Led $950K in a third."
+        text = "Managed $1.4M+ in program portfolios."
+        flags = flag_unearned_claims(text, source)
+        assert any("1.4m" in f.lower() or "dollar amount" in f.lower() for f in flags)
+
+    def test_grounded_dollar_amount_not_flagged(self):
+        from translate_app.grounding import flag_unearned_claims
+        source = "Managed $950K in programs as COR."
+        text = "Delivered $950K+ in programs as COR."
+        flags = flag_unearned_claims(text, source)
+        assert not any("dollar amount" in f.lower() for f in flags)
+
+    def test_multiple_grounded_amounts_not_flagged(self):
+        from translate_app.grounding import flag_unearned_claims
+        source = "Led $275K programs. Managed $240K contracts."
+        text = "Led $275K programs and $240K contracts."
+        flags = flag_unearned_claims(text, source)
+        assert not any("dollar amount" in f.lower() for f in flags)
+
+    # --------------- Integration with flag_bullet ---------------
+
+    def test_flag_bullet_now_includes_pnl_check(self):
+        """Wiring check — flag_bullet must surface P&L flags too."""
+        from translate_app.grounding import flag_bullet
+        source = "Managed budget for three programs."
+        bullet = "Managed P&L for three programs."
+        flags = flag_bullet(bullet, source)
+        assert any("p&l" in f.lower() for f in flags)
+
+    def test_flag_bullet_still_catches_numeric_fabrication(self):
+        """Regression — existing numeric check must still fire."""
+        from translate_app.grounding import flag_bullet
+        source = "Managed equipment for training."
+        bullet = "Managed $2.4M equipment portfolio."
+        flags = flag_bullet(bullet, source)
+        assert any("2.4m" in f.lower() or "$2.4m" in f.lower() for f in flags)
+
+    # ------------------ Empty / edge cases ------------------
+
+    def test_empty_text_returns_empty_flags(self):
+        from translate_app.grounding import flag_unearned_claims
+        flags = flag_unearned_claims("", "source text")
+        assert flags == []
+
+    def test_empty_source_still_flags_pnl(self):
+        """P&L is always flagged regardless of source."""
+        from translate_app.grounding import flag_unearned_claims
+        flags = flag_unearned_claims("Managed P&L.", "")
+        assert any("p&l" in f.lower() for f in flags)
+
+    def test_none_source_handled_gracefully(self):
+        from translate_app.grounding import flag_unearned_claims
+        flags = flag_unearned_claims("Managed programs.", None)
+        assert flags == []

@@ -224,8 +224,8 @@ export default function CareerRecon() {
     <>
       <div className="bg-surface-container-low px-4 pt-4 pb-6">
         <div className="flex items-center gap-2 mb-3">
-          <span className="w-2 h-2 rounded-full bg-on-surface-variant/40 inline-block" />
-          <span className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
+          <span className="w-2 h-2 rounded-full bg-secondary inline-block" />
+          <span className="font-label text-xs tracking-widest uppercase text-secondary">
             RECON / BRAINSTORM
           </span>
         </div>
@@ -237,7 +237,7 @@ export default function CareerRecon() {
       <main className="max-w-3xl mx-auto px-4 py-8 md:py-12">
         <div className="bg-surface-container-high rounded-2xl border border-outline/40 shadow-lg p-6 md:p-8">
           <div className="mb-8 pb-6 border-b border-outline/20">
-            <h2 className="font-headline text-xl text-on-surface mb-2">
+            <h2 className="font-headline text-xl uppercase text-on-surface mb-2">
               Find Your Civilian Mission
             </h2>
             <p className="font-body text-sm text-on-surface-variant">

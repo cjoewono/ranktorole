@@ -177,6 +177,7 @@ warning about an ungrounded numeric claim or scope-inflation verb.
 - `assistant_reply`: brief conversational confirmation from Claude
 - `clarifying_question`: always empty string on chat turns (field kept in schema for consistent frontend rendering)
 - History is loaded from DB on every call — the backend is the source of truth. **Any `history` key in the request body is ignored.**
+- Chat remains available after finalize. Users can continue refining via chat post-finalize; subsequent finalize calls overwrite the previous final state.
 
 **Error Responses**
 
@@ -184,7 +185,6 @@ warning about an ungrounded numeric claim or scope-inflation verb.
 - 401 → missing or expired JWT
 - 403 → free-tier per-resume chat limit hit (`CHAT_LIMIT_REACHED` code)
 - 404 → resume not found or not owned by user
-- 409 → resume is already finalized (`is_finalized=True`)
 - 422 → Claude API returned unparseable response
 - 429 → throttle exceeded (`user_chat` scope)
 - 503 → Claude API unavailable
@@ -247,15 +247,14 @@ Content-Type: application/json
 
 - All fields optional — any provided field overwrites current Resume value
 - Sets `is_finalized = True`
-- Once finalized, POST `/chat/` returns 409
-- Finalization is not reversible via API (admin only)
+- Chat (`POST /chat/`) remains available after finalization for continued refinement
+- Finalization is not reversible via API (admin only); subsequent finalize calls overwrite previous final state
 
 **Error Responses**
 
 - 400 → payload violates validation rules
 - 401 → missing or expired JWT
 - 404 → resume not found or not owned by user
-- 409 → already finalized
 - 429 → throttle exceeded (`user_finalize` scope)
 
 ---
@@ -624,7 +623,7 @@ No PAN, no CVV, no payment methods — ever.
 - `chat_history`: stored in DB — backend loads and appends to it on every chat turn
 - `chat_turn_count`: stored (integer counter; drives per-resume chat quota)
 - `ai_initial_draft`: stored (snapshot of the first draft, used for redline diff in FINALIZING)
-- `is_finalized`: stored (boolean; once true, chat endpoint returns 409)
+- `is_finalized`: stored (boolean; marks the resume as having been formally finalized at least once. Does not lock the chat endpoint — users may continue refining after finalize)
 - Raw Claude API response: never stored
 - Raw PDF bytes: never stored — extracted text only
 - Failed translation attempts: not stored

@@ -1403,5 +1403,42 @@ via manual smoke test. Backend test count unchanged at 241.
 
 ---
 
+## April 21, 2026 (early morning) | Option D: user responsibility banner
+
+**Status:** ✅ Shipped. Commit `4772608`.
+
+Closes the honesty stack loop. Layers 1–3 (prompt guardrails, deterministic
+validator, flag-gated verify checkboxes) catch fabricated metrics, scope
+inflation, unearned credentials, and P&L-class claims. Semantic stretches
+that don't match blocklists (e.g., 'technical advisory' when source said
+'red-team') remain uncaught by code. The banner makes explicit that the
+user owns the final resume.
+
+Single JSX block in `FinalizingEditor.jsx` between the "Edit & Finalize"
+h2 and the Mission Headline input. Non-dismissable. Uses existing design
+tokens — amber FINAL REVIEW label mirrors the summary Grounding Check
+pattern. No state, no props, no callbacks.
+
+Test count unchanged at 241 (no backend touched, frontend has no test
+framework). Frontend build clean.
+
+## April 21, 2026 (early morning) | is_finalized contract resolved
+
+**Status:** ✅ Resolved. Docs-only.
+
+DATA_CONTRACT.md said `POST /chat/` returns 409 when `is_finalized=True`.
+Code returned 200. Active test asserted 200. Three things disagreed.
+
+Decision (Cal): chat stays open after finalize so users can continue
+refining via chat. Code already matches this behavior. DATA_CONTRACT.md
+updated in four locations to reflect the actual contract: chat endpoint
+error responses (409 removed), chat behavior section (note added that
+chat remains available post-finalize), finalize endpoint behavior (note
+added that subsequent finalize calls overwrite previous final state),
+data storage section (`is_finalized` description clarified — boolean
+marker, does not lock chat).
+
+No code changes. No test changes. Test count unchanged at 241.
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 21, 2026 — Bugfix: CHAT_UPDATED reducer flags propagation, 241 tests passing
+Last updated: April 21, 2026 — Option D banner shipped, is_finalized contract resolved, 241 tests passing

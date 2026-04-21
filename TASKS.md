@@ -367,14 +367,28 @@ None.
 - [x] Verified in browser: Navy 1110 profile now correctly references Surface Warfare Officer
 - [x] Test count: 173 → 183 passing (10 new tests across 3 commits)
 
+## Completed — April 20–21, 2026 (Launch-Prep Sprint)
+
+- [x] Bugfix: + NEW RESUME on Dashboard now opens fresh upload form (RESET path in useResumeMachine, navigate ?new=1)
+- [x] Tailoring v1: TAILORING RULES added to \_SYSTEM_PROMPT, two-stage CoT (silent JD analysis → tailored rewrite), clarifying_question repurposed as ATS FIT ASSESSMENT + targeted question
+- [x] Tailoring v2: REWRITE promoted to primary task, PRESERVATION as constraint. Per-role identity (P3): identity markers (PSYOP, Ukraine, COR) appear at least once per role. R3 split into word-swap / reframe / fabricate cases. Three demonstrated transformations embedded in prompt.
+- [x] Throttle rebalance for launch: Pro draft 5→15/day, chat 20→75/day, upload/finalize 5→20/day. Free tier unchanged (1/day draft drives conversion). Global 500/day ceiling unchanged.
+- [x] 429 UX: custom DRF exception handler emits structured `{code: "DAILY_LIMIT_REACHED", detail, retry_after_seconds}`. UpgradeModal gained `variant="wait"` for pro-tier daily caps. apiFetch generic 429 fallback replaces DRF's "Expected available in X seconds" message.
+- [x] Tailoring v2.1: R3(a)/R3(b) extended with explicit noun-phrase mirroring. R3(c) expanded with implied-responsibility guardrail (P&L canonical example). Example 4 added with "What stayed limited" commentary.
+- [x] Tailoring v2.2: HARD LIMITS block (H1-H4) promoted to standalone section before PRESERVATION RULES. H1: P&L phrases. H2: aggregate totals. H3: unearned credentials. H4: ATS Strong matches must be grounded.
+- [x] Option A — unearned-claim validator: `flag_unearned_claims` added to `grounding.py` covering P&L phrases (always flagged), unearned skills (source-check), unearned credentials (source-check), dollar aggregates (source-check). Wired into `flag_bullet`; `flag_summary` picks it up transitively. Zero frontend or API shape changes. +18 tests, 223 → 241.
+- [x] Bugfix: CHAT_UPDATED reducer dropped `bullet_flags`/`summary_flags` from chat-path responses. 2-line `??` pattern fix (matches AI_SUGGESTIONS_RECEIVED).
+- [x] ResumeChatView is_finalized contract resolved: chat stays open post-finalize (decision: enable continued refinement via chat). Code already correct, DATA_CONTRACT.md updated.
+- [x] Option D — user responsibility banner in FinalizingEditor.jsx between Edit & Finalize header and Mission Headline input. Closes the honesty stack loop with explicit user ownership framing.
+
 ## Start Next Session With
 
 Remaining deploy blockers for April 24 launch (priority order):
 
-1. ResumeChatView is_finalized contract (DATA_CONTRACT says 409, code returns 200, test asserts 200)
-2. Throttle UX audit (review prod DEFAULT_THROTTLE_RATES; add global 429 handler in apiFetch — DRF default message is user-hostile)
-3. Secret rotation before EC2 (Anthropic API key, Google OAuth client secret, O\*NET API key, Django SECRET_KEY)
-4. EC2 manual deploy steps:
+1. **Navy officer designator gap.** Codes 1110, 1120, etc. return zero from O\*NET `/veterans/military/` endpoint. Ship local lookup table of ~30 codes following the same pattern as `_resolve_mos_title()`. Affects real users (Navy officers).
+2. **Design change** (TBD — Cal will bring spec to next session)
+3. **Secret rotation before EC2** (Anthropic API key, Google OAuth client secret, O\*NET API key, Django SECRET_KEY — all potentially exposed via earlier `docker compose config` terminal output)
+4. **EC2 manual deploy (Wednesday)**:
    - DNS A records → cjoewono.com
    - Security group (80/443 only)
    - Docker + Certbot install
@@ -383,11 +397,13 @@ Remaining deploy blockers for April 24 launch (priority order):
    - Gunicorn override
    - Google OAuth redirect URI for https://cjoewono.com
    - Auto-renewal cron
-5. Navy officer designator gap (decision pending: ship local lookup table of ~30 codes vs. defer)
+
+Launch + video recording: Thursday April 24.
 
 Post-launch backlog (not blocking April 24):
 
 - Wrap `invalidate_*_cache()` calls in try/except to degrade gracefully on Redis outage (Session 15 tradeoff documented)
+- Per-tier custom 429 copy (current generic apiFetch fallback works, just not pretty)
 - Qualitative-aggregate refinement (prompt tweak for "multi-million dollar programs" claims)
-- LLM-as-judge semantic fidelity pass for scope inflation beyond regex
+- LLM-as-judge semantic fidelity pass for stretches beyond regex capability (e.g. "technical advisory" when source said "red-team") — Option D banner explicitly acknowledges this gap to users
 - Extend `grounding.py` validator to scan `civilian_title` field

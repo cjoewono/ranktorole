@@ -46,6 +46,14 @@ Required secrets: `SECRET_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE
 - Upload/Draft/Chat/Finalize/Recon brainstorm: tiered (free/pro) via `TieredThrottle` subclasses
 - Billing checkout/portal: 5/min (`CheckoutThrottle`, anti card-testing)
 
+`tiered_throttle_exception_handler` in `translate_app/throttles.py` rewrites the
+429 response body to `{code: "DAILY_LIMIT_REACHED", retry_after_seconds: …}` **only**
+for tiered user-daily scopes (`user_upload`, `user_draft`, `user_chat`,
+`user_finalize`, `user_onet`, `user_recon_brainstorm`). All other throttles —
+`AnonRateThrottle`, `LoginRateThrottle`, `RegisterThrottle`, `CheckoutThrottle` —
+fall through to DRF's default 429 message so unauthenticated users never see
+tier-cap language during normal browsing or auth flows.
+
 ## Tier Enforcement (DRF Permissions)
 
 Two permission classes in `user_app/permissions.py` gate free-tier usage in

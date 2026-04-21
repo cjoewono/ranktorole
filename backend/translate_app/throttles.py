@@ -99,22 +99,55 @@ class ReconEnrichThrottle(TieredThrottle):
 from rest_framework.views import exception_handler
 from rest_framework.exceptions import Throttled
 
+# Scopes that represent per-user daily tier caps. Only 429s from these
+# throttles get the structured DAILY_LIMIT_REACHED payload. All other
+# throttle scopes (anon, login, register, billing_checkout) fall through
+# to DRF's default "Request was throttled" message.
+_DAILY_TIER_SCOPES = frozenset({
+    'user_upload',
+    'user_draft',
+    'user_chat',
+    'user_finalize',
+    'user_onet',
+    'user_recon_brainstorm',
+})
+
+
+def _fired_tiered_scope(view):
+    """Return the scope of the tiered throttle declared on this view, or None."""
+    if view is None:
+        return None
+    try:
+        for cls in (getattr(view, 'throttle_classes', None) or []):
+            scope = getattr(cls, 'scope', None)
+            if scope in _DAILY_TIER_SCOPES:
+                return scope
+    except Exception:
+        return None
+    return None
+
 
 def tiered_throttle_exception_handler(exc, context):
     """
-    Replaces DRF's default 429 payload with a structured body so the
-    frontend can route to a tier-aware daily-limit modal.
+    Replaces DRF's default 429 payload ONLY for tiered user-daily throttle scopes.
 
-    Falls back to DRF's default handler for all other exceptions.
+    Anti-enumeration throttles (anon, login, register) and infrastructure
+    throttles (billing_checkout) pass through to DRF's default handler so
+    unauthenticated visitors never see tier-cap language.
     """
     response = exception_handler(exc, context)
 
-    if isinstance(exc, Throttled) and response is not None:
-        wait_seconds = int(exc.wait) if exc.wait is not None else None
-        response.data = {
-            'code': 'DAILY_LIMIT_REACHED',
-            'detail': str(exc.detail) if hasattr(exc, 'detail') else 'Daily limit reached.',
-            'retry_after_seconds': wait_seconds,
-        }
+    if not isinstance(exc, Throttled) or response is None:
+        return response
 
+    view = context.get('view') if context else None
+    if _fired_tiered_scope(view) is None:
+        return response
+
+    wait_seconds = int(exc.wait) if exc.wait is not None else None
+    response.data = {
+        'code': 'DAILY_LIMIT_REACHED',
+        'detail': str(exc.detail) if hasattr(exc, 'detail') else 'Daily limit reached.',
+        'retry_after_seconds': wait_seconds,
+    }
     return response

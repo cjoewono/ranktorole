@@ -533,6 +533,33 @@ class TestThrottleResponseShape:
 
 
 # ---------------------------------------------------------------------------
+# throttles.py — handler scoping (DAILY_LIMIT_REACHED only for tiered caps)
+# ---------------------------------------------------------------------------
+
+class TestThrottleHandlerScoping:
+    """DAILY_LIMIT_REACHED code must only fire for tiered user-daily scopes.
+    Anti-enumeration throttles (anon, login, register) fall through to DRF's
+    default 429 so unauthenticated visitors never see tier-cap language.
+    """
+
+    def test_anon_throttle_does_not_emit_daily_limit_code(self):
+        """Handler must NOT stamp DAILY_LIMIT_REACHED when the view only
+        declares a non-tiered throttle (AnonRateThrottle, scope='anon')."""
+        from rest_framework.throttling import AnonRateThrottle
+        from rest_framework.exceptions import Throttled
+        from translate_app.throttles import tiered_throttle_exception_handler
+
+        view = MagicMock()
+        view.throttle_classes = [AnonRateThrottle]
+
+        exc = Throttled(wait=720)
+        response = tiered_throttle_exception_handler(exc, {'view': view})
+
+        assert response is not None
+        assert response.data.get('code') != 'DAILY_LIMIT_REACHED'
+
+
+# ---------------------------------------------------------------------------
 # views.py — POST /api/v1/resumes/{id}/chat/
 # ---------------------------------------------------------------------------
 

@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'user_app',
     'contact_app',
     'onet_app',
+    'recon_app',
 ]
 
 MIDDLEWARE = [
@@ -150,7 +151,7 @@ REST_FRAMEWORK = {
         'user_upload': '3/day',
         'user_finalize': '3/day',
         'user_onet': '10/day',
-        'user_recon_enrich': '15/day',
+        'user_recon_brainstorm': '15/day',
         'billing_checkout': '5/min',
     },
 }
@@ -203,7 +204,7 @@ TIERED_THROTTLE_RATES = {
     'user_chat':         {'free': '10/day', 'pro': '75/day'},
     'user_finalize':     {'free': '3/day',  'pro': '20/day'},
     'user_onet':         {'free': '10/day', 'pro': '30/day'},
-    'user_recon_enrich': {'free': '15/day', 'pro': '25/day'},
+    'user_recon_brainstorm': {'free': '15/day', 'pro': '25/day'},
 }
 
 # ---------------------------------------------------------------------------

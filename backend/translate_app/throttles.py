@@ -93,7 +93,7 @@ class OnetThrottle(TieredThrottle):
 
 
 class ReconEnrichThrottle(TieredThrottle):
-    scope = 'user_recon_enrich'
+    scope = 'user_recon_brainstorm'
 
 
 from rest_framework.views import exception_handler

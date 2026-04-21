@@ -1382,5 +1382,26 @@ the final product.
 
 ---
 
+## April 21, 2026 (early morning) | Bugfix: CHAT_UPDATED reducer dropped flags
+
+**Status:** ✅ Shipped.
+
+During Option A smoke testing, observed the draft-path
+(`handleGenerateDraft` → `DRAFT_RECEIVED`) correctly propagates
+`bullet_flags` / `summary_flags` from backend response into state.
+The chat-path (`handleChatSend` → `CHAT_UPDATED`) did not — the
+dispatcher sent the flags in the action payload but the reducer
+ignored them. Flags from the initial draft persisted stale through
+any chat refinement turn.
+
+Fix: 2-line addition to `CHAT_UPDATED` using the `??` pattern already
+established in `AI_SUGGESTIONS_RECEIVED`. Flags now flow through
+every chat turn correctly.
+
+No tests changed — frontend still has no test framework. Verified
+via manual smoke test. Backend test count unchanged at 241.
+
+---
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 20, 2026 — Option A: grounding.py unearned-claim validator, 241 tests passing
+Last updated: April 21, 2026 — Bugfix: CHAT_UPDATED reducer flags propagation, 241 tests passing

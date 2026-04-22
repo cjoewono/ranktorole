@@ -68,6 +68,7 @@ class RegisterView(APIView):
     def post(self, request: 'Request') -> Response:
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
+            logger.warning("Register validation failed: %s", serializer.errors)
             return Response(
                 {"error": "Registration failed."},
                 status=status.HTTP_400_BAD_REQUEST,

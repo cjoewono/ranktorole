@@ -140,6 +140,16 @@
 
 ---
 
+## 9. Utility Classes
+
+Shared CSS utilities defined in `frontend/src/index.css` via `@layer components`.
+
+| Class             | Expands to                                     | Usage                                            |
+| ----------------- | ---------------------------------------------- | ------------------------------------------------ |
+| `.label-tactical` | `font-label text-xs tracking-widest uppercase` | Form labels, section labels, small caps headings |
+
+---
+
 ## 8. Stitch Prompt Template
 
 Use this block as the opening of any new screen prompt passed to Stitch:

@@ -9,6 +9,12 @@
   }
 }
 
+@layer components {
+  .label-tactical {
+    @apply font-label text-xs tracking-widest uppercase;
+  }
+}
+
 @layer utilities {
   .tactical-grid {
     background-image: radial-gradient(circle, #434749 1px, transparent 1px);

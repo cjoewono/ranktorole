@@ -2,6 +2,14 @@ RankToRole — Project Log
 
 ---
 
+## April 22, 2026 | CSS Utility — `.label-tactical`
+
+**Status:** ✅ Complete
+
+Added `.label-tactical` utility class to `frontend/src/index.css` under `@layer components`. Expands to `font-label text-xs tracking-widest uppercase`. Class only — no consumer migration in this commit. 136 existing occurrences across 20 files will adopt it opportunistically during natural component edits.
+
+---
+
 ## April 21, 2026 | Stripe Frontend + Backend Hardening + Webhook E2E Verification
 
 **Status:** ✅ Complete

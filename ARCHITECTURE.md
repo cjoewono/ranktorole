@@ -18,6 +18,8 @@
 
 All successful auth endpoints (register, login, Google OAuth) return the same payload via `_build_auth_response()` in `user_app/views.py`:
 
+`username` is a backend identifier only — it is auto-derived from the email's local-part at registration (`_derive_unique_username` in `user_app/serializers.py`), never collected from the user, and never displayed in the UI. The user-facing callsign is collected via `profile_context` during ForgeSetup.
+
 ```json
 { "user": <UserSerializer>, "access": "<JWT access token>" }
 ```

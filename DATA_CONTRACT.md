@@ -322,6 +322,27 @@ GET  /api/v1/auth/google/
 POST /api/v1/auth/google/callback/
 ```
 
+### POST /api/v1/auth/register/
+
+**Request body** (required fields only — `username` is NOT accepted):
+
+```json
+{ "email": "string", "password": "string (min 8 chars)" }
+```
+
+Username is derived server-side from the email's local-part. Collisions are
+resolved by appending a numeric suffix (e.g., `jdoe-2`). The client never
+sends `username` on register. The derived `username` is returned in the
+response `user` object as a backend identifier; it is not displayed in the UI.
+
+**Response 201**
+
+```json
+{ "user": { "id": "uuid", "email": "...", "username": "...", ... }, "access": "JWT" }
+```
+
+Refresh token is set as an `HttpOnly` cookie.
+
 Both login and register return **normalized** error messages to prevent user
 enumeration:
 

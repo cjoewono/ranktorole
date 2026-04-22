@@ -2,6 +2,22 @@ RankToRole — Project Log
 
 ---
 
+## April 22, 2026 | Removed Callsign field from Register form; auto-derive username server-side
+
+**Status:** ✅ Complete
+
+Removed the Callsign input field from `Register.jsx`. Username is now derived server-side in `RegisterSerializer` from the email's local-part via `_derive_unique_username()`. Collisions are resolved by appending a numeric suffix (`jdoe-2`, `jdoe-3`, …). The user-facing callsign concept lives only in `profile_context`, collected during ForgeSetup — no more duplicated concept at registration. `UserSerializer` still exposes `username` in auth responses (backend identifier only, never displayed in UI). Frontend: removed `username` state, Callsign `<div>`, and `username` from `registerRequest`. Backend: reduced `RegisterSerializer.fields` to `['email', 'password']`. Updated 7 existing register tests to drop username from request bodies. Added 1 collision test. Test count: 233 → 234.
+
+---
+
+## April 22, 2026 | Register auto-login via loginWithToken
+
+**Status:** ✅ Complete
+
+`Register.jsx` now calls `loginWithToken(data.access, data.user)` immediately after a successful 201 from `registerRequest`, then routes to `/profile` (ForgeSetup) for new users or `/dashboard` if `profile_context` is already populated. Eliminates the register → /login → re-authenticate → /profile detour. Reuses existing `AuthContext.loginWithToken` infrastructure — the same helper already used by the Google OAuth callback. No backend changes; `registerRequest` already returned the `{ user, access }` shape via `apiFetch`. Test count unchanged at 233.
+
+---
+
 ## April 22, 2026 | \_build_auth_response helper extraction
 
 **Status:** ✅ Complete

@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { registerRequest } from "../api/auth";
+import { useAuth } from "../context/AuthContext";
 import TacticalLabel from "../components/forms/TacticalLabel";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { loginWithToken } = useAuth();
   const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -16,12 +17,12 @@ export default function Register() {
     setError(null);
     setLoading(true);
     try {
-      await registerRequest(email, username, password);
+      const data = await registerRequest(email, password);
       // Clear fields before navigating so Chrome password manager can't capture them
       setEmail("");
-      setUsername("");
       setPassword("");
-      navigate("/login");
+      loginWithToken(data.access, data.user);
+      navigate(data.user?.profile_context ? "/dashboard" : "/profile");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -91,20 +92,6 @@ export default function Register() {
                 placeholder="C-ALPHA@VANGUARD.SYS"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="tactical-input"
-              />
-            </div>
-
-            {/* Username / Callsign */}
-            <div>
-              <TacticalLabel>Callsign</TacticalLabel>
-              <input
-                type="text"
-                required
-                autoComplete="username"
-                placeholder="VANGUARD-ALPHA"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
                 className="tactical-input"
               />
             </div>

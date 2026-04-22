@@ -40,7 +40,6 @@ class TestRegister:
     def test_register_valid(self, client, db):
         resp = client.post(REGISTER_URL, {
             'email': 'new@example.com',
-            'username': 'newuser',
             'password': 'strongpassword123',
         })
         assert resp.status_code == 201
@@ -50,7 +49,6 @@ class TestRegister:
     def test_register_response_excludes_password(self, client, db):
         resp = client.post(REGISTER_URL, {
             'email': 'new@example.com',
-            'username': 'newuser',
             'password': 'strongpassword123',
         })
         assert 'password' not in resp.data
@@ -59,26 +57,41 @@ class TestRegister:
     def test_register_duplicate_email(self, client, user):
         resp = client.post(REGISTER_URL, {
             'email': 'test@example.com',
-            'username': 'other',
             'password': 'strongpassword123',
         })
         assert resp.status_code == 400
 
     def test_register_missing_password(self, client, db):
-        resp = client.post(REGISTER_URL, {'email': 'only@example.com', 'username': 'only'})
+        resp = client.post(REGISTER_URL, {'email': 'only@example.com'})
         assert resp.status_code == 400
 
     def test_register_missing_email(self, client, db):
-        resp = client.post(REGISTER_URL, {'username': 'only', 'password': 'strongpassword123'})
+        resp = client.post(REGISTER_URL, {'password': 'strongpassword123'})
         assert resp.status_code == 400
 
     def test_register_invalid_email_format(self, client, db):
         resp = client.post(REGISTER_URL, {
             'email': 'not-an-email',
-            'username': 'baduser',
             'password': 'strongpassword123',
         })
         assert resp.status_code == 400
+
+
+def test_register_handles_username_collision(db, client):
+    """When two users share the same email local-part, the second gets a numeric suffix."""
+    resp1 = client.post(REGISTER_URL, {
+        'email': 'collide@first.com',
+        'password': 'testpass123',
+    })
+    assert resp1.status_code == 201
+    assert resp1.json()['user']['username'] == 'collide'
+
+    resp2 = client.post(REGISTER_URL, {
+        'email': 'collide@second.com',
+        'password': 'testpass123',
+    })
+    assert resp2.status_code == 201
+    assert resp2.json()['user']['username'] == 'collide-2'
 
 
 class TestLogin:
@@ -258,7 +271,6 @@ class TestRegisterThrottle:
         monkeypatch.setattr(RegisterThrottle, "wait", lambda self: None)
         resp = client.post(REGISTER_URL, {
             'email': 'throttled@example.com',
-            'username': 'throttleduser',
             'password': 'strongpassword123',
         })
         assert resp.status_code == 429

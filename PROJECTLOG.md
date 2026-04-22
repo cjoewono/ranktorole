@@ -2,6 +2,14 @@ RankToRole — Project Log
 
 ---
 
+## April 22, 2026 | \_build_auth_response helper extraction
+
+**Status:** ✅ Complete
+
+Extracted `_build_auth_response()` helper in `user_app/views.py`. Deduped 3 auth response sites (RegisterView 201, LoginView 200, GoogleCallbackView 200). `RefreshToken` construction, `UserSerializer` call, and `_set_refresh_cookie` now live in one place — adding a field to the auth response is a single-file change. Test count unchanged at 233.
+
+---
+
 ## April 22, 2026 | formatDate utility extraction
 
 **Status:** ✅ Complete

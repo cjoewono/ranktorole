@@ -14,6 +14,16 @@
 - `services.py` handles all external API and LLM calls
 - Views only handle request/response, nothing else
 
+## Auth Response Shape
+
+All successful auth endpoints (register, login, Google OAuth) return the same payload via `_build_auth_response()` in `user_app/views.py`:
+
+```json
+{ "user": <UserSerializer>, "access": "<JWT access token>" }
+```
+
+The refresh token is set as an `HttpOnly` cookie by `_set_refresh_cookie()`. To add a field to every auth response (e.g. `subscription_status`), edit `_build_auth_response` only.
+
 ## Product Flow Architecture
 
 ### Phase 1 — PDF Ingestion

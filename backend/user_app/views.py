@@ -42,6 +42,25 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     )
 
 
+def _build_auth_response(user, status_code: int = status.HTTP_200_OK) -> Response:
+    """Build the standard auth response: user payload + access token + refresh cookie.
+
+    Used by RegisterView (201), LoginView (200), and the Google OAuth completion
+    views (200). Centralizes the auth response shape so adding a field (e.g.,
+    subscription_status) is a one-place change.
+    """
+    refresh = RefreshToken.for_user(user)
+    response = Response(
+        {
+            'user': UserSerializer(user).data,
+            'access': str(refresh.access_token),
+        },
+        status=status_code,
+    )
+    _set_refresh_cookie(response, str(refresh))
+    return response
+
+
 class RegisterView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [RegisterThrottle]
@@ -54,16 +73,7 @@ class RegisterView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         user = serializer.save()
-        refresh = RefreshToken.for_user(user)
-        response = Response(
-            {
-                'user': UserSerializer(user).data,
-                'access': str(refresh.access_token),
-            },
-            status=status.HTTP_201_CREATED,
-        )
-        _set_refresh_cookie(response, str(refresh))
-        return response
+        return _build_auth_response(user, status.HTTP_201_CREATED)
 
 
 class LoginView(APIView):
@@ -79,15 +89,7 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         user = serializer.validated_data['user']
-        refresh = RefreshToken.for_user(user)
-        response = Response(
-            {
-                'user': UserSerializer(user).data,
-                'access': str(refresh.access_token),
-            }
-        )
-        _set_refresh_cookie(response, str(refresh))
-        return response
+        return _build_auth_response(user)
 
 
 class TokenRefreshView(APIView):
@@ -209,16 +211,7 @@ class GoogleCallbackView(APIView):
             )
 
         user = _get_or_create_google_user(email, userinfo)
-        refresh = RefreshToken.for_user(user)
-        response = Response(
-            {
-                'user': UserSerializer(user).data,
-                'access': str(refresh.access_token),
-            },
-            status=status.HTTP_200_OK,
-        )
-        _set_refresh_cookie(response, str(refresh))
-        return response
+        return _build_auth_response(user)
 
 
 class ProfileView(APIView):

@@ -4,14 +4,7 @@ import PageHeader from "../components/PageHeader";
 import { deleteResume, reopenResume } from "../api/resumes";
 import { useResumes } from "../context/ResumeContext";
 import { exportPDF } from "../utils/pdfExport";
-
-function formatDate(isoString) {
-  return new Date(isoString).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+import { formatDate } from "../utils/formatDate";
 
 function StatusBadge({ resume }) {
   if (resume.is_finalized) {

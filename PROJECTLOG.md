@@ -2,6 +2,14 @@ RankToRole — Project Log
 
 ---
 
+## April 22, 2026 | formatDate utility extraction
+
+**Status:** ✅ Complete
+
+Extracted `formatDate` to `frontend/src/utils/formatDate.js`. Deduped Dashboard + Contacts. Uppercase variant exposed via opts (`{ uppercase: true }`). Dashboard call sites unchanged; Contacts call sites updated to pass `{ uppercase: true }`.
+
+---
+
 ## April 22, 2026 | CSS Utility — `.label-tactical`
 
 **Status:** ✅ Complete

@@ -6,6 +6,7 @@ import {
   updateContact,
   deleteContact,
 } from "../api/contacts";
+import { formatDate } from "../utils/formatDate";
 
 const EMPTY_FORM = { name: "", email: "", company: "", role: "", notes: "" };
 
@@ -30,17 +31,6 @@ function hashName(name) {
     hash = (hash * 31 + name.charCodeAt(i)) % AVATAR_COLORS.length;
   }
   return Math.abs(hash);
-}
-
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  return d
-    .toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-    .toUpperCase();
 }
 
 export default function Contacts() {
@@ -366,7 +356,7 @@ export default function Contacts() {
                   {/* Footer: date + actions */}
                   <div className="flex items-center justify-between mt-auto pt-1">
                     <span className="font-label text-xs tracking-widest uppercase text-outline">
-                      {formatDate(c.created_at)}
+                      {formatDate(c.created_at, { uppercase: true })}
                     </span>
                     <div
                       className="flex gap-4"

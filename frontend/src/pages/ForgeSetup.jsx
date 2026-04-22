@@ -5,6 +5,8 @@ import { apiFetch } from "../api/client";
 import PageHeader from "../components/PageHeader";
 import { createPortalSession } from "../api/billing";
 import UpgradeModal from "../components/UpgradeModal";
+import TacticalLabel from "../components/forms/TacticalLabel";
+import TacticalSelect from "../components/forms/TacticalSelect";
 
 const BRANCHES = [
   "Army",
@@ -36,27 +38,6 @@ async function fetchOnetSkills(keyword) {
   } catch {
     return [];
   }
-}
-
-function FieldLabel({ children }) {
-  return (
-    <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-      {children}
-    </label>
-  );
-}
-
-function TacticalSelect({ value, onChange, required, children }) {
-  return (
-    <select
-      required={required}
-      value={value}
-      onChange={onChange}
-      className="tactical-input appearance-none cursor-pointer"
-    >
-      {children}
-    </select>
-  );
 }
 
 export default function ForgeSetup() {
@@ -241,9 +222,9 @@ export default function ForgeSetup() {
             </div>
             <div className="space-y-5">
               <div>
-                <FieldLabel>
+                <TacticalLabel>
                   Military Branch <span className="text-error">*</span>
-                </FieldLabel>
+                </TacticalLabel>
                 <TacticalSelect
                   required
                   value={branch}
@@ -262,7 +243,7 @@ export default function ForgeSetup() {
               </div>
 
               <div className="border-t border-outline-variant/10 pt-5">
-                <FieldLabel>MOS / Rating / AFSC</FieldLabel>
+                <TacticalLabel>MOS / Rating / AFSC</TacticalLabel>
                 <input
                   type="text"
                   value={mos}
@@ -288,9 +269,9 @@ export default function ForgeSetup() {
             </div>
             <div className="space-y-5">
               <div>
-                <FieldLabel>
+                <TacticalLabel>
                   Target Civilian Sector <span className="text-error">*</span>
-                </FieldLabel>
+                </TacticalLabel>
                 <TacticalSelect
                   required
                   value={targetSector}
@@ -311,7 +292,7 @@ export default function ForgeSetup() {
 
               <div className="border-t border-outline-variant/10 pt-5 space-y-4">
                 <div className="flex items-center justify-between">
-                  <FieldLabel>Transferable Skills</FieldLabel>
+                  <TacticalLabel>Transferable Skills</TacticalLabel>
                   {selectedSkills.length > 0 && (
                     <span className="font-label text-xs tracking-widest uppercase text-primary">
                       {selectedSkills.length} selected
@@ -497,9 +478,7 @@ export default function ForgeSetup() {
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                    Email
-                  </label>
+                  <TacticalLabel>Email</TacticalLabel>
                   <p className="tactical-input opacity-60 cursor-not-allowed">
                     {user?.email}
                   </p>
@@ -509,9 +488,7 @@ export default function ForgeSetup() {
                 </div>
 
                 <div className="border-t border-outline-variant/10 pt-4">
-                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                    Account Tier
-                  </label>
+                  <TacticalLabel>Account Tier</TacticalLabel>
                   <p className="tactical-input opacity-60 cursor-not-allowed uppercase">
                     {user?.tier || "free"}
                   </p>
@@ -541,9 +518,7 @@ export default function ForgeSetup() {
 
               <form onSubmit={handlePasswordChange} className="space-y-5">
                 <div>
-                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                    Current Password
-                  </label>
+                  <TacticalLabel>Current Password</TacticalLabel>
                   <input
                     type="password"
                     value={currentPassword}
@@ -553,9 +528,7 @@ export default function ForgeSetup() {
                   />
                 </div>
                 <div className="border-t border-outline-variant/10 pt-5">
-                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                    New Password
-                  </label>
+                  <TacticalLabel>New Password</TacticalLabel>
                   <input
                     type="password"
                     value={newPassword}
@@ -566,9 +539,7 @@ export default function ForgeSetup() {
                   />
                 </div>
                 <div className="border-t border-outline-variant/10 pt-5">
-                  <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                    Confirm New Password
-                  </label>
+                  <TacticalLabel>Confirm New Password</TacticalLabel>
                   <input
                     type="password"
                     value={confirmPassword}

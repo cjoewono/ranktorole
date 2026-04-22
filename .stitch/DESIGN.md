@@ -148,6 +148,19 @@ Shared CSS utilities defined in `frontend/src/index.css` via `@layer components`
 | ----------------- | ---------------------------------------------- | ------------------------------------------------ |
 | `.label-tactical` | `font-label text-xs tracking-widest uppercase` | Form labels, section labels, small caps headings |
 
+### Form components
+
+Canonical form primitives live in `frontend/src/components/forms/`:
+
+| Component        | File                 | Props                                                     | Usage                                                                   |
+| ---------------- | -------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `TacticalLabel`  | `TacticalLabel.jsx`  | `children`, `htmlFor`                                     | Wrap label text; pass `htmlFor` to link to input `id` for accessibility |
+| `TacticalSelect` | `TacticalSelect.jsx` | `value`, `onChange`, `required`, `id`, `name`, `children` | Styled `<select>` with `tactical-input` + `appearance-none`             |
+
+`TacticalLabel` and `TacticalSelect` are the **canonical primitives** for form labels and selects. Use these in all new form work.
+
+**Migration status (as of April 22, 2026):** ForgeSetup, Login, and Register are fully migrated. Contacts and CareerRecon are **not yet migrated** — their form layouts diverge (avatar logic, branch dropdown) and are deferred post-launch.
+
 ---
 
 ## 8. Stitch Prompt Template

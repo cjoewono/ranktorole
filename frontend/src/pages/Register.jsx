@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { registerRequest } from "../api/auth";
+import TacticalLabel from "../components/forms/TacticalLabel";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -82,9 +83,7 @@ export default function Register() {
           >
             {/* Email */}
             <div>
-              <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                Email
-              </label>
+              <TacticalLabel>Email</TacticalLabel>
               <input
                 type="email"
                 required
@@ -98,9 +97,7 @@ export default function Register() {
 
             {/* Username / Callsign */}
             <div>
-              <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                Callsign
-              </label>
+              <TacticalLabel>Callsign</TacticalLabel>
               <input
                 type="text"
                 required
@@ -114,9 +111,7 @@ export default function Register() {
 
             {/* Password */}
             <div>
-              <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                Security Key
-              </label>
+              <TacticalLabel>Security Key</TacticalLabel>
               <input
                 type="password"
                 required

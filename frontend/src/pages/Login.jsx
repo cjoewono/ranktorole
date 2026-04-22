@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import TacticalLabel from "../components/forms/TacticalLabel";
 
 export default function Login() {
   const { login } = useAuth();
@@ -73,9 +74,7 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email */}
             <div className="relative">
-              <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                Email
-              </label>
+              <TacticalLabel>Email</TacticalLabel>
               <input
                 type="email"
                 required
@@ -89,9 +88,7 @@ export default function Login() {
 
             {/* Password */}
             <div className="relative">
-              <label className="block font-label text-xs tracking-widest uppercase text-on-surface-variant mb-1">
-                Password
-              </label>
+              <TacticalLabel>Password</TacticalLabel>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}

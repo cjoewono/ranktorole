@@ -18,6 +18,14 @@ Extracted `formatDate` to `frontend/src/utils/formatDate.js`. Deduped Dashboard 
 
 ---
 
+## April 22, 2026 | TacticalLabel + TacticalSelect hoisted to components/forms/
+
+**Status:** ✅ Complete
+
+Hoisted `TacticalLabel` (formerly `FieldLabel`) and `TacticalSelect` from `ForgeSetup.jsx` to `frontend/src/components/forms/`. Both files export named + default. `TacticalLabel` accepts optional `htmlFor` for accessibility linkage; `TacticalSelect` accepts optional `id` and `name` for the same reason. Migrated ForgeSetup (9 labels + 2 selects), Login (2 labels), and Register (3 labels). Contacts and CareerRecon migration deferred post-launch — their form layouts diverge (avatar logic, branch dropdown). Test count unchanged at 233.
+
+---
+
 ## April 22, 2026 | CSS Utility — `.label-tactical`
 
 **Status:** ✅ Complete

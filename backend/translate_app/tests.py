@@ -645,8 +645,13 @@ class TestResumeChatView:
         assert response.status_code == 400
 
     @patch("translate_app.views.call_claude_chat")
-    def test_finalized_resume_chat_returns_409(self, mock_chat, auth_client, user, db):
-        """Finalized resumes reject chat turns — user must reopen first."""
+    def test_finalized_resume_chat_remains_available(self, mock_chat, auth_client, user, db):
+        """Finalized resumes still accept chat turns for continued refinement.
+
+        Users can keep refining via chat post-finalize; subsequent finalize
+        calls overwrite the previous final state. Reopen is available for
+        explicit unlock workflows but is not required for chat.
+        """
         mock_chat.return_value = _make_chat_result(_CHAT_PAYLOAD)
         resume = _create_resume(user, is_finalized=True)
         response = auth_client.post(
@@ -654,8 +659,9 @@ class TestResumeChatView:
             {"message": "Update bullets."},
             format="json",
         )
-        assert response.status_code == 409
-        assert mock_chat.called is False  # gate short-circuits before Claude call
+        assert response.status_code == 200
+        assert "assistant_reply" in response.data
+        assert "roles" in response.data
 
     def test_no_session_anchor_returns_400(self, auth_client, user, db):
         resume = _create_resume(user, session_anchor=None)

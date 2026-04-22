@@ -264,12 +264,6 @@ class ResumeChatView(APIView):
         if resume is None:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if resume.is_finalized:
-            return Response(
-                {"error": "Resume is finalized. Reopen it to continue editing."},
-                status=status.HTTP_409_CONFLICT,
-            )
-
         message = request.data.get("message", "").strip()
         if not message:
             return Response(

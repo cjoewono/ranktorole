@@ -106,7 +106,7 @@
 
 - [x] Build `POST /api/v1/resumes/{id}/chat/` view (DB-backed chat history)
 - [x] Register URL in `resume_urls.py`
-- [x] Handle 409 if `is_finalized=True`
+- [x] ~~Handle 409 if `is_finalized=True`~~ (Resolved April 22 — chat stays open post-finalize; see PROJECTLOG.)
 - [x] Write pytest tests for chat endpoint
 
 ### Step 5 — Finalize Endpoint
@@ -378,7 +378,7 @@ None.
 - [x] Tailoring v2.2: HARD LIMITS block (H1-H4) promoted to standalone section before PRESERVATION RULES. H1: P&L phrases. H2: aggregate totals. H3: unearned credentials. H4: ATS Strong matches must be grounded.
 - [x] Option A — unearned-claim validator: `flag_unearned_claims` added to `grounding.py` covering P&L phrases (always flagged), unearned skills (source-check), unearned credentials (source-check), dollar aggregates (source-check). Wired into `flag_bullet`; `flag_summary` picks it up transitively. Zero frontend or API shape changes. +18 tests, 223 → 241.
 - [x] Bugfix: CHAT_UPDATED reducer dropped `bullet_flags`/`summary_flags` from chat-path responses. 2-line `??` pattern fix (matches AI_SUGGESTIONS_RECEIVED).
-- [x] ResumeChatView is_finalized contract aligned with DATA_CONTRACT: `POST /chat/` returns 409 when `is_finalized=True`. Reopen required to continue editing. DATA_CONTRACT.md updated.
+- [x] ~~ResumeChatView is_finalized contract aligned with DATA_CONTRACT: `POST /chat/` returns 409 when `is_finalized=True`. Reopen required to continue editing.~~ (Resolved April 22 — 409 gate removed; chat stays open post-finalize; see PROJECTLOG.)
 - [x] Option D — user responsibility banner in FinalizingEditor.jsx between Edit & Finalize header and Mission Headline input. Closes the honesty stack loop with explicit user ownership framing.
 - [x] Global 429 handler: `apiFetch` dispatches `daily-limit` CustomEvent on `DAILY_LIMIT_REACHED`; `AppShell` renders `<UpgradeModal variant="wait" />` globally. Removed duplicate local handling from `useResumeMachine` and dead reducer cases/state.
 - [x] Billing success/cancel frontend routes: BillingSuccess page with exponential backoff polling for tier activation, BillingCancel static page; lazy imports + route guards + AppShell mounts added

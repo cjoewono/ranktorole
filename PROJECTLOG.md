@@ -1602,5 +1602,28 @@ marker, does not lock chat).
 
 No code changes. No test changes. Test count unchanged at 241.
 
+---
+
+## April 22, 2026 | is_finalized gate removed from ResumeChatView
+
+**Status:** ✅ Code now matches the chat-stays-open decision.
+
+Prior state: ResumeChatView.post returned 409 when is_finalized=True.
+Test asserted 409. DATA_CONTRACT had internal contradictions.
+The April 21 decision in PROJECTLOG ("chat stays open after finalize")
+was documented but the code change was never made.
+
+This commit:
+
+- Removed the 5-line 409 gate from ResumeChatView.post
+- Rewrote test_finalized_resume_chat_returns_409 as
+  test_finalized_resume_chat_remains_available, asserting 200
+- Updated DATA_CONTRACT.md line ~562 (is_finalized storage
+  description) to reflect chat-stays-open
+- Resolved TASKS.md entries for the is_finalized gate work
+
+Test count unchanged at 234 (test rewritten in place, not added
+or removed).
+
 Project log maintained: github.com/cjoewono/ranktorole
-Last updated: April 21, 2026 — Option D banner shipped, is_finalized contract resolved, 241 tests passing
+Last updated: April 22, 2026 — is_finalized chat-stays-open shipped, 234 tests passing

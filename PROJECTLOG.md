@@ -2,6 +2,20 @@ RankToRole — Project Log
 
 ---
 
+## April 22, 2026 | refactor(frontend): add useContacts context to mirror useResumes pattern
+
+Added `ContactsContext.jsx` mirroring `ResumeContext.jsx`. Removed `useEffect`-based fetch from `Contacts.jsx`; data now flows through `useContacts()` hook. Mutator helpers (`createContact`, `updateContact`, `deleteContact`) live in the context with optimistic state updates and revert-on-error for deletes. `ContactsProvider` mounted in `App.jsx` alongside `ResumeProvider`. Both 234 backend tests and frontend build confirmed clean.
+
+---
+
+## April 22, 2026 | fix(frontend): removed orphan fetchOnetSkills call from ForgeSetup
+
+**Status:** ✅ Complete
+
+The `/api/v1/onet/search/` endpoint was deleted in the April 21 Recon rebuild but `ForgeSetup.jsx` still called it on MOS field blur, generating repeated 404s in production logs and showing a misleading "Leave field to auto-load matching skills from O\*NET" hint. Removed: `fetchOnetSkills` function, `handleMosBlur` async handler, three state declarations (`onetSkills`, `loadingSkills`, `onetFetched`), `onBlur={handleMosBlur}` attribute from the MOS input, and the preset-tag/loading-spinner JSX block. Updated the MOS helper text to "Optional. Used to inform civilian skill mapping." Selected skills chip display now renders from `selectedSkills` directly (was `customOnlySkills`, which was always identical since `onetSkills` was always `[]`). Manual skill addition path (`customSkill`/`addCustomSkill`) preserved unchanged. Backend test count unchanged at 234.
+
+---
+
 ## April 22, 2026 | Removed Callsign field from Register form; auto-derive username server-side
 
 **Status:** ✅ Complete

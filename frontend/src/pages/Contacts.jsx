@@ -1,11 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useContacts } from "../context/ContactsContext";
 import PageHeader from "../components/PageHeader";
-import {
-  listContacts,
-  createContact,
-  updateContact,
-  deleteContact,
-} from "../api/contacts";
 import { formatDate } from "../utils/formatDate";
 
 const EMPTY_FORM = { name: "", email: "", company: "", role: "", notes: "" };
@@ -34,22 +29,21 @@ function hashName(name) {
 }
 
 export default function Contacts() {
-  const [contacts, setContacts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const {
+    contacts,
+    loading,
+    error,
+    createContact,
+    updateContact,
+    deleteContact,
+  } = useContacts();
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState(null);
-
-  useEffect(() => {
-    listContacts()
-      .then(setContacts)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+  const [formError, setFormError] = useState(null);
 
   function startEdit(contact) {
     setEditingId(contact.id);
@@ -68,42 +62,29 @@ export default function Contacts() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setShowForm(false);
-    setError(null);
+    setFormError(null);
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError(null);
+    setFormError(null);
     setSaving(true);
     try {
       if (editingId) {
-        const updated = await updateContact(editingId, form);
-        setContacts((prev) =>
-          prev.map((c) => (c.id === editingId ? updated : c)),
-        );
+        await updateContact(editingId, form);
       } else {
-        const created = await createContact(form);
-        setContacts((prev) => [...prev, created]);
+        await createContact(form);
       }
       cancelForm();
     } catch (err) {
-      setError(err.message);
+      setFormError(err.message);
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(id) {
-    setContacts((prev) => prev.filter((c) => c.id !== id));
-    try {
-      await deleteContact(id);
-    } catch (err) {
-      setError(err.message);
-      // revert on error by re-fetching
-      listContacts()
-        .then(setContacts)
-        .catch(() => {});
-    }
+    await deleteContact(id);
   }
 
   function toggleExpand(id) {
@@ -140,9 +121,9 @@ export default function Contacts() {
       />
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-        {error && (
+        {(error || formError) && (
           <div className="bg-error-container text-on-error-container font-body text-sm px-4 py-3">
-            {error}
+            {error || formError}
           </div>
         )}
 

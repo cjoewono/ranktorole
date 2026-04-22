@@ -148,6 +148,10 @@ Fields are `blank=True` on partial fields because upload creates the record befo
 
 ## Frontend Architecture
 
+### Global Data Providers
+
+Resume and Contact data are accessed via React context providers (`ResumesProvider`, `ContactsProvider`) mounted in `App.jsx`, not via per-page `useEffect` fetches. Pages consume `useResumes()` and `useContacts()` hooks; all API calls and optimistic state updates live in the provider. This means data survives route transitions — navigating away from `/contacts` and back does not re-fetch.
+
 ### AppShell Pattern
 
 `App.jsx` renders an `AppShell` component that owns the persistent NavBar and mounts all

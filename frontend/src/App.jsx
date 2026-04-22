@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ResumeProvider } from "./context/ResumeContext";
+import { ContactsProvider } from "./context/ContactsContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NavBar from "./components/NavBar";
 import UpgradeModal from "./components/UpgradeModal";
@@ -140,25 +141,27 @@ export default function App() {
       <ErrorBoundary>
         <AuthProvider>
           <ResumeProvider>
-            <Suspense fallback={<Spinner />}>
-              <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route
-                  path="/auth/google/callback"
-                  element={<GoogleCallback />}
-                />
-                <Route path="/profile" element={<AppShell />} />
-                <Route path="/dashboard" element={<AppShell />} />
-                <Route path="/resume-builder" element={<AppShell />} />
-                <Route path="/recon" element={<AppShell />} />
-                <Route path="/contacts" element={<AppShell />} />
-                <Route path="/billing/success" element={<AppShell />} />
-                <Route path="/billing/cancel" element={<AppShell />} />
-                <Route path="*" element={<DefaultRedirect />} />
-              </Routes>
-            </Suspense>
+            <ContactsProvider>
+              <Suspense fallback={<Spinner />}>
+                <Routes>
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route
+                    path="/auth/google/callback"
+                    element={<GoogleCallback />}
+                  />
+                  <Route path="/profile" element={<AppShell />} />
+                  <Route path="/dashboard" element={<AppShell />} />
+                  <Route path="/resume-builder" element={<AppShell />} />
+                  <Route path="/recon" element={<AppShell />} />
+                  <Route path="/contacts" element={<AppShell />} />
+                  <Route path="/billing/success" element={<AppShell />} />
+                  <Route path="/billing/cancel" element={<AppShell />} />
+                  <Route path="*" element={<DefaultRedirect />} />
+                </Routes>
+              </Suspense>
+            </ContactsProvider>
           </ResumeProvider>
         </AuthProvider>
       </ErrorBoundary>

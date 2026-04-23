@@ -169,3 +169,8 @@ Resolved titles cached 30 days per `(branch, mos)` key. On miss, the prompt
 explicitly instructs Haiku to speak at branch level only and not invent
 specifics. This is a trust-critical control — veterans detect fabricated
 military titles immediately and lose product confidence.
+
+## Known Accepted Risks
+
+- **social-auth-app-django 5.4.2** (CVE-2025-61783, moderate): Held at 5.4.2 to preserve Django 4.2 LTS compatibility. The fix in 5.6.0 requires Django 5.1+. A Django 5.x migration is planned.
+- **pytest 8.3.3** (CVE-2025-71176, moderate): Dev-only testing dependency, not shipped to production. Upgrade to pytest 9 pending pytest-django compatibility.

@@ -29,17 +29,6 @@ const SECTORS = [
   "Other",
 ];
 
-async function fetchOnetSkills(keyword) {
-  try {
-    const data = await apiFetch(
-      `/api/v1/onet/search/?keyword=${encodeURIComponent(keyword)}`,
-    );
-    return data.skills || [];
-  } catch {
-    return [];
-  }
-}
-
 export default function ForgeSetup() {
   const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -53,9 +42,6 @@ export default function ForgeSetup() {
   const [selectedSkills, setSelectedSkills] = useState(
     user?.profile_context?.skills || [],
   );
-  const [onetSkills, setOnetSkills] = useState([]);
-  const [loadingSkills, setLoadingSkills] = useState(false);
-  const [onetFetched, setOnetFetched] = useState(false);
   const [customSkill, setCustomSkill] = useState("");
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -84,16 +70,6 @@ export default function ForgeSetup() {
       );
       setPortalLoading(false);
     }
-  }
-
-  async function handleMosBlur() {
-    if (!mos.trim()) return;
-    setLoadingSkills(true);
-    setOnetFetched(false);
-    const skills = await fetchOnetSkills(mos.trim());
-    setOnetSkills(skills);
-    setLoadingSkills(false);
-    setOnetFetched(true);
   }
 
   function toggleSkill(skill) {
@@ -185,12 +161,6 @@ export default function ForgeSetup() {
     }
   }
 
-  // O*NET preset tags + any custom skills not already in O*NET list
-  const presetTags = onetSkills;
-  const customOnlySkills = selectedSkills.filter(
-    (s) => !onetSkills.includes(s),
-  );
-
   return (
     <>
       <PageHeader
@@ -248,12 +218,11 @@ export default function ForgeSetup() {
                   type="text"
                   value={mos}
                   onChange={(e) => setMos(e.target.value)}
-                  onBlur={handleMosBlur}
                   placeholder="e.g., 11B, IT2, 3D0X4"
                   className="tactical-input"
                 />
                 <p className="font-label text-xs tracking-widest text-outline mt-1.5">
-                  Leave field to auto-load matching skills from O*NET
+                  Optional. Used to inform civilian skill mapping.
                 </p>
               </div>
             </div>
@@ -300,55 +269,10 @@ export default function ForgeSetup() {
                   )}
                 </div>
 
-                {/* O*NET preset tags */}
-                {loadingSkills && (
-                  <p className="font-label text-xs tracking-widest uppercase text-on-surface-variant">
-                    Scanning O*NET...
-                  </p>
-                )}
-
-                {!loadingSkills && onetFetched && presetTags.length === 0 && (
-                  <p className="font-label text-xs tracking-widest uppercase text-outline">
-                    No matching skills found for that code. Add your own below.
-                  </p>
-                )}
-
-                {!loadingSkills && presetTags.length > 0 && (
-                  <div>
-                    <p className="font-label text-xs tracking-widest uppercase text-outline mb-2">
-                      O*NET suggestions — tap to select
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {presetTags.map((skill) => {
-                        const isSelected = selectedSkills.includes(skill);
-                        return (
-                          <button
-                            key={skill}
-                            type="button"
-                            onClick={() => toggleSkill(skill)}
-                            className={
-                              isSelected
-                                ? "bg-primary/15 text-primary border border-primary/40 font-label text-xs tracking-wide px-3 py-1.5 rounded-sm transition-colors flex items-center gap-1.5"
-                                : "bg-surface-container-highest text-on-surface-variant border border-outline-variant font-label text-xs tracking-wide px-3 py-1.5 rounded-sm hover:border-primary/30 hover:text-on-surface transition-colors"
-                            }
-                          >
-                            {skill}
-                            {isSelected && (
-                              <span className="text-primary/60 text-xs leading-none">
-                                ×
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Custom-only skills (selected but not from O*NET list) */}
-                {customOnlySkills.length > 0 && (
+                {/* Selected skills */}
+                {selectedSkills.length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {customOnlySkills.map((skill) => (
+                    {selectedSkills.map((skill) => (
                       <button
                         key={skill}
                         type="button"

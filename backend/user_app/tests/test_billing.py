@@ -195,7 +195,7 @@ class TestPortalAllowlist:
     def test_portal_rejects_http_production_url(self, auth_client):
         r = auth_client.post(
             '/api/v1/billing/portal/',
-            data={'return_url': 'http://ranktorole.app/profile'},
+            data={'return_url': 'http://ranktorole.net/profile'},
             format='json',
         )
         assert r.status_code == 400
@@ -213,7 +213,7 @@ class TestPortalAllowlist:
         mock_portal.return_value = {'url': 'https://billing.stripe.com/p/session/abc'}
         r = auth_client.post(
             '/api/v1/billing/portal/',
-            data={'return_url': 'https://ranktorole.app/profile'},
+            data={'return_url': 'https://ranktorole.net/profile'},
             format='json',
         )
         assert r.status_code == 200

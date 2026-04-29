@@ -44,7 +44,7 @@ April 24, 2026
 
 ### Production (EC2)
 
-- `sudo certbot certonly --webroot -w /var/lib/letsencrypt -d ranktorole.app -d www.ranktorole.app`
+- `sudo certbot certonly --webroot -w /var/lib/letsencrypt -d ranktorole.net -d www.ranktorole.net`
 - `docker compose up -d db nginx frontend`
 - `docker compose run -d backend gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3`
 - `docker compose exec backend python manage.py migrate`
@@ -182,9 +182,9 @@ Raw `military_text` and `job_description` are NEVER passed after call 1.
 - Audit log: every status transition writes a `SubscriptionAuditLog` row (append-only, unique `stripe_event_id` for idempotency)
 - Env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `STRIPE_CHECKOUT_SUCCESS_URL`, `STRIPE_CHECKOUT_CANCEL_URL`
 - Profile page (`/profile`) hosts Manage Billing (Pro) and Upgrade to Pro (Free) buttons.
-- `PortalSessionView` enforces a `return_url` allowlist: `https://ranktorole.app/*` or `http://localhost:*`. Other URLs return 400.
+- `PortalSessionView` enforces a `return_url` allowlist: `https://ranktorole.net/*` or `http://localhost:*`. Other URLs return 400.
 - Production security headers (HSTS, SSL redirect, secure cookies, X-Frame-Options DENY) are gated on `not DEBUG` in `settings.py`.
-- **Secret promotion for EC2:** swap `STRIPE_SECRET_KEY` (`sk_test_…` → `sk_live_…`), create a dashboard-registered webhook endpoint at `https://ranktorole.app/api/v1/billing/webhook/`, copy the signing secret into `.env` as `STRIPE_WEBHOOK_SECRET`. The Stripe CLI webhook secret (`whsec_…` from `stripe listen`) does not validate live events.
+- **Secret promotion for EC2:** swap `STRIPE_SECRET_KEY` (`sk_test_…` → `sk_live_…`), create a dashboard-registered webhook endpoint at `https://ranktorole.net/api/v1/billing/webhook/`, copy the signing secret into `.env` as `STRIPE_WEBHOOK_SECRET`. The Stripe CLI webhook secret (`whsec_…` from `stripe listen`) does not validate live events.
 
 ## Common Pitfalls
 

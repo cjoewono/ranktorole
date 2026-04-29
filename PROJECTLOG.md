@@ -72,7 +72,7 @@ Five commits: `26d1be2` (billing success/cancel routes + AuthContext.refreshUser
 
 **Throttle scoping fix — real launch bug.** Anon 100/day throttle was being labeled `DAILY_LIMIT_REACHED`, blocking first-time visitor registration with a 75k-second retry-after. Fixed: scoped `DAILY_LIMIT_REACHED` to tiered user paths only; anon/login/register/billing_checkout 429s now pass through to DRF default. Caught during SSO regression investigation — would have killed acquisition on launch day.
 
-**Backend hardening (Prompt C):** `PortalSessionView` return_url allowlist (ranktorole.app + localhost only, 400 on other URLs, +5 tests), production security headers gated on `DEBUG=False` (HSTS preload, SSL redirect, secure cookies, X-Frame DENY, strict referrer), tier integrity sweep passing all 5 invariants (read-only serializer, no frontend tier writes, CheckoutThrottle on billing, PRO_STATUSES alignment, webhook auth-only).
+**Backend hardening (Prompt C):** `PortalSessionView` return_url allowlist (ranktorole.net + localhost only, 400 on other URLs, +5 tests), production security headers gated on `DEBUG=False` (HSTS preload, SSL redirect, secure cookies, X-Frame DENY, strict referrer), tier integrity sweep passing all 5 invariants (read-only serializer, no frontend tier writes, CheckoutThrottle on billing, PRO_STATUSES alignment, webhook auth-only).
 
 **Webhook E2E verification (real Stripe CLI forwarding).** Upgrade: checkout.session.completed + subscription.created/updated → AuditLog: inactive → active → incomplete → active. Cancel: subscription.deleted → active → canceled. Idempotent replay confirmed (3 duplicate .deleted events → no-ops). Free↔Pro UI state transitions verified in browser for both directions.
 
@@ -780,12 +780,12 @@ None. Dev still uses Vite on host + backend in Docker with runserver. Nginx is n
 
 ### Manual Steps Required (not in repo)
 
-1. DNS: Point `ranktorole.app` and `www.ranktorole.app` A records to EC2 public IP
+1. DNS: Point `ranktorole.net` and `www.ranktorole.net` A records to EC2 public IP
 2. EC2 security group: Confirm ports 80/443 open, 22 from your IP only, no 8000/5432
 3. Install Docker on EC2 if not already installed
 4. Install Certbot on EC2: `sudo apt install certbot`
-5. Create production `.env` on EC2 with `DEBUG=False`, rotated `SECRET_KEY`, real DB password, production `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_OAUTH_REDIRECT_URI=https://ranktorole.app/auth/google/callback`
-6. Google Cloud Console: Add `https://ranktorole.app/auth/google/callback` as authorized redirect URI
+5. Create production `.env` on EC2 with `DEBUG=False`, rotated `SECRET_KEY`, real DB password, production `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `GOOGLE_OAUTH_REDIRECT_URI=https://ranktorole.net/auth/google/callback`
+6. Google Cloud Console: Add `https://ranktorole.net/auth/google/callback` as authorized redirect URI
 7. Run Certbot to obtain cert
 8. Start Docker Compose, run migrations, verify end-to-end
 
@@ -983,13 +983,13 @@ changes — everything in this session is infrastructure, dependencies, or docs.
 
 All covered in ARCHITECTURE.md § SSL / HTTPS. Summary:
 
-1. DNS A records for `ranktorole.app` and `www.ranktorole.app` → EC2 public IP
+1. DNS A records for `ranktorole.net` and `www.ranktorole.net` → EC2 public IP
 2. Security group: ports 80/443 open to world; 22 from admin IP; no 8000 or 5432
 3. `apt install docker.io docker-compose-plugin certbot`
 4. Production `.env` on host with `DEBUG=False`, rotated `SECRET_KEY`, real DB password
-5. `sudo certbot certonly --standalone -d ranktorole.app -d www.ranktorole.app`
-6. Google Cloud Console — add `https://ranktorole.app/auth/google/callback` as authorized redirect
-7. Stripe dashboard — live webhook endpoint pointed at `https://ranktorole.app/api/v1/billing/webhook/`, signing secret copied into `.env`
+5. `sudo certbot certonly --standalone -d ranktorole.net -d www.ranktorole.net`
+6. Google Cloud Console — add `https://ranktorole.net/auth/google/callback` as authorized redirect
+7. Stripe dashboard — live webhook endpoint pointed at `https://ranktorole.net/api/v1/billing/webhook/`, signing secret copied into `.env`
 8. `0 */12 * * * certbot renew --quiet && docker compose exec nginx nginx -s reload` in crontab
 
 ---

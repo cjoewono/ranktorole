@@ -43,7 +43,7 @@ def _is_allowed_return_url(url: str) -> bool:
     """
     if not url or not isinstance(url, str):
         return False
-    if url.startswith('https://ranktorole.app/'):
+    if url.startswith('https://ranktorole.net/'):
         return True
     if url.startswith('http://localhost:'):
         return True

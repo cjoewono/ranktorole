@@ -522,7 +522,7 @@ on fully-grounded output.
 
 ## SSL / HTTPS (Production)
 
-- Certbot runs on EC2 host: `sudo certbot certonly --webroot -w /var/lib/letsencrypt -d ranktorole.app -d www.ranktorole.app`
+- Certbot runs on EC2 host: `sudo certbot certonly --webroot -w /var/lib/letsencrypt -d ranktorole.net -d www.ranktorole.net`
 - Nginx serves ACME challenge on port 80, redirects all else to 443
 - SSL certs mounted read-only into Nginx container via `/etc/letsencrypt` volume
 - Django trusts `X-Forwarded-Proto: https` header from Nginx (`SECURE_PROXY_SSL_HEADER`)

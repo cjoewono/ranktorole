@@ -95,10 +95,10 @@ Lazy daily reset: `_reset_if_new_day()` zeroes counters on first hit after UTC m
 
 - SSL terminated at Nginx — Django sees `X-Forwarded-Proto: https` via `SECURE_PROXY_SSL_HEADER`
 - Certbot (Let's Encrypt) runs on EC2 host, not in Docker
-- Cert path: `/etc/letsencrypt/live/ranktorole.app/`
+- Cert path: `/etc/letsencrypt/live/ranktorole.net/`
 - HSTS enabled in production (31,536,000 seconds / 1 year) — do not enable until SSL cert is confirmed working
 - HTTP → HTTPS redirect at both Nginx level and Django level (`SECURE_SSL_REDIRECT`)
-- `CSRF_TRUSTED_ORIGINS` must include `https://ranktorole.app` in production `.env`
+- `CSRF_TRUSTED_ORIGINS` must include `https://ranktorole.net` in production `.env`
 - Auto-renewal: `sudo certbot renew --quiet` via cron (every 12 hours)
 
 ## Billing (Stripe)
@@ -116,7 +116,7 @@ Lazy daily reset: `_reset_if_new_day()` zeroes counters on first hit after UTC m
 
 - PCI scope is SAQ A. The application never sees, stores, or transmits card data. All card entry is on Stripe-hosted Checkout.
 - `user.tier` is writable only by `StripeWebhookView`. Frontend observes tier via `GET /api/v1/auth/profile/` and never sets it.
-- `PortalSessionView` enforces a `return_url` allowlist: only `https://ranktorole.app/*` and `http://localhost:*` are accepted. All other values return 400.
+- `PortalSessionView` enforces a `return_url` allowlist: only `https://ranktorole.net/*` and `http://localhost:*` are accepted. All other values return 400.
 - `CheckoutSessionView` and `PortalSessionView` are both throttled at 5/min per user (`CheckoutThrottle`) to defeat card-testing and portal-session spamming.
 - Post-checkout, `/billing/success` polls `GET /api/v1/auth/profile/` to observe the webhook-driven tier flip. The `session_id` query parameter is displayed for diagnostics only and is never used to authorize a tier change.
 - Production security headers (HSTS with preload, SSL redirect, secure cookies, X-Frame-Options DENY) are set in `settings.py` when `DEBUG` is False.

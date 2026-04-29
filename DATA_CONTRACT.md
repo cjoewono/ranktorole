@@ -430,7 +430,7 @@ one yet.
 
 `return_url` must match one of:
 
-- `https://ranktorole.app/*` (production)
+- `https://ranktorole.net/*` (production)
 - `http://localhost:*` (development)
 
 Any other URL returns 400 `{"detail": "Invalid return_url."}`.

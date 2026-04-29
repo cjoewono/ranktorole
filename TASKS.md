@@ -282,23 +282,23 @@
 
 ### DNS + Infrastructure
 
-- [ ] Point `ranktorole.app` and `www.ranktorole.app` A records at EC2 public IP
+- [ ] Point `ranktorole.net` and `www.ranktorole.net` A records at EC2 public IP
 - [ ] Confirm EC2 security group: 80/443 open to world, 22 from admin IP only, no 8000 or 5432
 - [ ] Install `docker.io`, `docker-compose-plugin`, `certbot` on EC2
 
 ### Certificates
 
-- [ ] `sudo certbot certonly --standalone -d ranktorole.app -d www.ranktorole.app`
-- [ ] Verify cert files present at `/etc/letsencrypt/live/ranktorole.app/`
+- [ ] `sudo certbot certonly --standalone -d ranktorole.net -d www.ranktorole.net`
+- [ ] Verify cert files present at `/etc/letsencrypt/live/ranktorole.net/`
 - [ ] Add renewal cron: `0 */12 * * * certbot renew --quiet && docker compose exec nginx nginx -s reload`
 
 ### Application Config
 
 - [ ] Create production `.env` on host with `DEBUG=False`, rotated `SECRET_KEY`, real DB password, production `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`
-- [ ] Set `GOOGLE_OAUTH_REDIRECT_URI=https://ranktorole.app/auth/google/callback`
+- [ ] Set `GOOGLE_OAUTH_REDIRECT_URI=https://ranktorole.net/auth/google/callback`
 - [ ] Set `STRIPE_CHECKOUT_SUCCESS_URL` and `STRIPE_CHECKOUT_CANCEL_URL` to production URLs
-- [ ] Google Cloud Console: add `https://ranktorole.app/auth/google/callback` as authorized redirect
-- [ ] Stripe dashboard: add live webhook endpoint `https://ranktorole.app/api/v1/billing/webhook/` and copy signing secret into `.env`
+- [ ] Google Cloud Console: add `https://ranktorole.net/auth/google/callback` as authorized redirect
+- [ ] Stripe dashboard: add live webhook endpoint `https://ranktorole.net/api/v1/billing/webhook/` and copy signing secret into `.env`
 
 ### Deploy + Verify
 
@@ -385,7 +385,7 @@ None.
 - [x] AuthContext.refreshUser — new callback for polling user tier changes post-checkout
 - [x] Subscription section on Profile page — Manage Billing (Pro) and Upgrade to Pro (Free) buttons
 - [x] Throttle scoping fix (real launch bug): DAILY_LIMIT_REACHED scoped to tiered user paths only; anon/login/register/billing_checkout 429s pass through to DRF default. Would have blocked first-time visitor registration on launch day.
-- [x] Backend hardening: PortalSessionView return_url allowlist (ranktorole.app + localhost only, 400 on other, +5 tests), production security headers gated on DEBUG=False (HSTS preload, SSL redirect, secure cookies, X-Frame DENY, strict referrer)
+- [x] Backend hardening: PortalSessionView return_url allowlist (ranktorole.net + localhost only, 400 on other, +5 tests), production security headers gated on DEBUG=False (HSTS preload, SSL redirect, secure cookies, X-Frame DENY, strict referrer)
 - [x] Tier integrity sweep: all 5 invariants verified (read-only serializer, no frontend tier writes, CheckoutThrottle on billing, PRO_STATUSES alignment, webhook auth-only)
 - [x] Webhook E2E verified with real Stripe CLI forwarding: upgrade lifecycle (inactive→active→incomplete→active), cancel lifecycle (active→canceled), idempotent replay confirmed
 - [x] Test count: 226 → 233 (+7: 5 allowlist tests, 1 throttle scoping test, 1 other)
@@ -395,14 +395,14 @@ None.
 Remaining deploy blockers for April 24 launch (priority order):
 
 1. **Code review + refactor pass** — webhook instrumentation decision (commit or revert `logger.warning` lines added to `billing_views.py` webhook except blocks), duplicate subscription guard assessment, no-op audit log optimization
-2. **Secret rotation** — Anthropic API key, Google OAuth client secret, O\*NET API key, Django SECRET_KEY, Stripe test-mode secret key (exposed in session chat), Stripe webhook secret (swap CLI-generated → dashboard-registered endpoint at `https://ranktorole.app/api/v1/billing/webhook/`)
+2. **Secret rotation** — Anthropic API key, Google OAuth client secret, O\*NET API key, Django SECRET_KEY, Stripe test-mode secret key (exposed in session chat), Stripe webhook secret (swap CLI-generated → dashboard-registered endpoint at `https://ranktorole.net/api/v1/billing/webhook/`)
 3. **EC2 manual deploy** (Wednesday):
-   - DNS A records → ranktorole.app and www.ranktorole.app
+   - DNS A records → ranktorole.net and www.ranktorole.net
    - Security group: 80/443 open to world, 22 from admin IP only, no 8000/5432
    - Docker + Certbot install
    - Production .env (`DEBUG=False`, rotated keys, `REDIS_URL=redis://redis:6379/0`, Stripe live keys, production ALLOWED_HOSTS/CORS/CSRF)
    - Nginx webhook body passthrough (`proxy_request_buffering off` on `/api/v1/billing/webhook/` to preserve raw body for Stripe signature verification)
-   - Google OAuth redirect URI → `https://ranktorole.app/auth/google/callback` in Google Cloud Console + .env
+   - Google OAuth redirect URI → `https://ranktorole.net/auth/google/callback` in Google Cloud Console + .env
    - SSL via certbot + auto-renewal cron
 4. **Production smoke test** — register, login, upload, draft, chat, finalize, export PDF; Stripe Checkout → webhook → Pro tier flip; Career Recon brainstorm
 

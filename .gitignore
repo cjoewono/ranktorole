@@ -17,6 +17,7 @@ claude-mem.worktrees/
 COMPLETE/
 .env
 .env.local
+.env.production
 frontend/.vite/
 frontend/node_modules/
 frontend/dist/
